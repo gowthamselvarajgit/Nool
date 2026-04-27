@@ -1,36 +1,37 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.auth;
 
+import com.nool.backend.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "saree_owner")
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SareeOwner {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "owner_id")
+    @Column(name = "user_id")
     private Long id;
 
-    @Column(name = "owner_name", nullable = false)
-    private String ownerName;
-
-    @Column(name = "mobile_number", nullable = false, length = 15)
+    @Column(name = "mobile_number", nullable = false, unique = true, length = 15)
     private String mobileNumber;
 
-    @Column(name = "active", nullable = false)
-    private boolean active = true;
+    @Column(name = "password", nullable = false)
+    private String password;
 
-    @OneToOne
-    @JoinColumn(name = "user_id", unique = true)
-    private User user;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role;
+
+    @Column(name = "active_status", nullable = false)
+    private boolean active = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

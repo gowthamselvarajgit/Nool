@@ -1,4 +1,4 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.owner;
 
 import jakarta.persistence.*;
 import lombok.*;

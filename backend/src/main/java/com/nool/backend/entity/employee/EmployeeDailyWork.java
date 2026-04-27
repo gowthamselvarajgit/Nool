@@ -1,6 +1,5 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.employee;
 
-import com.nool.backend.enums.AttendanceStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,9 +8,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "attendance",
+        name = "employee_daily_work",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"employee_id", "attendance_date"})
+                @UniqueConstraint(columnNames = {"employee_id", "work_date"})
         }
 )
 @Getter
@@ -19,19 +18,21 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Attendance {
+public class EmployeeDailyWork {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "attendance_id")
+    @Column(name = "work_id")
     private Long id;
 
-    @Column(name = "attendance_date", nullable = false)
-    private LocalDate attendanceDate;
+    @Column(name = "work_date", nullable = false)
+    private LocalDate workDate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "attendance_status", nullable = false)
-    private AttendanceStatus attendanceStatus;
+    @Column(name = "fresh_saree_count", nullable = false)
+    private Integer freshCount;
+
+    @Column(name = "repolish_saree_count", nullable = false)
+    private Integer rePolishCount;
 
     @Column(name = "remarks")
     private String remarks;
@@ -56,4 +57,5 @@ public class Attendance {
     protected void onUpdate(){
         this.updatedAt = LocalDateTime.now();
     }
+
 }

@@ -1,4 +1,4 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.employee;
 
 import com.nool.backend.enums.PaymentMode;
 import jakarta.persistence.*;

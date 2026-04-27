@@ -1,42 +1,37 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.owner;
 
-import com.nool.backend.enums.PaymentMode;
+import com.nool.backend.entity.auth.User;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "owner_payments")
+@Table(name = "saree_owner")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class OwnerPayment {
+public class SareeOwner {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "payment_id")
+    @Column(name = "owner_id")
     private Long id;
 
-    @Column(name = "payment_date", nullable = false)
-    private LocalDate paymentDate;
+    @Column(name = "owner_name", nullable = false)
+    private String ownerName;
 
-    @Column(name = "amount_received", nullable = false)
-    private Integer amountReceived;
+    @Column(name = "mobile_number", nullable = false, length = 15)
+    private String mobileNumber;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_mode", nullable = false)
-    private PaymentMode paymentMode;
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
 
-    @Column(name = "remarks")
-    private String remarks;
-
-    @ManyToOne
-    @JoinColumn(name = "owner_id", nullable = false)
-    private SareeOwner sareeOwner;
+    @OneToOne
+    @JoinColumn(name = "user_id", unique = true)
+    private User user;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

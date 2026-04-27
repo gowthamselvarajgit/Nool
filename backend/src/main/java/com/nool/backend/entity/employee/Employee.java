@@ -1,37 +1,44 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.employee;
 
-import com.nool.backend.enums.Role;
+import com.nool.backend.entity.auth.User;
+import com.nool.backend.enums.EmployeeStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "employees")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class Employee {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
+    @Column(name = "employee_id")
     private Long id;
 
-    @Column(name = "mobile_number", nullable = false, unique = true, length = 15)
-    private String mobileNumber;
+    @Column(name = "employee_name", nullable = false)
+    private String name;
 
-    @Column(name = "password", nullable = false)
-    private String password;
+    @Column(name = "joining_date", nullable = false)
+    private LocalDate joiningDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private Role role;
+    @Column(name = "status", nullable = false)
+    private EmployeeStatus status;
 
-    @Column(name = "active_status", nullable = false)
-    private boolean active = true;
+    @Column(name = "polishing_rate", nullable = false)
+    private Double polishRate;
+
+    //login link
+    @OneToOne
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

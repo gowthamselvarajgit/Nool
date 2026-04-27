@@ -1,6 +1,6 @@
-package com.nool.backend.entity;
+package com.nool.backend.entity.employee;
 
-import com.nool.backend.enums.EmployeeStatus;
+import com.nool.backend.enums.AttendanceStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -8,36 +8,37 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "employees")
+@Table(
+        name = "attendance",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"employee_id", "attendance_date"})
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Employee {
+public class Attendance {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "employee_id")
+    @Column(name = "attendance_id")
     private Long id;
 
-    @Column(name = "employee_name", nullable = false)
-    private String name;
-
-    @Column(name = "joining_date", nullable = false)
-    private LocalDate joiningDate;
+    @Column(name = "attendance_date", nullable = false)
+    private LocalDate attendanceDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private EmployeeStatus status;
+    @Column(name = "attendance_status", nullable = false)
+    private AttendanceStatus attendanceStatus;
 
-    @Column(name = "polishing_rate", nullable = false)
-    private Double polishRate;
+    @Column(name = "remarks")
+    private String remarks;
 
-    //login link
-    @OneToOne
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
-    private User user;
+    @ManyToOne
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
