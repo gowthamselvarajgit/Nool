@@ -11,7 +11,7 @@ import java.time.LocalDate;
 @Data
 public class CreateEmployeeRequestDto {
     @NotBlank(message = "Employee name is required")
-    private String name;
+    private String employeeName;
 
     @NotNull(message = "Joining date is required")
     private LocalDate joiningDate;
