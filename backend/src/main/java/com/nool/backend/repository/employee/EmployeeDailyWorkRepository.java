@@ -17,6 +17,9 @@ public interface EmployeeDailyWorkRepository extends JpaRepository<EmployeeDaily
     @Query("SELECT SUM(w.freshCount) FROM EmployeeDailyWork w WHERE w.workDate = :workDate")
     Long sumFreshWorkByDate(LocalDate workDate);
 
+
     @Query("SELECT SUM(w.rePolishCount) FROM EmployeeDailyWork w WHERE w.workDate = :workDate")
     Long sumRePolishWorkByDate(LocalDate wordDate);
+
+    List<EmployeeDailyWork> findByEmployeeIdAndWorkDateBetween(Long employeeId, LocalDate fromDate, LocalDate toDate);
 }
