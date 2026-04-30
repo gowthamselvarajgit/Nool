@@ -25,7 +25,7 @@ public class OwnerPayment {
     private LocalDate paymentDate;
 
     @Column(name = "amount_received", nullable = false)
-    private Integer amountReceived;
+    private Double amountPaid;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_mode", nullable = false)
@@ -36,7 +36,7 @@ public class OwnerPayment {
 
     @ManyToOne
     @JoinColumn(name = "owner_id", nullable = false)
-    private SareeOwner sareeOwner;
+    private SareeOwner owner;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
