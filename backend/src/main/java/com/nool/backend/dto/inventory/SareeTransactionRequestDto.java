@@ -12,16 +12,19 @@ public class SareeTransactionRequestDto {
     @NotNull(message = "Owner id is required")
     private Long ownerId;
 
-    @NotNull(message = "Transaction date is required")
-    private LocalDate transactionDate;
+    @NotNull(message = "Received date is required")
+    private LocalDate receivedDate;
 
     @NotNull(message = "Received saree count is required")
-    @PositiveOrZero(message = "Received saree count cannot be negative")
-    private Integer receivedCount;
+    @PositiveOrZero(message = "Received quantity cannot be negative")
+    private Integer receivedQuantity;
+
+    @NotNull(message = "Returned date is required")
+    private LocalDate returnedDate;
 
     @NotNull(message = "Returned saree count is required")
     @PositiveOrZero(message = "Returned saree count cannot be negative")
-    private Integer returnedCount;
+    private Integer returnedQuantity;
 
     private String remarks;
 }

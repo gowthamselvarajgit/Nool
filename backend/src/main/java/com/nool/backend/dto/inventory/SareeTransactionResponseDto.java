@@ -11,7 +11,9 @@ public class SareeTransactionResponseDto {
     private Long transactionId;
     private Long ownerId;
     private String ownerName;
-    private LocalDate transactionDate;
-    private Integer returnedCount;
+    private LocalDate receivedDate;
+    private Integer receivedQuantity;
+    private LocalDate returnedDate;
+    private Integer returnedQuantity;
     private String remarks;
 }
