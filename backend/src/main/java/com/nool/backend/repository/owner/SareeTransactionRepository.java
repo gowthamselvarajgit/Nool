@@ -32,4 +32,29 @@ public interface SareeTransactionRepository extends JpaRepository<SareeTransacti
     Long sumTotalReturned(LocalDate fromDate, LocalDate toDate);
 
 
+    @Query("""
+           SELECT COALESCE(SUM(t.receivedQuantity), 0)
+           FROM SareeTransaction t
+           WHERE t.sareeOwner.id = :ownerId
+             AND t.receivedDate BETWEEN :fromDate AND :toDate
+           """)
+    Long sumReceivedByOwnerAndDateRange(
+            Long ownerId,
+            LocalDate fromDate,
+            LocalDate toDate
+    );
+
+
+    @Query("""
+           SELECT COALESCE(SUM(t.returnedQuantity), 0)
+           FROM SareeTransaction t
+           WHERE t.sareeOwner.id = :ownerId
+             AND t.returnedDate BETWEEN :fromDate AND :toDate
+           """)
+    Long sumReturnedByOwnerAndDateRange(
+            Long ownerId,
+            LocalDate fromDate,
+            LocalDate toDate
+    );
+
 }
