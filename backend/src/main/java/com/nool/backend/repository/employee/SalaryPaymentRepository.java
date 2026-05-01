@@ -17,6 +17,12 @@ public interface SalaryPaymentRepository extends JpaRepository<SalaryPayment, Lo
     List<SalaryPayment> findByPaymentDateBetween(LocalDate fromDate, LocalDate toDate);
 
     @Query("""
+            SELECT COALESCE(SUM(s.amountPaid), 0)
+            FROM SalaryPayment s
+            """)
+    Double sumTotalSalaryPaid();
+
+    @Query("""
            SELECT COALESCE(SUM(s.amountPaid), 0)
            FROM SalaryPayment s
            WHERE s.employee.id = :employeeId

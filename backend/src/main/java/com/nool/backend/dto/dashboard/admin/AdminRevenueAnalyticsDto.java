@@ -8,7 +8,8 @@ import java.time.LocalDate;
 @Data
 @Builder
 public class AdminRevenueAnalyticsDto {
-    private LocalDate date;
-    private Long totalFreshCount;
+    private LocalDate fromDate;
+    private LocalDate toDate;
+    private Long completedSarees;
     private Double totalRevenue;
 }
