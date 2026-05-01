@@ -28,4 +28,13 @@ public interface SalaryPaymentRepository extends JpaRepository<SalaryPayment, Lo
            WHERE s.employee.id = :employeeId
            """)
     Double sumTotalSalaryPaidByEmployee(Long employeeId);
+
+
+    @Query("""
+           SELECT MAX(s.paymentDate)
+           FROM SalaryPayment s
+           WHERE s.employee.id = :employeeId
+           """)
+    LocalDate findLastPaymentDateByEmployee(Long employeeId);
+
 }

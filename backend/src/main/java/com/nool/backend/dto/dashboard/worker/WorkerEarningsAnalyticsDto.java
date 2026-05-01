@@ -12,4 +12,6 @@ public class WorkerEarningsAnalyticsDto {
     private Integer freshWorkCount;
     private Integer repolishWorkCount;
     private Double earning;
+
+    private Boolean isAbsent;
 }
