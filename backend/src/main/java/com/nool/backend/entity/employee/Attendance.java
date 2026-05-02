@@ -53,6 +53,7 @@ public class Attendance {
         this.updatedAt = now;
     }
 
+    @PreUpdate
     protected void onUpdate(){
         this.updatedAt = LocalDateTime.now();
     }

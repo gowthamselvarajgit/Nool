@@ -33,8 +33,8 @@ public class AdminLeaveProductivityServiceImpl implements AdminLeaveProductivity
         return employees.stream()
                 .map(employee -> {
                     Long employeeId = employee.getId();
-                    long presentDays = attendanceRepository.countByEmployeeIdAndAttendanceDateBetweenAndStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.PRESENT);
-                    List<Attendance> absences = attendanceRepository.findByEmployeeIdAndAttendanceDateBetweenAndStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.ABSENT);
+                    long presentDays = attendanceRepository.countByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.PRESENT);
+                    List<Attendance> absences = attendanceRepository.findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.ABSENT);
                     long absentDays = absences.size();
                     List<LocalDate> absentDates = absences.stream().map(Attendance::getAttendanceDate).toList();
                     List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());

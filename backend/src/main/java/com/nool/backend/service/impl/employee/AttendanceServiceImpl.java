@@ -97,7 +97,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     public AttendanceSummaryDto getAttendanceSummary(Long employeeId, DateRangeDto dateRangeDto) {
         Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        List<Attendance> attendances = attendanceRepository.findEmployeeIdAndAttendanceDateBetween(employeeId, dateRangeDto.getFromDate(),dateRangeDto.getToDate());
+        List<Attendance> attendances = attendanceRepository.findByEmployeeIdAndAttendanceDateBetween(employeeId, dateRangeDto.getFromDate(),dateRangeDto.getToDate());
 
         long totalWorkingDays = attendances.size();
 

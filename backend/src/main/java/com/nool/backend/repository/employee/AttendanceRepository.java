@@ -12,29 +12,42 @@ import java.util.List;
 
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
+
     List<Attendance> findByAttendanceDate(LocalDate attendanceDate);
 
-    long countByAttendanceDateAndStatus(LocalDate attendanceDate, AttendanceStatus status);
+    long countByAttendanceDateAndAttendanceStatus(
+            LocalDate attendanceDate,
+            AttendanceStatus attendanceStatus
+    );
 
-    List<Attendance> findEmployeeIdAndAttendanceDateBetween(Long employeeId, LocalDate fromDate, LocalDate toDate);
-
-    @Query("SELECT COUNT(a) FROM Attendance a WHERE a.employee.id = :employeeId AND a.status = 'PRESENT'")
-    long countPresentDaysByEmployee(Long employeeId);
-
-
-    long countByEmployeeIdAndAttendanceDateBetweenAndStatus(
+    List<Attendance> findByEmployeeIdAndAttendanceDateBetween(
             Long employeeId,
             LocalDate fromDate,
-            LocalDate toDate,
+            LocalDate toDate
+    );
+
+    @Query("""
+           SELECT COUNT(a)
+           FROM Attendance a
+           WHERE a.employee.id = :employeeId
+             AND a.attendanceStatus = :status
+           """)
+    long countPresentDaysByEmployee(
+            Long employeeId,
             AttendanceStatus status
     );
 
-
-    List<Attendance> findByEmployeeIdAndAttendanceDateBetweenAndStatus(
+    long countByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(
             Long employeeId,
             LocalDate fromDate,
             LocalDate toDate,
-            AttendanceStatus status
+            AttendanceStatus attendanceStatus
     );
 
+    List<Attendance> findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(
+            Long employeeId,
+            LocalDate fromDate,
+            LocalDate toDate,
+            AttendanceStatus attendanceStatus
+    );
 }

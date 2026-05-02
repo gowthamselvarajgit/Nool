@@ -160,7 +160,7 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
                 .findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        List<Attendance> absences = attendanceRepository.findByEmployeeIdAndAttendanceDateBetweenAndStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.ABSENT);
+        List<Attendance> absences = attendanceRepository.findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.ABSENT);
         List<LocalDate> leaveDates = absences.stream()
                 .map(Attendance::getAttendanceDate)
                 .sorted()

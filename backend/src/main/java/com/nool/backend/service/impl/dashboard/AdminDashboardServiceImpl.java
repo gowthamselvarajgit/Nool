@@ -138,8 +138,8 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         long totalEmployees = employeeRepository.count();
         long activeEmployees = employeeRepository.countByStatus(EmployeeStatus.ACTIVE);
         long inactiveEmployees = employeeRepository.countByStatus(EmployeeStatus.LEFT);
-        long presentToday = attendanceRepository.countByAttendanceDateAndStatus(today, AttendanceStatus.PRESENT);
-        long absentToday = attendanceRepository.countByAttendanceDateAndStatus(today, AttendanceStatus.ABSENT);
+        long presentToday = attendanceRepository.countByAttendanceDateAndAttendanceStatus(today, AttendanceStatus.PRESENT);
+        long absentToday = attendanceRepository.countByAttendanceDateAndAttendanceStatus(today, AttendanceStatus.ABSENT);
         Long freshToday = employeeDailyWorkRepository.sumFreshWorkByDate(today);
         Long rePolishToday = employeeDailyWorkRepository.sumRePolishWorkByDate(today);
         Long totalFreshMonth = employeeDailyWorkRepository.sumFreshWorkByDateRange(startOfMonth,today);

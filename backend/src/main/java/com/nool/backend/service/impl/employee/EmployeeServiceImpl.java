@@ -24,14 +24,29 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final UserRepository userRepository;
 
     @Override
-    public void createEmployee(CreateEmployeeRequestDto requestDto) {
+    public EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto) {
+        if (employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
+            throw new RuntimeException("Employee with this mobile number already exists");
+        }
+
         Employee employee = Employee.builder()
                 .name(requestDto.getEmployeeName())
+                .mobileNumber(requestDto.getMobileNumber())
                 .joiningDate(requestDto.getJoiningDate())
                 .polishRate(requestDto.getPolishingRate())
                 .status(EmployeeStatus.ACTIVE).build();
 
-        employeeRepository.save(employee);
+        Employee saved = employeeRepository.save(employee);
+
+        return EmployeeResponseDto.builder()
+                .employeeId(saved.getId())
+                .employeeName(saved.getName())
+                .mobileNumber(saved.getMobileNumber())
+                .joiningDate(saved.getJoiningDate())
+                .polishingRate(saved.getPolishRate())
+                .status(saved.getStatus().name())
+                .build();
+
     }
 
     @Override

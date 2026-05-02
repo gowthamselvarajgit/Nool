@@ -5,7 +5,7 @@ import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.employee.*;
 
 public interface EmployeeService {
-    void createEmployee(CreateEmployeeRequestDto requestDto);
+    EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto);
 
     void updateEmployee(UpdateEmployeeRequestDto requestDto);
 

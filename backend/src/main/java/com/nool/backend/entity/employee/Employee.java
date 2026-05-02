@@ -25,6 +25,9 @@ public class Employee {
     @Column(name = "employee_name", nullable = false)
     private String name;
 
+    @Column(name = "mobile_number", nullable = false, unique = true)
+    private String mobileNumber;
+
     @Column(name = "joining_date", nullable = false)
     private LocalDate joiningDate;
 
@@ -37,7 +40,7 @@ public class Employee {
 
     //login link
     @OneToOne
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", nullable = true, unique = true)
     private User user;
 
     @Column(name = "created_at", nullable = false, updatable = false)
