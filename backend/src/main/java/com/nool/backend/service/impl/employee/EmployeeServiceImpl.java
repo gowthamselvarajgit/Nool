@@ -54,6 +54,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
         employee.setName(requestDto.getEmployeeName());
         employee.setPolishRate(requestDto.getPolishingRate());
+        employee.setMobileNumber(requestDto.getMobileNumber());
         employeeRepository.save(employee);
     }
 
@@ -72,6 +73,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .employeeName(employee.getName())
                 .joiningDate(employee.getJoiningDate())
                 .polishingRate(employee.getPolishRate())
+                .mobileNumber(employee.getMobileNumber())
                 .status(employee.getStatus().name())
                 .build();
     }

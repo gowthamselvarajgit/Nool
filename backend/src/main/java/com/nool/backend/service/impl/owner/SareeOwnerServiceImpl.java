@@ -2,11 +2,9 @@ package com.nool.backend.service.impl.owner;
 
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
-import com.nool.backend.dto.owner.CreateSareeOwnerRequestDto;
-import com.nool.backend.dto.owner.SareeOwnerListDto;
-import com.nool.backend.dto.owner.SareeOwnerResponseDto;
-import com.nool.backend.dto.owner.UpdateSareeOwnerRequestDto;
+import com.nool.backend.dto.owner.*;
 import com.nool.backend.entity.owner.SareeOwner;
+import com.nool.backend.enums.OwnerStatus;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.service.owner.SareeOwnerService;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +23,17 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
     private final SareeOwnerRepository sareeOwnerRepository;
     @Override
     public void createOwner(CreateSareeOwnerRequestDto requestDto) {
+
+
+        if (sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+            throw new RuntimeException("Owner with this mobile number already exists");
+        }
+
+
         SareeOwner sareeOwner = SareeOwner.builder()
                 .ownerName(requestDto.getOwnerName())
                 .mobileNumber(requestDto.getMobileNumber())
-                .active(true)
+                .status(OwnerStatus.ACTIVE)
                 .build();
 
         sareeOwnerRepository.save(sareeOwner);
@@ -49,9 +54,17 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .ownerId(sareeOwner.getId())
                 .ownerName(sareeOwner.getOwnerName())
                 .mobileNumber(sareeOwner.getMobileNumber())
-                .status(sareeOwner.isActive() ? "ACTIVE" : "INACTIVE")
+                .ownerStatus(sareeOwner.getStatus())
                 .build();
     }
+
+    @Override
+    public void updateOwnerStatus(OwnerStatusUpdateDto requestDto) {
+        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new RuntimeException("Owner Not Found"));
+        owner.setStatus(requestDto.getStatus());
+        sareeOwnerRepository.save(owner);
+    }
+
 
     @Override
     public PaginationResponseDto<SareeOwnerListDto> getOwnerList(PaginationRequestDto paginationRequestDto) {
@@ -70,7 +83,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                         .ownerId(sareeOwner.getId())
                         .ownerName(sareeOwner.getOwnerName())
                         .mobileNumber(sareeOwner.getMobileNumber())
-                        .status(sareeOwner.isActive() ? "ACTIVE" : "INACTIVE")
+                        .ownerStatus(sareeOwner.getStatus())
                         .build())
                 .collect(Collectors.toList());
 

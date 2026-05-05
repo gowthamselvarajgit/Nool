@@ -34,6 +34,7 @@ public class EmployeeController {
         return employeeService.getEmployeeById(employeeId);
     }
 
+    @PostMapping("/list")
     public PaginationResponseDto<EmployeeListResponse> getEmployeeList(@RequestBody PaginationRequestDto paginationRequestDto){
         return employeeService.getEmployeeList(paginationRequestDto);
     }

@@ -1,6 +1,7 @@
 package com.nool.backend.entity.owner;
 
 import com.nool.backend.entity.auth.User;
+import com.nool.backend.enums.OwnerStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,11 +24,12 @@ public class SareeOwner {
     @Column(name = "owner_name", nullable = false)
     private String ownerName;
 
-    @Column(name = "mobile_number", nullable = false, length = 15)
+    @Column(name = "mobile_number", unique = true, nullable = false, length = 15)
     private String mobileNumber;
 
-    @Column(name = "active", nullable = false)
-    private boolean active = true;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private OwnerStatus status;
 
     @OneToOne
     @JoinColumn(name = "user_id", unique = true)
