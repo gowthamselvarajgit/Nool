@@ -4,6 +4,7 @@ import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.dashboard.owner.OwnerDashboardSummaryDto;
 import com.nool.backend.dto.dashboard.owner.OwnerInventoryAnalyticsDto;
 import com.nool.backend.entity.owner.SareeOwner;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.OwnerPaymentRepository;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.repository.owner.SareeTransactionRepository;
@@ -25,7 +26,7 @@ public class OwnerDashboardServiceImpl implements OwnerDashboardService {
 
     @Override
     public OwnerDashboardSummaryDto getDashboardSummary(Long ownerId, DateRangeDto dateRangeDto) {
-        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new RuntimeException("Owner not found"));
+        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         Long totalSareesGiven = sareeTransactionRepository.sumReceivedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
         Long totalSareesReturned = sareeTransactionRepository.sumReturnedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());

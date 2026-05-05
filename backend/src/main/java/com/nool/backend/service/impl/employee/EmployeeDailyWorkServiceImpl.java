@@ -8,6 +8,7 @@ import com.nool.backend.dto.dailywork.EmployeeDailyWorkRequestDto;
 import com.nool.backend.dto.dailywork.EmployeeWorkSummaryDto;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.service.employee.EmployeeDailyWorkService;
@@ -29,7 +30,7 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
 
     @Override
     public EmployeeDailyWorkListDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {
-        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         EmployeeDailyWork employeeDailyWork = EmployeeDailyWork.builder()
                 .employee(employee)
                 .workDate(requestDto.getWorkDate())
@@ -88,7 +89,7 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
 
     @Override
     public EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 

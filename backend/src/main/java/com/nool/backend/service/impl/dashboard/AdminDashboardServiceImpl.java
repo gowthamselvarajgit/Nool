@@ -8,6 +8,7 @@ import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
 import com.nool.backend.enums.AttendanceStatus;
 import com.nool.backend.enums.EmployeeStatus;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
@@ -174,7 +175,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                     Long employeeId = entry.getKey();
                     Long freshCount = entry.getValue();
 
-                    Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+                    Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
                     return  freshCount * employee.getPolishRate();
                 })
                 .sum();

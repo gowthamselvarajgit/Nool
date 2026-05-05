@@ -11,6 +11,7 @@ import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
 import com.nool.backend.entity.employee.SalaryPayment;
 import com.nool.backend.enums.PaymentMode;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.repository.employee.SalaryPaymentRepository;
@@ -34,7 +35,7 @@ public class SalaryServiceImpl implements SalaryService {
 
     @Override
     public SalaryPaymentResponseDto paySalary(SalaryPaymentRequestDto requestDto) {
-        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         SalaryPayment salaryPayment = SalaryPayment.builder()
                 .employee(employee)
                 .fromDate(requestDto.getFromDate())
@@ -99,7 +100,7 @@ public class SalaryServiceImpl implements SalaryService {
 
     @Override
     public SalarySummaryDto getSalarySummary(Long employeeId, DateRangeDto dateRangeDto) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
         long totalFresh = works

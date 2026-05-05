@@ -10,6 +10,7 @@ import com.nool.backend.dto.payment.OwnerPaymentSummaryDto;
 import com.nool.backend.entity.owner.OwnerPayment;
 import com.nool.backend.entity.owner.SareeOwner;
 import com.nool.backend.enums.PaymentMode;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.OwnerPaymentRepository;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.repository.owner.SareeTransactionRepository;
@@ -35,7 +36,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
 
     @Override
     public OwnerPaymentResponseDto recordPayment(OwnerPaymentRequestDto requestDto) {
-        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new RuntimeException("Owner not found"));
+        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         OwnerPayment payment = OwnerPayment.builder()
                 .owner(owner)
@@ -96,7 +97,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
     @Override
     public OwnerPaymentSummaryDto getPaymentSummary(Long ownerId, DateRangeDto dateRangeDto) {
 
-        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new RuntimeException("Owner not found"));
+        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         Double totalPaid = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
         Long totalReturned = sareeTransactionRepository.sumTotalReturned(dateRangeDto.getFromDate(), dateRangeDto.getToDate());

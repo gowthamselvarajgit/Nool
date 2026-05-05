@@ -9,6 +9,7 @@ import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
 import com.nool.backend.enums.AttendanceStatus;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
@@ -35,7 +36,7 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
 
     @Override
     public WorkerDashboardSummaryDto getDashboardSummary(Long employeeId, DateRangeDto dateRangeDto) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
         long totalWorkDays = works.stream()
@@ -93,7 +94,7 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
 
     @Override
     public List<WorkerEarningsAnalyticsDto> getEarningAnalytics(Long employeeId, DateRangeDto dateRangeDto) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
         Map<LocalDate, List<EmployeeDailyWork>> worksByDate = works.stream()
                 .collect(Collectors.groupingBy(EmployeeDailyWork::getWorkDate));
@@ -129,7 +130,7 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
     @Override
     public WorkerEarningsAnalyticsDto getEarningForMonth(Long employeeId, MonthYearRequestDto monthYearRequestDto) {
 
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         YearMonth yearMonth = YearMonth.of(monthYearRequestDto.getYear(), monthYearRequestDto.getMonth());
         LocalDate start = yearMonth.atDay(1);
@@ -158,7 +159,7 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
     public WorkerLeaveAnalyticsDto getLeaveAnalytics(Long employeeId, DateRangeDto dateRangeDto) {
         Employee employee = employeeRepository
                 .findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Employee not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         List<Attendance> absences = attendanceRepository.findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.ABSENT);
         List<LocalDate> leaveDates = absences.stream()

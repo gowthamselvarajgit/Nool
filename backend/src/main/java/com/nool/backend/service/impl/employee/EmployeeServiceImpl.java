@@ -5,6 +5,8 @@ import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.employee.*;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.enums.EmployeeStatus;
+import com.nool.backend.exception.DuplicateResourceException;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.service.employee.EmployeeService;
@@ -27,7 +29,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto) {
         if (employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
-            throw new RuntimeException("Employee with this mobile number already exists");
+            throw new DuplicateResourceException("Employee with this mobile number already exists");
         }
 
         Employee employee = Employee.builder()
@@ -54,10 +56,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void updateEmployee(UpdateEmployeeRequestDto requestDto) {
 
-        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         if (!employee.getMobileNumber().equals(requestDto.getMobileNumber()) &&
         employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
-            throw new RuntimeException("Mobile number already in use");
+            throw new DuplicateResourceException("Mobile number already in use");
         }
         employee.setName(requestDto.getEmployeeName());
         employee.setPolishRate(requestDto.getPolishingRate());
@@ -68,14 +70,14 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Transactional
     @Override
     public void updateEmployeeStatus(EmployeeStatusUpdateDto requestDto) {
-        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         employee.setStatus(requestDto.getStatus());
         employeeRepository.save(employee);
     }
 
     @Override
     public EmployeeResponseDto getEmployeeById(Long employeeId) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(()->new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(()->new ResourceNotFoundException("Employee not found"));
         return EmployeeResponseDto.builder()
                 .employeeId(employee.getId())
                 .employeeName(employee.getName())

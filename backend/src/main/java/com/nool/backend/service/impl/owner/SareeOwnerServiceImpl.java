@@ -5,6 +5,8 @@ import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.owner.*;
 import com.nool.backend.entity.owner.SareeOwner;
 import com.nool.backend.enums.OwnerStatus;
+import com.nool.backend.exception.DuplicateResourceException;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.service.owner.SareeOwnerService;
 import jakarta.transaction.Transactional;
@@ -26,7 +28,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
     public SareeOwnerResponseDto createOwner(CreateSareeOwnerRequestDto requestDto) {
 
         if (sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
-            throw new RuntimeException("Owner with this mobile number already exists");
+            throw new DuplicateResourceException("Owner with this mobile number already exists");
         }
 
 
@@ -50,10 +52,10 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
     @Transactional
     @Override
     public void updateOwner(UpdateSareeOwnerRequestDto requestDto) {
-        SareeOwner sareeOwner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new RuntimeException("Saree Owner not found"));
+        SareeOwner sareeOwner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new ResourceNotFoundException("Saree Owner not found"));
 
         if (!sareeOwner.getMobileNumber().equals(requestDto.getMobileNumber()) && sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())){
-            throw new RuntimeException("Mobile number already in use");
+            throw new DuplicateResourceException("Mobile number already in use");
         }
         sareeOwner.setOwnerName(requestDto.getOwnerName());
         sareeOwner.setMobileNumber(requestDto.getMobileNumber());
@@ -62,7 +64,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
 
     @Override
     public SareeOwnerResponseDto getOwnerById(Long ownerId) {
-        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new RuntimeException("Owner not found"));
+        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
         return SareeOwnerResponseDto.builder()
                 .ownerId(sareeOwner.getId())
                 .ownerName(sareeOwner.getOwnerName())
@@ -74,7 +76,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
     @Transactional
     @Override
     public void updateOwnerStatus(OwnerStatusUpdateDto requestDto) {
-        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new RuntimeException("Owner Not Found"));
+        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new ResourceNotFoundException("Owner Not Found"));
         owner.setStatus(requestDto.getStatus());
         sareeOwnerRepository.save(owner);
     }

@@ -10,6 +10,7 @@ import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.enums.AttendanceStatus;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.service.employee.AttendanceService;
@@ -30,7 +31,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final EmployeeRepository employeeRepository;
     @Override
     public AttendanceResponseDto markAttendance(AttendanceRequestDto requestDto) {
-        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         Attendance attendance = Attendance.builder()
                 .employee(employee)
                 .attendanceDate(requestDto.getAttendanceDate())
@@ -50,7 +51,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public AttendanceResponseDto getAttendanceById(Long attendanceId) {
-        Attendance attendance = attendanceRepository.findById(attendanceId).orElseThrow(()->new RuntimeException("Attendance not found"));
+        Attendance attendance = attendanceRepository.findById(attendanceId).orElseThrow(()->new ResourceNotFoundException("Attendance not found"));
 
         return AttendanceResponseDto.builder()
                 .attendanceId(attendance.getId())
@@ -95,7 +96,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public AttendanceSummaryDto getAttendanceSummary(Long employeeId, DateRangeDto dateRangeDto) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         List<Attendance> attendances = attendanceRepository.findByEmployeeIdAndAttendanceDateBetween(employeeId, dateRangeDto.getFromDate(),dateRangeDto.getToDate());
 

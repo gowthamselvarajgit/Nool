@@ -9,6 +9,8 @@ import com.nool.backend.dto.inventory.SareeTransactionRequestDto;
 import com.nool.backend.dto.inventory.SareeTransactionResponseDto;
 import com.nool.backend.entity.owner.SareeOwner;
 import com.nool.backend.entity.owner.SareeTransaction;
+import com.nool.backend.exception.BadRequestException;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.repository.owner.SareeTransactionRepository;
 import com.nool.backend.service.owner.SareeInventoryService;
@@ -33,7 +35,7 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
             SareeTransactionRequestDto requestDto) {
 
         SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId())
-                .orElseThrow(() -> new RuntimeException("Owner not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         boolean hasReceived =
                 requestDto.getReceivedDate() != null &&
@@ -44,7 +46,7 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
                         requestDto.getReturnedQuantity() != null;
 
         if (!hasReceived && !hasReturned) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "At least received or returned details must be provided");
         }
 
@@ -116,7 +118,7 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
             DateRangeDto dateRangeDto) {
 
         SareeOwner owner = sareeOwnerRepository.findById(ownerId)
-                .orElseThrow(() -> new RuntimeException("Owner not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         List<SareeTransaction> received =
                 sareeTransactionRepository.findBySareeOwnerIdAndReceivedDateBetween(
