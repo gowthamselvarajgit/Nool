@@ -2,7 +2,6 @@ package com.nool.backend.repository.employee;
 
 import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.enums.AttendanceStatus;
-import org.springframework.cglib.core.Local;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;

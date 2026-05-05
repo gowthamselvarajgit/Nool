@@ -34,7 +34,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         Attendance attendance = Attendance.builder()
                 .employee(employee)
                 .attendanceDate(requestDto.getAttendanceDate())
-                .attendanceStatus(AttendanceStatus.valueOf(requestDto.getStatus()))
+                .attendanceStatus(requestDto.getStatus())
                 .build();
 
         Attendance savedAttendance = attendanceRepository.save(attendance);
@@ -44,7 +44,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .employeeId(employee.getId())
                 .employeeName(employee.getName())
                 .attendanceDate(savedAttendance.getAttendanceDate())
-                .status(savedAttendance.getAttendanceStatus().name())
+                .status(savedAttendance.getAttendanceStatus())
                 .build();
     }
 
@@ -57,7 +57,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .employeeId(attendance.getEmployee().getId())
                 .employeeName(attendance.getEmployee().getName())
                 .attendanceDate(attendance.getAttendanceDate())
-                .status(attendance.getAttendanceStatus().name())
+                .status(attendance.getAttendanceStatus())
                 .build();
     }
 
@@ -81,7 +81,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                         .employeeId(attendance.getEmployee().getId())
                         .employeeName(attendance.getEmployee().getName())
                         .attendanceDate(attendance.getAttendanceDate())
-                        .status(attendance.getAttendanceStatus().name())
+                        .status(attendance.getAttendanceStatus())
                         .build()).collect(Collectors.toList());
         return PaginationResponseDto.<AttendanceListResponseDto>builder()
                 .content(content)

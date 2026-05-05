@@ -1,5 +1,6 @@
 package com.nool.backend.dto.attendance;
 
+import com.nool.backend.enums.AttendanceStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -12,5 +13,5 @@ public class AttendanceResponseDto {
     private Long employeeId;
     private String employeeName;
     private LocalDate attendanceDate;
-    private String status;
+    private AttendanceStatus status;
 }

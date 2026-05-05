@@ -1,5 +1,6 @@
 package com.nool.backend.dto.attendance;
 
+import com.nool.backend.enums.AttendanceStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -16,5 +17,5 @@ public class AttendanceRequestDto {
     private LocalDate attendanceDate;
 
     @NotBlank(message = "Attendance status is required")
-    private String status;
+    private AttendanceStatus status;
 }
