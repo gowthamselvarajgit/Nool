@@ -8,6 +8,7 @@ import com.nool.backend.enums.EmployeeStatus;
 import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.service.employee.EmployeeService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,19 +50,26 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     }
 
+    @Transactional
     @Override
     public void updateEmployee(UpdateEmployeeRequestDto requestDto) {
+
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+        if (!employee.getMobileNumber().equals(requestDto.getMobileNumber()) &&
+        employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
+            throw new RuntimeException("Mobile number already in use");
+        }
         employee.setName(requestDto.getEmployeeName());
         employee.setPolishRate(requestDto.getPolishingRate());
         employee.setMobileNumber(requestDto.getMobileNumber());
         employeeRepository.save(employee);
     }
 
+    @Transactional
     @Override
     public void updateEmployeeStatus(EmployeeStatusUpdateDto requestDto) {
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
-        employee.setStatus(EmployeeStatus.valueOf(requestDto.getStatus()));
+        employee.setStatus(requestDto.getStatus());
         employeeRepository.save(employee);
     }
 

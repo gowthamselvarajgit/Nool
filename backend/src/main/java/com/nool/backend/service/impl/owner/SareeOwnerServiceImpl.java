@@ -7,6 +7,7 @@ import com.nool.backend.entity.owner.SareeOwner;
 import com.nool.backend.enums.OwnerStatus;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.service.owner.SareeOwnerService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,8 +23,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
 
     private final SareeOwnerRepository sareeOwnerRepository;
     @Override
-    public void createOwner(CreateSareeOwnerRequestDto requestDto) {
-
+    public SareeOwnerResponseDto createOwner(CreateSareeOwnerRequestDto requestDto) {
 
         if (sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
             throw new RuntimeException("Owner with this mobile number already exists");
@@ -36,12 +36,25 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .status(OwnerStatus.ACTIVE)
                 .build();
 
-        sareeOwnerRepository.save(sareeOwner);
+        SareeOwner saved = sareeOwnerRepository.save(sareeOwner);
+
+        return SareeOwnerResponseDto.builder()
+                .ownerId(saved.getId())
+                .ownerName(saved.getOwnerName())
+                .mobileNumber(saved.getMobileNumber())
+                .ownerStatus(saved.getStatus())
+                .build();
+
     }
 
+    @Transactional
     @Override
     public void updateOwner(UpdateSareeOwnerRequestDto requestDto) {
         SareeOwner sareeOwner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new RuntimeException("Saree Owner not found"));
+
+        if (!sareeOwner.getMobileNumber().equals(requestDto.getMobileNumber()) && sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())){
+            throw new RuntimeException("Mobile number already in use");
+        }
         sareeOwner.setOwnerName(requestDto.getOwnerName());
         sareeOwner.setMobileNumber(requestDto.getMobileNumber());
         sareeOwnerRepository.save(sareeOwner);
@@ -58,6 +71,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .build();
     }
 
+    @Transactional
     @Override
     public void updateOwnerStatus(OwnerStatusUpdateDto requestDto) {
         SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new RuntimeException("Owner Not Found"));

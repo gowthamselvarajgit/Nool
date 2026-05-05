@@ -1,5 +1,6 @@
 package com.nool.backend.dto.employee;
 
+import com.nool.backend.enums.EmployeeStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -10,6 +11,6 @@ public class EmployeeStatusUpdateDto {
     private Long employeeId;
 
     @NotBlank(message = "Employee status is required")
-    private String status;
+    private EmployeeStatus status;
 
 }

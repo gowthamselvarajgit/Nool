@@ -15,8 +15,8 @@ public class SareeOwnerController {
     private final SareeOwnerService sareeOwnerService;
 
     @PostMapping
-    public void createOwner(@Valid @RequestBody CreateSareeOwnerRequestDto requestDto){
-        sareeOwnerService.createOwner(requestDto);
+    public SareeOwnerResponseDto createOwner(@Valid @RequestBody CreateSareeOwnerRequestDto requestDto){
+        return sareeOwnerService.createOwner(requestDto);
     }
 
     @GetMapping("/{ownerId}")

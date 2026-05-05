@@ -1,0 +1,35 @@
+package com.nool.backend.controller.owner;
+
+import com.nool.backend.dto.common.DateRangeDto;
+import com.nool.backend.dto.common.PaginationRequestDto;
+import com.nool.backend.dto.common.PaginationResponseDto;
+import com.nool.backend.dto.payment.OwnerPaymentHistoryDto;
+import com.nool.backend.dto.payment.OwnerPaymentRequestDto;
+import com.nool.backend.dto.payment.OwnerPaymentResponseDto;
+import com.nool.backend.dto.payment.OwnerPaymentSummaryDto;
+import com.nool.backend.service.owner.OwnerPaymentService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/owner-payments")
+@RequiredArgsConstructor
+public class OwnerPaymentController {
+    private final OwnerPaymentService ownerPaymentService;
+
+    @PostMapping
+    public OwnerPaymentResponseDto recordPayment(@Valid @RequestBody OwnerPaymentRequestDto requestDto){
+        return ownerPaymentService.recordPayment(requestDto);
+    }
+
+    @PostMapping("/owner/{ownerId}/history")
+    public PaginationResponseDto<OwnerPaymentHistoryDto> getPaymentHistory(@PathVariable Long ownerId, @RequestBody PaginationRequestDto paginationRequestDto){
+        return ownerPaymentService.getPaymentHistory(ownerId, paginationRequestDto);
+    }
+
+    @PostMapping("/owner/{ownerId}/summary")
+    public OwnerPaymentSummaryDto getOwnerPaymentSummaryDto(@PathVariable Long ownerId, @Valid @RequestBody DateRangeDto dateRangeDto){
+        return ownerPaymentService.getPaymentSummary(ownerId, dateRangeDto);
+    }
+}

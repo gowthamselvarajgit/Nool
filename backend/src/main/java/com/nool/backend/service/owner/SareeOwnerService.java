@@ -8,7 +8,7 @@ import java.awt.image.VolatileImage;
 
 public interface SareeOwnerService {
 
-    void createOwner(CreateSareeOwnerRequestDto requestDto);
+    SareeOwnerResponseDto createOwner(CreateSareeOwnerRequestDto requestDto);
 
     void updateOwner(UpdateSareeOwnerRequestDto requestDto);
 
