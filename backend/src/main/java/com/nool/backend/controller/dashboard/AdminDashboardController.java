@@ -13,23 +13,26 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AdminDashboardController {
     private final AdminDashboardService adminDashboardService;
-    private final AdminLeaveProductivitySummary adminLeaveProductivitySummary;
 
+    //✅ ADMIN DASHBOARD SUMMARY API – PASSED
     @GetMapping("/summary")
     public AdminDashboardSummaryDto getDashboardSummary(){
         return adminDashboardService.getDashboardSummary();
     }
 
+    //✅ ADMIN REVENUE ANALYTICS API – PASSED
     @PostMapping("/revenue")
     public AdminRevenueAnalyticsDto getRevenueAnalytics(@Valid @RequestBody DateRangeDto dateRangeDto){
         return adminDashboardService.getRevenueAnalytics(dateRangeDto);
     }
 
+    //✅ ADMIN MONTHLY REVENUE ANALYTICS API – PASSED
     @PostMapping("/revenue/month")
     public AdminRevenueAnalyticsDto getRevenueForMonth(@Valid @RequestBody MonthYearRequestDto monthYearRequestDto){
         return adminDashboardService.getRevenueForMonth(monthYearRequestDto);
     }
 
+    //✅ ADMIN WORKFORCE ANALYTICS API – PASSED
     @PostMapping("/workforce")
     public AdminWorkforceAnalyticsDto getWorkforceAnalytics(@Valid @RequestBody DateRangeDto dateRangeDto){
         return adminDashboardService.getWorkforceAnalytics(dateRangeDto);

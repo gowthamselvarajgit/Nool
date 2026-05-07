@@ -5,6 +5,7 @@ import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.dailywork.EmployeeDailyWorkListDto;
 import com.nool.backend.dto.dailywork.EmployeeDailyWorkRequestDto;
+import com.nool.backend.dto.dailywork.EmployeeDailyWorkResponseDto;
 import com.nool.backend.dto.dailywork.EmployeeWorkSummaryDto;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
@@ -29,7 +30,7 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
 
 
     @Override
-    public EmployeeDailyWorkListDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {
+    public EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
         EmployeeDailyWork employeeDailyWork = EmployeeDailyWork.builder()
                 .employee(employee)
@@ -40,14 +41,14 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
 
         EmployeeDailyWork saved = employeeDailyWorkRepository.save(employeeDailyWork);
         double  todayEarning = saved.getFreshCount() * employee.getPolishRate();
-        return EmployeeDailyWorkListDto.builder()
+        return EmployeeDailyWorkResponseDto.builder()
                 .workId(saved.getId())
                 .employeeId(employee.getId())
                 .employeeName(employee.getName())
                 .workDate(saved.getWorkDate())
                 .freshCount(saved.getFreshCount())
                 .rePolishCount(saved.getRePolishCount())
-                .todayEarning(todayEarning)
+                .todayRevenue(todayEarning)
                 .build();
     }
 

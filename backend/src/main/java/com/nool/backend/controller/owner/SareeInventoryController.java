@@ -18,21 +18,25 @@ import org.springframework.web.bind.annotation.*;
 public class SareeInventoryController {
     private final SareeInventoryService sareeInventoryService;
 
+    //✅ SAREE INVENTORY TRANSACTION API – PASSED
     @PostMapping("/transaction")
     public SareeTransactionResponseDto recordSareeTransaction(@Valid @RequestBody SareeTransactionRequestDto requestDto){
         return sareeInventoryService.recordSareeTransaction(requestDto);
     }
 
+    //✅ SAREE INVENTORY LIST API – PASSED
     @PostMapping("/owner/{ownerId}/transactions")
     public PaginationResponseDto<SareeTransactionResponseDto> getOwnerTransactions(@PathVariable Long ownerId, @RequestBody PaginationRequestDto paginationRequestDto){
         return sareeInventoryService.getSareeTransactionList(ownerId, paginationRequestDto);
     }
 
+    //✅ SAREE INVENTORY SUMMARY API – PASSED
     @PostMapping("/owner/{ownerId}/summary")
     public OwnerInventorySummaryDto getOwnerInventorySummary(@PathVariable Long ownerId, @Valid @RequestBody DateRangeDto dateRangeDto){
         return sareeInventoryService.getOwnerInventorySummary(ownerId, dateRangeDto);
     }
 
+    //✅ SAREE INVENTORY OVERALL SUMMARY API – PASSED
     @PostMapping("/summary")
     public SareeInventorySummaryDto getOverallInventorySummary(@Valid @RequestBody DateRangeDto dateRangeDto){
         return sareeInventoryService.getOverallInventorySummary(dateRangeDto);

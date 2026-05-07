@@ -14,26 +14,31 @@ import org.springframework.web.bind.annotation.*;
 public class EmployeeController {
     private final EmployeeService employeeService;
 
+    //✅ EMPLOYEE CREATE API – PASSED
     @PostMapping
     public EmployeeResponseDto createEmployee(@Valid @RequestBody CreateEmployeeRequestDto requestDto){
         return employeeService.createEmployee(requestDto);
     }
 
+    //✅ EMPLOYEE UPDATE API – PASSED
     @PutMapping
     public void updateEmployee(@Valid @RequestBody UpdateEmployeeRequestDto requestDto){
         employeeService.updateEmployee(requestDto);
     }
 
+    //✅ EMPLOYEE STATUS UPDATE API – PASSED
     @PatchMapping("/status")
     public void updateEmployeeStatus(@Valid @RequestBody EmployeeStatusUpdateDto requestDto){
         employeeService.updateEmployeeStatus(requestDto);
     }
 
+    //✅ EMPLOYEE GET API – PASSED
     @GetMapping("/{employeeId}")
     public EmployeeResponseDto getEmployeeById(@PathVariable Long employeeId){
         return employeeService.getEmployeeById(employeeId);
     }
 
+    //✅ EMPLOYEE LIST API – PASSED
     @PostMapping("/list")
     public PaginationResponseDto<EmployeeListResponse> getEmployeeList(@RequestBody PaginationRequestDto paginationRequestDto){
         return employeeService.getEmployeeList(paginationRequestDto);

@@ -5,10 +5,11 @@ import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.dailywork.EmployeeDailyWorkListDto;
 import com.nool.backend.dto.dailywork.EmployeeDailyWorkRequestDto;
+import com.nool.backend.dto.dailywork.EmployeeDailyWorkResponseDto;
 import com.nool.backend.dto.dailywork.EmployeeWorkSummaryDto;
 
 public interface EmployeeDailyWorkService {
-    EmployeeDailyWorkListDto addDailyWork(EmployeeDailyWorkRequestDto requestDto);
+    EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto);
 
     PaginationResponseDto<EmployeeDailyWorkListDto> getDailyWorkList(PaginationRequestDto paginationRequestDto);
 

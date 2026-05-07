@@ -18,16 +18,19 @@ import org.springframework.web.bind.annotation.*;
 public class SalaryPaymentController {
     private final SalaryService salaryService;
 
+    //✅ Salary Payment API – PASSED
     @PostMapping
     public SalaryPaymentResponseDto paySalary(@Valid @RequestBody SalaryPaymentRequestDto requestDto){
         return salaryService.paySalary(requestDto);
     }
 
+    //✅ Salary Payment History API – PASSED
     @PostMapping("/employee/{employeeId}/history")
     public PaginationResponseDto<SalaryPaymentHistoryDto> getSalaryPaymentHistory(@PathVariable Long employeeId, @RequestBody PaginationRequestDto paginationRequestDto){
         return salaryService.getSalaryPaymentHistory(employeeId, paginationRequestDto);
     }
 
+    //✅ Salary Summary API – PASSED
     @PostMapping("/employee/{employeeId}/summary")
     public SalarySummaryDto getSalarySummary(@PathVariable Long employeeId,@Valid @RequestBody DateRangeDto dateRangeDto){
         return salaryService.getSalarySummary(employeeId, dateRangeDto);

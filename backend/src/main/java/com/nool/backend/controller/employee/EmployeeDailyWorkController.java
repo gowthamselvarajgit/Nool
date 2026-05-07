@@ -20,16 +20,19 @@ public class EmployeeDailyWorkController {
 
     private final EmployeeDailyWorkService employeeDailyWorkService;
 
+    //✅ EMPLOYEE DAILY WORK ADD API – PASSED
     @PostMapping
-    public EmployeeDailyWorkListDto addDailyWork(@Valid @RequestBody EmployeeDailyWorkRequestDto requestDto){
+    public EmployeeDailyWorkResponseDto addDailyWork(@Valid @RequestBody EmployeeDailyWorkRequestDto requestDto){
         return employeeDailyWorkService.addDailyWork(requestDto);
     }
 
+    //✅ EMPLOYEE DAILY WORK LIST API – PASSED
     @PostMapping("/list")
     public PaginationResponseDto<EmployeeDailyWorkListDto> getDailyWorkList(@RequestBody PaginationRequestDto paginationRequestDto){
         return employeeDailyWorkService.getDailyWorkList(paginationRequestDto);
     }
 
+    //✅ EMPLOYEE DAILY WORK SUMMARY API – PASSED
     @PostMapping("/employee/{employeeId}/summary")
     public EmployeeWorkSummaryDto getEmployeeWorkSummary(@PathVariable Long employeeId, @Valid @RequestBody DateRangeDto dateRangeDto){
         return employeeDailyWorkService.getEmployeeWorkSummary(employeeId, dateRangeDto);

@@ -10,7 +10,6 @@ import com.nool.backend.dto.salary.SalarySummaryDto;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
 import com.nool.backend.entity.employee.SalaryPayment;
-import com.nool.backend.enums.PaymentMode;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
@@ -33,35 +32,48 @@ public class SalaryServiceImpl implements SalaryService {
     private final EmployeeDailyWorkRepository employeeDailyWorkRepository;
     private final SalaryPaymentRepository salaryPaymentRepository;
 
+    /* =========================
+       ✅ PAY SALARY
+       ========================= */
     @Override
     public SalaryPaymentResponseDto paySalary(SalaryPaymentRequestDto requestDto) {
-        Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        Employee employee = employeeRepository.findById(requestDto.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
         SalaryPayment salaryPayment = SalaryPayment.builder()
                 .employee(employee)
                 .fromDate(requestDto.getFromDate())
                 .toDate(requestDto.getToDate())
                 .amountPaid(requestDto.getAmountPaid())
-                .paymentMode(PaymentMode.valueOf(requestDto.getPaymentMode()))
+                .paymentMode(requestDto.getPaymentMode()) // ✅ enum directly
                 .paymentDate(requestDto.getPaymentDate())
                 .remarks(requestDto.getRemarks())
                 .build();
-        SalaryPayment savedSalaryPayment = salaryPaymentRepository.save(salaryPayment);
+
+        SalaryPayment saved = salaryPaymentRepository.save(salaryPayment);
 
         return SalaryPaymentResponseDto.builder()
-                .salaryPaymentId(savedSalaryPayment.getId())
+                .salaryPaymentId(saved.getId())
                 .employeeId(employee.getId())
                 .employeeName(employee.getName())
-                .amountPaid(savedSalaryPayment.getAmountPaid())
-                .paymentMode(savedSalaryPayment.getPaymentMode().name())
-                .paymentDate(savedSalaryPayment.getPaymentDate())
-                .fromDate(savedSalaryPayment.getFromDate())
-                .toDate(savedSalaryPayment.getToDate())
-                .remarks(savedSalaryPayment.getRemarks())
+                .amountPaid(saved.getAmountPaid())
+                .paymentMode(saved.getPaymentMode().name())
+                .paymentDate(saved.getPaymentDate())
+                .fromDate(saved.getFromDate())
+                .toDate(saved.getToDate())
+                .remarks(saved.getRemarks())
                 .build();
     }
 
+    /* =========================
+       ✅ SALARY PAYMENT HISTORY
+       ========================= */
     @Override
-    public PaginationResponseDto<SalaryPaymentHistoryDto> getSalaryPaymentHistory(Long employeeId, PaginationRequestDto paginationRequestDto) {
+    public PaginationResponseDto<SalaryPaymentHistoryDto> getSalaryPaymentHistory(
+            Long employeeId,
+            PaginationRequestDto paginationRequestDto) {
+
         PageRequest pageRequest = PageRequest.of(
                 paginationRequestDto.getPage(),
                 paginationRequestDto.getSize(),
@@ -69,13 +81,12 @@ public class SalaryServiceImpl implements SalaryService {
                 paginationRequestDto.getSortBy()
         );
 
-        Page<SalaryPayment> page = salaryPaymentRepository.findByEmployeeId(employeeId, pageRequest);
+        Page<SalaryPayment> page =
+                salaryPaymentRepository.findByEmployeeId(employeeId, pageRequest);
 
-        List<SalaryPaymentHistoryDto> content = page
-                .getContent()
+        List<SalaryPaymentHistoryDto> content = page.getContent()
                 .stream()
-                .map(salaryPayment -> SalaryPaymentHistoryDto
-                        .builder()
+                .map(salaryPayment -> SalaryPaymentHistoryDto.builder()
                         .salaryPaymentId(salaryPayment.getId())
                         .employeeId(salaryPayment.getEmployee().getId())
                         .employeeName(salaryPayment.getEmployee().getName())
@@ -98,21 +109,35 @@ public class SalaryServiceImpl implements SalaryService {
                 .build();
     }
 
+    /* =========================
+       ✅ SALARY SUMMARY
+       ========================= */
     @Override
     public SalarySummaryDto getSalarySummary(Long employeeId, DateRangeDto dateRangeDto) {
-        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-        List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
-        long totalFresh = works
-                .stream()
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        List<EmployeeDailyWork> works =
+                employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(
+                        employeeId,
+                        dateRangeDto.getFromDate(),
+                        dateRangeDto.getToDate()
+                );
+
+        long totalFresh = works.stream()
                 .mapToLong(EmployeeDailyWork::getFreshCount)
                 .sum();
 
         double totalEarnings = totalFresh * employee.getPolishRate();
 
-        Double totalPaid = salaryPaymentRepository.sumTotalSalaryPaidByEmployee(employeeId);
+        // ✅ Null-safe paid amount
+        Double totalPaidBoxed =
+                salaryPaymentRepository.sumTotalSalaryPaidByEmployee(employeeId);
+        double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
 
-        double pendingSalary = totalEarnings - totalPaid;
+        // ✅ Pending salary must NEVER be negative
+        double pendingSalary = Math.max(totalEarnings - totalPaid, 0);
 
         return SalarySummaryDto.builder()
                 .employeeId(employeeId)

@@ -18,16 +18,19 @@ import org.springframework.web.bind.annotation.*;
 public class OwnerPaymentController {
     private final OwnerPaymentService ownerPaymentService;
 
+    //✅ OWNER PAYMENT ADD API – PASSED
     @PostMapping
     public OwnerPaymentResponseDto recordPayment(@Valid @RequestBody OwnerPaymentRequestDto requestDto){
         return ownerPaymentService.recordPayment(requestDto);
     }
 
+    //✅ OWNER PAYMENT HISTORY API – PASSED
     @PostMapping("/owner/{ownerId}/history")
     public PaginationResponseDto<OwnerPaymentHistoryDto> getPaymentHistory(@PathVariable Long ownerId, @RequestBody PaginationRequestDto paginationRequestDto){
         return ownerPaymentService.getPaymentHistory(ownerId, paginationRequestDto);
     }
 
+    //✅ OWNER PAYMENT SUMMARY API – PASSED
     @PostMapping("/owner/{ownerId}/summary")
     public OwnerPaymentSummaryDto getOwnerPaymentSummaryDto(@PathVariable Long ownerId, @Valid @RequestBody DateRangeDto dateRangeDto){
         return ownerPaymentService.getPaymentSummary(ownerId, dateRangeDto);

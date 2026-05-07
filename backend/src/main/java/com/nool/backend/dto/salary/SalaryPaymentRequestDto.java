@@ -1,5 +1,6 @@
 package com.nool.backend.dto.salary;
 
+import com.nool.backend.enums.PaymentMode;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
@@ -26,7 +27,7 @@ public class SalaryPaymentRequestDto {
     private LocalDate paymentDate;
 
     @NotNull(message = "Payment mode is required")
-    private String paymentMode;
+    private PaymentMode paymentMode;
 
     private String remarks;
 }

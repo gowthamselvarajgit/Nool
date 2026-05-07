@@ -16,6 +16,6 @@ public class AttendanceRequestDto {
     @NotNull(message = "Attendance date is required")
     private LocalDate attendanceDate;
 
-    @NotBlank(message = "Attendance status is required")
+    @NotNull(message = "Attendance status is required")
     private AttendanceStatus status;
 }

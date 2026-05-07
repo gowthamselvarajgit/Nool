@@ -9,7 +9,6 @@ import com.nool.backend.dto.payment.OwnerPaymentResponseDto;
 import com.nool.backend.dto.payment.OwnerPaymentSummaryDto;
 import com.nool.backend.entity.owner.OwnerPayment;
 import com.nool.backend.entity.owner.SareeOwner;
-import com.nool.backend.enums.PaymentMode;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.OwnerPaymentRepository;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
@@ -34,14 +33,19 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
     private final SareeOwnerRepository sareeOwnerRepository;
     private final SareeTransactionRepository sareeTransactionRepository;
 
+    /* =========================
+       ✅ RECORD OWNER PAYMENT
+       ========================= */
     @Override
     public OwnerPaymentResponseDto recordPayment(OwnerPaymentRequestDto requestDto) {
-        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId()).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
+
+        SareeOwner owner = sareeOwnerRepository.findById(requestDto.getOwnerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         OwnerPayment payment = OwnerPayment.builder()
                 .owner(owner)
                 .amountPaid(requestDto.getAmountPaid())
-                .paymentMode(PaymentMode.valueOf(requestDto.getPaymentMode()))
+                .paymentMode(requestDto.getPaymentMode()) // ✅ enum directly (NO valueOf)
                 .paymentDate(requestDto.getPaymentDate())
                 .remarks(requestDto.getRemarks())
                 .build();
@@ -59,19 +63,24 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                 .build();
     }
 
+    /* =========================
+       ✅ OWNER PAYMENT HISTORY
+       ========================= */
     @Override
-    public PaginationResponseDto<OwnerPaymentHistoryDto> getPaymentHistory(Long ownerId, PaginationRequestDto paginationRequestDto) {
+    public PaginationResponseDto<OwnerPaymentHistoryDto> getPaymentHistory(
+            Long ownerId,
+            PaginationRequestDto paginationRequestDto) {
+
         PageRequest pageRequest = PageRequest.of(
-                        paginationRequestDto.getPage(),
-                        paginationRequestDto.getSize(),
-                        Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
-                        paginationRequestDto.getSortBy()
-                );
+                paginationRequestDto.getPage(),
+                paginationRequestDto.getSize(),
+                Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+                paginationRequestDto.getSortBy()
+        );
 
         Page<OwnerPayment> page = ownerPaymentRepository.findByOwnerId(ownerId, pageRequest);
 
-        List<OwnerPaymentHistoryDto> content = page
-                .getContent()
+        List<OwnerPaymentHistoryDto> content = page.getContent()
                 .stream()
                 .map(p -> OwnerPaymentHistoryDto.builder()
                         .paymentId(p.getId())
@@ -94,20 +103,44 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                 .build();
     }
 
+    /* =========================
+       ✅ OWNER PAYMENT SUMMARY
+       ========================= */
     @Override
     public OwnerPaymentSummaryDto getPaymentSummary(Long ownerId, DateRangeDto dateRangeDto) {
 
-        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
+        SareeOwner owner = sareeOwnerRepository.findById(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
-        Double totalPaid = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
-        Long totalReturned = sareeTransactionRepository.sumTotalReturned(dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+        // ✅ Null-safe paid amount
+        Double totalPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
+        double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
 
-        double totalPayable = totalReturned * RATE_PER_SAREE;
-        double pendingAmount = totalPayable - totalPaid;
+        // ✅ Owner-wise, date-wise inventory calculation
+        Long totalReceivedBoxed = sareeTransactionRepository.sumTotalReceivedByOwner(
+                ownerId,
+                dateRangeDto.getFromDate(),
+                dateRangeDto.getToDate()
+        );
+
+        Long totalReturnedBoxed = sareeTransactionRepository.sumTotalReturnedByOwner(
+                ownerId,
+                dateRangeDto.getFromDate(),
+                dateRangeDto.getToDate()
+        );
+
+        long totalReceived = totalReceivedBoxed == null ? 0 : totalReceivedBoxed;
+        long totalReturned = totalReturnedBoxed == null ? 0 : totalReturnedBoxed;
+
+        long netSarees = totalReceived - totalReturned;
+        double totalPayable = netSarees * RATE_PER_SAREE;
+
+        // ✅ NEVER allow negative pending
+        double pendingAmount = Math.max(totalPayable - totalPaid, 0);
 
         return OwnerPaymentSummaryDto.builder()
                 .ownerId(ownerId)
-                .ownerName(sareeOwner.getOwnerName())
+                .ownerName(owner.getOwnerName())
                 .totalAmountPayable(totalPayable)
                 .totalAmountPaid(totalPaid)
                 .pendingAmount(pendingAmount)

@@ -1,5 +1,6 @@
 package com.nool.backend.dto.payment;
 
+import com.nool.backend.enums.PaymentMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -18,7 +19,7 @@ public class OwnerPaymentRequestDto {
     private Double amountPaid;
 
     @NotNull(message = "Payment mode is required")
-    private String paymentMode;
+    private PaymentMode paymentMode;
 
     @NotNull(message = "Payment date is required")
     private LocalDate paymentDate;

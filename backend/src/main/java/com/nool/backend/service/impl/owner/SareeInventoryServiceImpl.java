@@ -39,15 +39,21 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
 
         boolean hasReceived =
                 requestDto.getReceivedDate() != null &&
-                        requestDto.getReceivedQuantity() != null;
+                        requestDto.getReceivedQuantity() != null &&
+                        requestDto.getReceivedQuantity() > 0;
 
         boolean hasReturned =
                 requestDto.getReturnedDate() != null &&
-                        requestDto.getReturnedQuantity() != null;
+                        requestDto.getReturnedQuantity() != null &&
+                        requestDto.getReturnedQuantity() > 0;
 
         if (!hasReceived && !hasReturned) {
             throw new BadRequestException(
                     "At least received or returned details must be provided");
+        }
+
+        if (requestDto.getReturnedDate() != null && (requestDto.getReturnedQuantity() == null || requestDto.getReturnedQuantity() <= 0)){
+            throw new BadRequestException("Returned quantity must be greater than zero when returned date is provided");
         }
 
         SareeTransaction transaction = SareeTransaction.builder()

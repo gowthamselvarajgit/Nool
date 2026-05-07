@@ -19,11 +19,13 @@ import java.util.List;
 public class AdminLeaveProductivityController {
     private final AdminLeaveProductivityService adminLeaveProductivityService;
 
+    //✅ ADMIN EMPLOYEE LEAVE & PRODUCTIVITY API – PASSED
     @PostMapping("/employees")
     public List<AdminEmployeeLeaveProductivityDto> getEmployeeLeaveProductivity(@Valid @RequestBody DateRangeDto dateRangeDto){
         return adminLeaveProductivityService.getEmployeeLeaveProductivity(dateRangeDto);
     }
 
+    //✅ ADMIN LEAVE & PRODUCTIVITY SUMMARY API – PASSED
     @PostMapping("/summary")
     public AdminLeaveProductivitySummary getLeaveProductivitySummary(@Valid @RequestBody DateRangeDto dateRangeDto){
         return adminLeaveProductivityService.getLeaveProductivitySummary(dateRangeDto);
