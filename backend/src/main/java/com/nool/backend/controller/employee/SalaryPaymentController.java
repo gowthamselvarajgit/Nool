@@ -35,4 +35,22 @@ public class SalaryPaymentController {
     public SalarySummaryDto getSalarySummary(@PathVariable Long employeeId,@Valid @RequestBody DateRangeDto dateRangeDto){
         return salaryService.getSalarySummary(employeeId, dateRangeDto);
     }
+
+    @PostMapping("/summary")
+    public SalarySummaryDto getMySalarySummary(
+            @Valid @RequestBody DateRangeDto dateRangeDto){
+
+        return salaryService.getMySalarySummary(dateRangeDto);
+    }
+
+
+    @PostMapping("/history")
+    public PaginationResponseDto<SalaryPaymentHistoryDto>
+    getMySalaryPaymentHistory(
+            @RequestBody PaginationRequestDto paginationRequestDto){
+
+        return salaryService.getMySalaryPaymentHistory(paginationRequestDto);
+    }
+
+
 }

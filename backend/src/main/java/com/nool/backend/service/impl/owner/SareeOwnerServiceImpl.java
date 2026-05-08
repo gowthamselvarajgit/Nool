@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.owner;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.owner.*;
@@ -110,6 +111,22 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
                 .last(page.isLast())
+                .build();
+    }
+
+    @Override
+    public SareeOwnerResponseDto getMyProfile() {
+        Long ownerId = CurrentUserUtil.getOwnerId();
+        if (ownerId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
+        return SareeOwnerResponseDto.builder()
+                .ownerId(sareeOwner.getId())
+                .ownerName(sareeOwner.getOwnerName())
+                .mobileNumber(sareeOwner.getMobileNumber())
+                .ownerStatus(sareeOwner.getStatus())
                 .build();
     }
 }

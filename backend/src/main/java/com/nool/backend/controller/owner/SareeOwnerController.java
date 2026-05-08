@@ -43,4 +43,12 @@ public class SareeOwnerController {
     public PaginationResponseDto<SareeOwnerListDto> getOwnerList(@Valid @RequestBody PaginationRequestDto paginationRequestDto){
         return sareeOwnerService.getOwnerList(paginationRequestDto);
     }
+
+
+    @GetMapping("/me")
+    public SareeOwnerResponseDto getMyProfile(){
+        return sareeOwnerService.getMyProfile();
+    }
+
+
 }

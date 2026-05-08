@@ -35,4 +35,20 @@ public class OwnerPaymentController {
     public OwnerPaymentSummaryDto getOwnerPaymentSummaryDto(@PathVariable Long ownerId, @Valid @RequestBody DateRangeDto dateRangeDto){
         return ownerPaymentService.getPaymentSummary(ownerId, dateRangeDto);
     }
+
+
+    @PostMapping("/history")
+    public PaginationResponseDto<OwnerPaymentHistoryDto>
+    getMyPaymentHistory(@RequestBody PaginationRequestDto paginationRequestDto){
+
+        return ownerPaymentService.getMyPaymentHistory(paginationRequestDto);
+    }
+
+    @PostMapping("/summary")
+    public OwnerPaymentSummaryDto getMyPaymentSummary(
+            @Valid @RequestBody DateRangeDto dateRangeDto){
+
+        return ownerPaymentService.getMyPaymentSummary(dateRangeDto);
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.owner;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -145,5 +146,25 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                 .totalAmountPaid(totalPaid)
                 .pendingAmount(pendingAmount)
                 .build();
+    }
+
+    @Override
+    public PaginationResponseDto<OwnerPaymentHistoryDto> getMyPaymentHistory(PaginationRequestDto paginationRequestDto) {
+        Long ownerId = CurrentUserUtil.getOwnerId();
+        if (ownerId == null){
+            throw new RuntimeException("Access denied");
+        }
+
+        return getPaymentHistory(ownerId, paginationRequestDto);
+    }
+
+    @Override
+    public OwnerPaymentSummaryDto getMyPaymentSummary(DateRangeDto dateRangeDto) {
+        Long ownerId = CurrentUserUtil.getOwnerId();
+        if (ownerId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        return getPaymentSummary(ownerId, dateRangeDto);
     }
 }

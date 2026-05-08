@@ -12,5 +12,6 @@ public interface AttendanceService {
     AttendanceResponseDto markAttendance(AttendanceRequestDto requestDto);
     AttendanceResponseDto getAttendanceById(Long attendanceId);
     PaginationResponseDto<AttendanceListResponseDto> getAttendanceList(PaginationRequestDto paginationRequestDto);
-    AttendanceSummaryDto getAttendanceSummary(Long employeeId, DateRangeDto dateRangeDto);
+    AttendanceSummaryDto getAttendanceSummaryByEmployee(Long employeeId, DateRangeDto dateRangeDto);
+    AttendanceSummaryDto getMyAttendanceSummary(DateRangeDto dateRangeDto);
 }

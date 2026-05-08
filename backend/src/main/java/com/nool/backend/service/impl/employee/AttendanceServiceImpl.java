@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.employee;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.attendance.AttendanceListResponseDto;
 import com.nool.backend.dto.attendance.AttendanceRequestDto;
 import com.nool.backend.dto.attendance.AttendanceResponseDto;
@@ -95,7 +96,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     @Override
-    public AttendanceSummaryDto getAttendanceSummary(Long employeeId, DateRangeDto dateRangeDto) {
+    public AttendanceSummaryDto getAttendanceSummaryByEmployee(Long employeeId, DateRangeDto dateRangeDto) {
         Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         List<Attendance> attendances = attendanceRepository.findByEmployeeIdAndAttendanceDateBetween(employeeId, dateRangeDto.getFromDate(),dateRangeDto.getToDate());
@@ -114,5 +115,31 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .absentDays(absentDays)
                 .attendancePercentage(attendancePercentage)
                 .build();
+    }
+
+    @Override
+    public AttendanceSummaryDto getMyAttendanceSummary(DateRangeDto dateRangeDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+
+        if (employeeId == null){
+            throw new RuntimeException("Access denied");
+        }
+
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(()->new ResourceNotFoundException("Employee not found"));
+        List<Attendance> attendances = attendanceRepository.findByEmployeeIdAndAttendanceDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+        long totalWorkingDays = attendances.size();
+        long absentDays = attendances.stream()
+                .filter(a -> a.getAttendanceStatus() == AttendanceStatus.ABSENT)
+                .count();
+        double attendancePercentage = totalWorkingDays == 0 ? 0 : ((double) (totalWorkingDays - absentDays) / totalWorkingDays) * 100;
+
+        return AttendanceSummaryDto.builder()
+                .employeeId(employeeId)
+                .employeeName(employee.getName())
+                .totalWorkingDays(totalWorkingDays)
+                .absentDays(absentDays)
+                .attendancePercentage(attendancePercentage)
+                .build();
+
     }
 }

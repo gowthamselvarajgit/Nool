@@ -19,4 +19,15 @@ public interface SareeInventoryService {
     OwnerInventorySummaryDto getOwnerInventorySummary(Long ownerId, DateRangeDto dateRangeDto);
 
     SareeInventorySummaryDto getOverallInventorySummary(DateRangeDto dateRangeDto);
+
+    PaginationResponseDto<SareeTransactionResponseDto>
+    getMySareeTransactionList(
+            PaginationRequestDto paginationRequestDto
+    );
+
+    OwnerInventorySummaryDto
+    getMyInventorySummary(
+            DateRangeDto dateRangeDto
+    );
+
 }

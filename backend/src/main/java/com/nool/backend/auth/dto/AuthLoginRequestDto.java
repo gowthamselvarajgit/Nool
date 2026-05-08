@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class LoginRequestDto {
+public class AuthLoginRequestDto {
 
     @NotBlank(message = "Mobile number is required")
     @Size(min = 10, max = 15, message = "Mobile number must be valid")

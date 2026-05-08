@@ -7,4 +7,5 @@ import com.nool.backend.dto.dashboard.owner.OwnerInventoryAnalyticsDto;
 public interface OwnerDashboardService {
     OwnerDashboardSummaryDto getDashboardSummary(Long ownerId, DateRangeDto dateRangeDto);
     OwnerInventoryAnalyticsDto getInventoryAnalytics(Long ownerId, DateRangeDto dateRangeDto);
+    OwnerDashboardSummaryDto getMyDashboard(DateRangeDto dateRangeDto);
 }

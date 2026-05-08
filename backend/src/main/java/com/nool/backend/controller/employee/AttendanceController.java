@@ -39,6 +39,11 @@ public class AttendanceController {
     //✅ ATTENDANCE SUMMARY API – PASSED
     @PostMapping("/employee/{employeeId}/summary")
     public AttendanceSummaryDto getAttendanceSummary(@PathVariable Long employeeId, @Valid @RequestBody DateRangeDto dateRangeDto){
-        return attendanceService.getAttendanceSummary(employeeId, dateRangeDto);
+        return attendanceService.getAttendanceSummaryByEmployee(employeeId, dateRangeDto);
+    }
+
+    @PostMapping("/summary")
+    public AttendanceSummaryDto getMyAttendanceSummary(@Valid @RequestBody DateRangeDto dateRangeDto){
+        return attendanceService.getMyAttendanceSummary(dateRangeDto);
     }
 }

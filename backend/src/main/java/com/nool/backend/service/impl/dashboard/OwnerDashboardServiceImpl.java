@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.dashboard;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.dashboard.owner.OwnerDashboardSummaryDto;
 import com.nool.backend.dto.dashboard.owner.OwnerInventoryAnalyticsDto;
@@ -60,5 +61,15 @@ public class OwnerDashboardServiceImpl implements OwnerDashboardService {
                 .sareesReturned(sareesReturned)
                 .sareesInHand(sareesInHand)
                 .build();
+    }
+
+    @Override
+    public OwnerDashboardSummaryDto getMyDashboard(DateRangeDto dateRangeDto) {
+        Long ownerId = CurrentUserUtil.getOwnerId();
+        if (ownerId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        return getDashboardSummary(ownerId,dateRangeDto);
     }
 }

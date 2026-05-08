@@ -15,4 +15,5 @@ public interface EmployeeDailyWorkService {
 
     EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto);
 
+    EmployeeWorkSummaryDto getMyWorkSummary(DateRangeDto dateRangeDto);
 }

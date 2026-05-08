@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.dashboard;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.MonthYearRequestDto;
 import com.nool.backend.dto.dashboard.worker.WorkerDashboardSummaryDto;
@@ -173,5 +174,34 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
                 .totalLeaveDays((long) leaveDates.size())
                 .leaveDates(leaveDates)
                 .build();
+    }
+
+    @Override
+    public WorkerDashboardSummaryDto getMyDashboard(DateRangeDto dateRangeDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        return getDashboardSummary(employeeId, dateRangeDto);
+    }
+
+    @Override
+    public List<WorkerEarningsAnalyticsDto> getMyEarningAnalytics(DateRangeDto dateRangeDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        return getEarningAnalytics(employeeId, dateRangeDto);
+    }
+
+    @Override
+    public WorkerLeaveAnalyticsDto getMyLeaveAnalytics(DateRangeDto dateRangeDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access Denied");
+        }
+        return getLeaveAnalytics(employeeId, dateRangeDto);
     }
 }

@@ -13,4 +13,7 @@ public interface WorkerDashboardService {
     List<WorkerEarningsAnalyticsDto> getEarningAnalytics(Long employeeId, DateRangeDto dateRangeDto);
     WorkerEarningsAnalyticsDto getEarningForMonth(Long employeeId, MonthYearRequestDto monthYearRequestDto);
     WorkerLeaveAnalyticsDto getLeaveAnalytics(Long employeeId, DateRangeDto dateRangeDto);
+    WorkerDashboardSummaryDto getMyDashboard(DateRangeDto dateRangeDto);
+    List<WorkerEarningsAnalyticsDto> getMyEarningAnalytics(DateRangeDto dateRangeDto);
+    WorkerLeaveAnalyticsDto getMyLeaveAnalytics(DateRangeDto dateRangeDto);
 }

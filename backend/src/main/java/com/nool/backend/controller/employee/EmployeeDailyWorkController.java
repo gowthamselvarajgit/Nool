@@ -37,4 +37,9 @@ public class EmployeeDailyWorkController {
     public EmployeeWorkSummaryDto getEmployeeWorkSummary(@PathVariable Long employeeId, @Valid @RequestBody DateRangeDto dateRangeDto){
         return employeeDailyWorkService.getEmployeeWorkSummary(employeeId, dateRangeDto);
     }
+
+    @PostMapping("/summary")
+    public EmployeeWorkSummaryDto getMyWorkSummary(@Valid @RequestBody DateRangeDto dateRangeDto){
+        return employeeDailyWorkService.getMyWorkSummary(dateRangeDto);
+    }
 }

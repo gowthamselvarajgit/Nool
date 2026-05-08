@@ -43,4 +43,9 @@ public class EmployeeController {
     public PaginationResponseDto<EmployeeListResponse> getEmployeeList(@RequestBody PaginationRequestDto paginationRequestDto){
         return employeeService.getEmployeeList(paginationRequestDto);
     }
+
+    @GetMapping("/me")
+    public EmployeeResponseDto getMyProfile(){
+        return employeeService.getMyProfile();
+    }
 }

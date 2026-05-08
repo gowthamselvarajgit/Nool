@@ -14,4 +14,10 @@ public interface SalaryService {
     PaginationResponseDto<SalaryPaymentHistoryDto> getSalaryPaymentHistory(Long employeeId, PaginationRequestDto paginationRequestDto);
 
     SalarySummaryDto getSalarySummary(Long employeeId, DateRangeDto dateRangeDto);
+
+    PaginationResponseDto<SalaryPaymentHistoryDto>
+    getMySalaryPaymentHistory(PaginationRequestDto paginationRequestDto);
+
+    SalarySummaryDto getMySalarySummary(DateRangeDto dateRangeDto);
+
 }

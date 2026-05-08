@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.owner;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -178,5 +179,25 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
                 .totalSareesReturned(totalReturned)
                 .sareesInHand(totalReceived - totalReturned)
                 .build();
+    }
+
+    @Override
+    public PaginationResponseDto<SareeTransactionResponseDto> getMySareeTransactionList(PaginationRequestDto paginationRequestDto) {
+        Long ownerId = CurrentUserUtil.getOwnerId();
+        if (ownerId == null) {
+            throw new RuntimeException("Access denied");
+        }
+
+        return getSareeTransactionList(ownerId,paginationRequestDto);
+    }
+
+    @Override
+    public OwnerInventorySummaryDto getMyInventorySummary(DateRangeDto dateRangeDto) {
+        Long ownerId = CurrentUserUtil.getOwnerId();
+        if (ownerId == null) {
+            throw new RuntimeException("Access denied");
+        }
+
+        return getOwnerInventorySummary(ownerId, dateRangeDto);
     }
 }

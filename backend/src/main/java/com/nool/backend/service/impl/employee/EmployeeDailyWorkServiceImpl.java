@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.employee;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -112,5 +113,15 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
                 .totalRePolishCount(totalRePolish)
                 .totalRevenue(totalRevenue)
                 .build();
+    }
+
+    @Override
+    public EmployeeWorkSummaryDto getMyWorkSummary(DateRangeDto dateRangeDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access denied");
+        }
+
+        return getEmployeeWorkSummary(employeeId, dateRangeDto);
     }
 }

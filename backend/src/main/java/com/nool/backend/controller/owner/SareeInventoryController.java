@@ -41,4 +41,21 @@ public class SareeInventoryController {
     public SareeInventorySummaryDto getOverallInventorySummary(@Valid @RequestBody DateRangeDto dateRangeDto){
         return sareeInventoryService.getOverallInventorySummary(dateRangeDto);
     }
+
+
+    @PostMapping("/transactions")
+    public PaginationResponseDto<SareeTransactionResponseDto>
+    getMyTransactions(@RequestBody PaginationRequestDto paginationRequestDto){
+
+        return sareeInventoryService.getMySareeTransactionList(paginationRequestDto);
+    }
+
+
+    @PostMapping("/my-summary")
+    public OwnerInventorySummaryDto getMyInventorySummary(
+            @Valid @RequestBody DateRangeDto dateRangeDto){
+
+        return sareeInventoryService.getMyInventorySummary(dateRangeDto);
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.employee;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.employee.*;
@@ -116,6 +117,23 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
                 .last(page.isLast())
+                .build();
+    }
+
+    @Override
+    public EmployeeResponseDto getMyProfile() {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access denied");
+        }
+        Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+        return EmployeeResponseDto.builder()
+                .employeeId(employee.getId())
+                .employeeName(employee.getName())
+                .joiningDate(employee.getJoiningDate())
+                .polishingRate(employee.getPolishRate())
+                .mobileNumber(employee.getMobileNumber())
+                .status(employee.getStatus().name())
                 .build();
     }
 }

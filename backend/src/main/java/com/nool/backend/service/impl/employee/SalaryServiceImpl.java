@@ -1,5 +1,6 @@
 package com.nool.backend.service.impl.employee;
 
+import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -146,5 +147,25 @@ public class SalaryServiceImpl implements SalaryService {
                 .totalSalaryPaid(totalPaid)
                 .pendingSalary(pendingSalary)
                 .build();
+    }
+
+    @Override
+    public PaginationResponseDto<SalaryPaymentHistoryDto> getMySalaryPaymentHistory(PaginationRequestDto paginationRequestDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        return getSalaryPaymentHistory(employeeId, paginationRequestDto);
+    }
+
+    @Override
+    public SalarySummaryDto getMySalarySummary(DateRangeDto dateRangeDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access Denied");
+        }
+
+        return getSalarySummary(employeeId, dateRangeDto);
     }
 }

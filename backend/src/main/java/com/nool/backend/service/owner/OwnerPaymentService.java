@@ -15,4 +15,10 @@ public interface OwnerPaymentService {
 
     OwnerPaymentSummaryDto getPaymentSummary(Long ownerId, DateRangeDto dateRangeDto);
 
+    PaginationResponseDto<OwnerPaymentHistoryDto>
+    getMyPaymentHistory(PaginationRequestDto paginationRequestDto);
+
+    OwnerPaymentSummaryDto
+    getMyPaymentSummary(DateRangeDto dateRangeDto);
+
 }

@@ -17,4 +17,6 @@ public interface SareeOwnerService {
     void updateOwnerStatus(OwnerStatusUpdateDto requestDto);
 
     PaginationResponseDto<SareeOwnerListDto> getOwnerList(PaginationRequestDto paginationRequestDto);
+
+    SareeOwnerResponseDto getMyProfile();
 }
