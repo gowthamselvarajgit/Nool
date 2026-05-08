@@ -19,7 +19,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil){
+    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
     }
 
@@ -39,20 +39,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (!jwtUtil.isTokenExpired(token)) {
 
                 Claims claims = jwtUtil.extractAllClaims(token);
+                Long userId = claims.get("userId", Long.class);
                 String role = claims.get("role", String.class);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                claims,
+                                userId,   // ✅ principal (identity)
                                 null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                                List.of(new SimpleGrantedAuthority(role))
                         );
 
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/auth/");
     }
 }

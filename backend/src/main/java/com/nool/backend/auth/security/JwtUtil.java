@@ -16,25 +16,27 @@ import java.util.Map;
 public class JwtUtil {
 
     @Value("${jwt.secret}")
-    private String secretKey;
+    private String secret;
 
     @Value("${jwt.expiration}")
-    private long expirationTime;
+    private long expiration;
 
-    private SecretKey getSigningKey(){
-        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(Map<String, Object> claims){
+    public String generateToken(Map<String, Object> claims, String subject) {
+
         return Jwts.builder()
                 .setClaims(claims)
+                .setSubject(subject)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
-                .signWith(getSigningKey(),SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public Claims extractAllClaims(String token){
+    public Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
@@ -42,7 +44,7 @@ public class JwtUtil {
                 .getBody();
     }
 
-    public boolean isTokenExpired(String token){
+    public boolean isTokenExpired(String token) {
         return extractAllClaims(token)
                 .getExpiration()
                 .before(new Date());
