@@ -248,8 +248,8 @@ NOOL/backend/
 │   ├── 📂 controller/
 │   │   └── AuthController.java
 │   │       ├── Endpoint: POST /api/auth/login
-│   │       ├── Endpoint: POST /api/auth/register
-│   │       ├── Endpoint: POST /api/auth/refresh
+│   │       ├── Endpoint: POST /api/auth/logout
+│   │       ├── Endpoint: GET  /api/auth/validate
 │   │       ├── Accepts AuthLoginRequestDto, returns AuthLoginResponseDto
 │   │       └── Handles JWT token generation
 │   │
@@ -260,9 +260,10 @@ NOOL/backend/
 │   │   │   └── Request body for login endpoint
 │   │   │
 │   │   ├── AuthLoginResponseDto.java
-│   │   │   ├── Fields: token (String), tokenType ("Bearer")
-│   │   │   ├── Fields: expiresIn (Long), refreshToken (String)
-│   │   │   └── Response with JWT token and metadata
+│   │   │   ├── Fields: token (String)
+│   │   │   ├── Fields: role (String)
+│   │   │   ├── Fields: employeeId (Long, nullable)
+│   │   │   └── Fields: ownerId (Long, nullable)
 │   │   │
 │   │   ├── AuthRegisterRequestDto.java
 │   │   │   ├── Fields: mobileNumber, password, role
@@ -1772,10 +1773,10 @@ backend/
 
 ### Authentication Endpoints
 ```http
-POST /api/auth/login                    # Login and get JWT token
-POST /api/auth/register                 # Register new user account
-POST /api/auth/refresh                  # Refresh JWT token
-POST /api/auth/logout                   # Logout user
+POST /api/auth/login      # ✅ Login and get JWT token
+POST /api/auth/logout     # ✅ Stateless logout (client-side token removal)
+GET  /api/auth/validate   # ✅ JWT validation check
+``
 ```
 
 ### Employee Management Endpoints
@@ -2020,10 +2021,10 @@ Started BackendApplication in X.XXX seconds
 Test the API:
 ```bash
 # Health check
-curl http://localhost:8082/api/auth/health
+curl curl http://localhost:8082/api/auth
 
 # Or use Postman:
-# GET http://localhost:8082/api/auth/health
+# GET http://localhost:8082/api/auth
 ```
 
 ---
@@ -2177,13 +2178,15 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf().disable()  // CSRF disabled for stateless API
-            .authorizeRequests()
-            .requestMatchers("/api/auth/**").permitAll()
-            .requestMatchers("/api/admin/**").hasRole("ADMIN")
-            .requestMatchers("/api/employees/**").hasAnyRole("ADMIN", "MANAGER", "EMPLOYEE")
-            .anyRequest().authenticated()
-            .and()
-            .addFilterBefore(new JwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/owner/**").hasAnyRole("ADMIN", "OWNER")
+                .requestMatchers("/api/employee/**").hasAnyRole("ADMIN", "EMPLOYEE")
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         
         return http.build();
     }
