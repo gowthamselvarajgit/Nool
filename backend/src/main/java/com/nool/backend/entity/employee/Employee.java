@@ -1,6 +1,6 @@
 package com.nool.backend.entity.employee;
 
-import com.nool.backend.entity.auth.User;
+import com.nool.backend.auth.entity.User;
 import com.nool.backend.enums.EmployeeStatus;
 import jakarta.persistence.*;
 import lombok.*;

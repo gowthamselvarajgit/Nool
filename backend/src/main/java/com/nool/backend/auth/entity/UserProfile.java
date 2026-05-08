@@ -1,4 +1,4 @@
-package com.nool.backend.entity.auth;
+package com.nool.backend.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,13 +18,16 @@ public class UserProfile {
     @Column(name = "profile_id")
     private Long id;
 
-    @Column(name = "name", nullable = false)
-    private String name;
-
     //link
-    @OneToOne
+    @OneToOne(optional = false)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
+
+    @Column(name = "employee_id")
+    private Long employeeId;
+
+    @Column(name = "owner_id")
+    private Long ownerId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -39,6 +42,7 @@ public class UserProfile {
         this.updatedAt = now;
     }
 
+    @PreUpdate
     protected void onUpdate(){
         this.updatedAt = LocalDateTime.now();
     }

@@ -1,4 +1,4 @@
-package com.nool.backend.repository.auth;
+package com.nool.backend.auth.repository;
 
 import com.nool.backend.auth.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,7 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-
     Optional<User> findByMobileNumber(String mobileNumber);
-    boolean existsByMobileNumber(String mobileNumber);
 }

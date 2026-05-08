@@ -1,4 +1,4 @@
-package com.nool.backend.config;
+package com.nool.backend.auth.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

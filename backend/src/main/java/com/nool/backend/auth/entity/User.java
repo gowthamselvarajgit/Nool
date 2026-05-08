@@ -1,4 +1,4 @@
-package com.nool.backend.entity.auth;
+package com.nool.backend.auth.entity;
 
 import com.nool.backend.enums.Role;
 import jakarta.persistence.*;
@@ -23,7 +23,7 @@ public class User {
     @Column(name = "mobile_number", nullable = false, unique = true, length = 15)
     private String mobileNumber;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password", nullable = false, length = 100)
     private String password;
 
     @Enumerated(EnumType.STRING)
@@ -32,6 +32,9 @@ public class User {
 
     @Column(name = "active_status", nullable = false)
     private boolean active = true;
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    private UserProfile userProfile;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -46,6 +49,7 @@ public class User {
         this.updatedAt = now;
     }
 
+    @PreUpdate
     protected void onUpdate(){
         this.updatedAt = LocalDateTime.now();
     }

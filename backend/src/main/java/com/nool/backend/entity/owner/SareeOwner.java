@@ -1,6 +1,6 @@
 package com.nool.backend.entity.owner;
 
-import com.nool.backend.entity.auth.User;
+import com.nool.backend.auth.entity.User;
 import com.nool.backend.enums.OwnerStatus;
 import jakarta.persistence.*;
 import lombok.*;
