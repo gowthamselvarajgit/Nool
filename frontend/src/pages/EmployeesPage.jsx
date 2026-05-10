@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Button, Card, Input, Modal, Badge } from '../components/Common';
+import { Button, Card, Input, Modal, Badge, Select, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { Table } from '../components/Table';
 import { employeeService } from '../services/api';
 import { formatDate, getEmployeeStatusColor, getInitials } from '../utils/formatters';
@@ -108,29 +108,12 @@ export const EmployeesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  useEffect(() => {
-    const keyword = searchKeyword.toLowerCase();
-    const filtered = employees.filter((emp) => {
-      return (
-        (emp.name || '').toLowerCase().includes(keyword) ||
-        (emp.mobileNumber || '').includes(keyword)
-      );
-    });
-    setFilteredEmployees(filtered);
-  }, [searchKeyword, employees]);
-
   const fetchEmployees = async () => {
     try {
       setLoading(true);
       setError('');
       const response = await employeeService.getList(0, 100);
-      // backend returns PaginationResponseDto with `content` array and different field names
       const list = response?.content || [];
-      // map backend fields to frontend-friendly shape
       const mapped = list.map((e) => ({
         id: e.employeeId,
         name: e.employeeName,
@@ -146,6 +129,21 @@ export const EmployeesPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  useEffect(() => {
+    const keyword = searchKeyword.toLowerCase();
+    const filtered = employees.filter((emp) => {
+      return (
+        (emp.name || '').toLowerCase().includes(keyword) ||
+        (emp.mobileNumber || '').includes(keyword)
+      );
+    });
+    setFilteredEmployees(filtered);
+  }, [searchKeyword, employees]);
 
   const handleCreateOrUpdate = async (formData) => {
     try {

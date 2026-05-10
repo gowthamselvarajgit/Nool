@@ -32,23 +32,7 @@ const OwnerManagementPage = () => {
   const itemsPerPage = 10;
   const [paymentAmount, setPaymentAmount] = useState('');
 
-  useEffect(() => {
-    fetchOwners();
-  }, []);
-
-  useEffect(() => {
-    const keyword = searchKeyword.toLowerCase();
-    const filtered = owners.filter((owner) => {
-      return (
-        (owner.ownerName || '').toLowerCase().includes(keyword) ||
-        (owner.mobileNumber || '').includes(keyword)
-      );
-    });
-    setFilteredOwners(filtered);
-    setCurrentPage(1);
-  }, [searchKeyword, owners]);
-
-  const fetchOwners = async () => {
+  async function fetchOwners() {
     try {
       setLoading(true);
       setError('');
@@ -73,6 +57,22 @@ const OwnerManagementPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchOwners();
+  }, []);
+
+  useEffect(() => {
+    const keyword = searchKeyword.toLowerCase();
+    const filtered = owners.filter((owner) => {
+      return (
+        (owner.ownerName || '').toLowerCase().includes(keyword) ||
+        (owner.mobileNumber || '').includes(keyword)
+      );
+    });
+    setFilteredOwners(filtered);
+    setCurrentPage(1);
+  }, [searchKeyword, owners]);
 
   const handleCreateOrUpdate = async (formData) => {
     try {

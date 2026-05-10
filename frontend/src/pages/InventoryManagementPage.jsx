@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Button, Input, Select, Modal, Badge } from '../components/Common';
 import Table from '../components/Table';
-import { Plus, Edit2, Trash2, Eye, Package, AlertCircle, TrendingDown, TrendingUp, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, TrendingDown, TrendingUp, Download } from 'lucide-react';
 
 export const InventoryManagementPage = () => {
   const [inventory, setInventory] = useState([]);
@@ -34,15 +34,7 @@ export const InventoryManagementPage = () => {
     categories: 0,
   });
 
-  useEffect(() => {
-    fetchInventory();
-  }, []);
-
-  useEffect(() => {
-    calculateStats();
-  }, [inventory]);
-
-  const fetchInventory = async () => {
+  async function fetchInventory() {
     try {
       setLoading(true);
       // Simulated data - Replace with actual API call
@@ -128,7 +120,7 @@ export const InventoryManagementPage = () => {
     }
   };
 
-  const calculateStats = () => {
+  function calculateStats() {
     const total = inventory.length;
     const value = inventory.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
     const lowStock = inventory.filter(item => item.quantity <= item.minStock).length;
@@ -141,6 +133,14 @@ export const InventoryManagementPage = () => {
       categories: uniqueCategories,
     });
   };
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  useEffect(() => {
+    calculateStats();
+  }, [inventory]);
 
   const handleAddItem = () => {
     setEditingItem(null);

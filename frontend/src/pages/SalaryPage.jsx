@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import {
   Card,
@@ -13,8 +13,7 @@ import {
 } from '../components/Common';
 import { Table } from '../components/Table';
 import { employeeService } from '../services/api';
-import { formatDate } from '../utils/formatters';
-import { DollarSign, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { DollarSign, CheckCircle, TrendingUp } from 'lucide-react';
 
 const SalaryPage = () => {
   const [employees, setEmployees] = useState([]);
@@ -22,7 +21,7 @@ const SalaryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [selectedEmployee, setSelectedEmployee] = useState('');
+
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,11 +34,7 @@ const SalaryPage = () => {
     workingDays: '25',
   });
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  const fetchInitialData = async () => {
+  async function fetchInitialData() {
     try {
       setLoading(true);
       setError('');
@@ -63,6 +58,10 @@ const SalaryPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
 
   const fetchSalaryForMonth = async (month) => {
     try {

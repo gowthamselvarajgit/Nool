@@ -1,209 +1,288 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowRight, CheckCircle2, Layout, PieChart, Shield, Zap, Users, Activity, BarChart3, TrendingUp } from 'lucide-react';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-surface selection:bg-primary-500/30 selection:text-primary-900 font-sans overflow-x-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-primary-50/50 to-transparent"></div>
+        <div className="absolute -top-[300px] -right-[200px] w-[800px] h-[800px] rounded-full bg-primary-400/10 blur-[100px] mix-blend-multiply"></div>
+        <div className="absolute top-[200px] -left-[200px] w-[600px] h-[600px] rounded-full bg-indigo-400/10 blur-[100px] mix-blend-multiply"></div>
+      </div>
 
       {/* ================= NAVBAR ================= */}
-      <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="text-xl font-bold text-teal-700">NOOL ERP</div>
-        <nav className="hidden md:flex gap-8 text-sm text-slate-600">
-          <a href="#">Product</a>
-          <a href="#">Solutions</a>
-          <a href="#">Pricing</a>
-          <a href="#">Learn</a>
-        </nav>
-        <div className="flex gap-3">
-          <button className="text-sm px-4 py-2 border rounded-lg">
-            Login
+      <nav className="relative z-50 max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-primary-500/30">
+            <span className="text-white font-display font-bold text-xl leading-none">N</span>
+          </div>
+          <span className="text-2xl font-display font-bold text-text-main tracking-tight">NOOL</span>
+        </div>
+        
+        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-secondary-600">
+          <a href="#features" className="hover:text-primary-600 transition-colors">Features</a>
+          <a href="#solutions" className="hover:text-primary-600 transition-colors">Solutions</a>
+          <a href="#testimonials" className="hover:text-primary-600 transition-colors">Success Stories</a>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/login')}
+            className="text-sm font-semibold text-secondary-700 hover:text-primary-600 transition-colors px-4 py-2"
+          >
+            Sign In
           </button>
           <button
             onClick={() => navigate('/login')}
-            className="text-sm px-4 py-2 rounded-lg bg-teal-600 text-white"
+            className="group relative inline-flex items-center justify-center gap-2 text-sm font-semibold text-white px-6 py-2.5 rounded-full overflow-hidden transition-all duration-300 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 hover:-translate-y-0.5"
           >
-            Sign Up
+            <div className="absolute inset-0 bg-gradient-to-r from-primary-600 to-indigo-600 transition-transform duration-300 group-hover:scale-[1.02]"></div>
+            <span className="relative">Get Started</span>
+            <ArrowRight className="relative w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
-      </header>
+      </nav>
 
-      {/* ================= HERO ================= */}
-      <section className="max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-20 items-center">
-        <div>
-          <h1 className="text-4xl lg:text-5xl font-extrabold leading-tight">
-            Manage employees, salaries & sarees.<br />
-            <span className="text-slate-500 font-normal">
-              All your operations, simplified.
-            </span>
-          </h1>
-
-          <p className="mt-6 max-w-xl text-slate-600">
-            NOOL ERP helps saree manufacturers manage attendance,
-            daily polishing work, inventory, owner payments and revenue
-            with complete accuracy.
-          </p>
-
-          <div className="mt-8 flex gap-4">
-            <input
-              placeholder="Your business email"
-              className="px-4 py-3 rounded-lg border w-64"
-            />
-            <button
-              onClick={() => navigate('/login')}
-              className="px-6 py-3 rounded-lg bg-teal-600 text-white font-semibold"
-            >
-              Get Started
-            </button>
-          </div>
-
-          <div className="mt-10 flex gap-6 text-sm text-slate-500">
-            <span>Klarna</span>
-            <span>Coinbase</span>
-            <span>Instacart</span>
-          </div>
+      {/* ================= HERO SECTION ================= */}
+      <section className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-32 lg:pt-32 lg:pb-40 text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-sm font-medium mb-8 animate-fade-in slide-down">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary-500"></span>
+          </span>
+          NOOL ERP 2.0 is now live
         </div>
 
-        {/* Mock Card */}
-        <div className="relative">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-80 mx-auto">
-            <p className="text-xs text-slate-500">Monthly Payout</p>
-            <p className="text-2xl font-bold mt-2">₹ 18,76,580</p>
+        <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold text-text-main tracking-tight leading-[1.1] mb-8 max-w-4xl mx-auto">
+          The Operating System for <br className="hidden md:block" />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-indigo-600">
+            Saree Manufacturing
+          </span>
+        </h1>
 
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Salary</span>
-                <span>₹ 9.2L</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Owner Pay</span>
-                <span>₹ 6.4L</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Expenses</span>
-                <span>₹ 3.1L</span>
-              </div>
-            </div>
-
-            <button className="mt-4 w-full py-2 rounded-lg bg-teal-600 text-white">
-              Pay Now
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= FEATURES ================= */}
-      <section className="bg-white py-20">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-teal-600 text-xs font-semibold uppercase">
-            Future‑Ready ERP
-          </p>
-          <h2 className="text-3xl font-bold mt-2">
-            Experience that scales with your factory
-          </h2>
-
-          <div className="mt-12 grid md:grid-cols-3 gap-8 text-left">
-            {[
-              ['Attendance Control', 'Prevent duplicate attendance and track productivity'],
-              ['Multiple Payments', 'Cash, bank or cheque handled cleanly'],
-              ['Enterprise Security', 'JWT auth, role‑based access, audits'],
-            ].map((f, i) => (
-              <div key={i} className="bg-slate-50 p-6 rounded-xl">
-                <h4 className="font-semibold mb-2">{f[0]}</h4>
-                <p className="text-sm text-slate-600">{f[1]}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= WHY NOOL ================= */}
-      <section className="py-20 max-w-7xl mx-auto px-6">
-        <h3 className="text-center text-3xl font-bold mb-12">
-          Why manufacturers choose NOOL
-        </h3>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-white rounded-xl p-8 shadow">
-            <p className="text-4xl font-bold text-teal-600">3k+</p>
-            <p className="mt-2 text-slate-600">
-              Sarees processed every month using NOOL
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-8 shadow">
-            <p className="font-semibold mb-2">Instant insights</p>
-            <p className="text-slate-600">
-              Know productivity, revenue and payouts in real‑time.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= DARK STEPS ================= */}
-      <section className="bg-slate-900 text-white py-20">
-        <div className="max-w-7xl mx-auto px-6">
-          <h3 className="text-3xl font-bold mb-12">
-            Start managing your factory in minutes
-          </h3>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              ['1', 'Create your account', 'Configure employees & rates'],
-              ['2', 'Record daily work', 'Attendance & output per employee'],
-              ['3', 'Track & pay', 'Salaries, owners & analytics'],
-            ].map((s, i) => (
-              <div key={i} className="bg-slate-800 p-6 rounded-xl">
-                <p className="text-3xl font-bold mb-4">{s[0]}</p>
-                <h4 className="font-semibold">{s[1]}</h4>
-                <p className="text-sm text-slate-400 mt-2">{s[2]}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= PRICING ================= */}
-      <section className="py-20 max-w-7xl mx-auto px-6">
-        <h3 className="text-center text-3xl font-bold mb-12">
-          Simple pricing
-        </h3>
-
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <div className="bg-white p-8 rounded-xl shadow">
-            <h4 className="font-semibold">Standard</h4>
-            <p className="text-2xl font-bold mt-2">₹299 / month</p>
-          </div>
-          <div className="bg-teal-600 text-white p-8 rounded-xl shadow">
-            <h4 className="font-semibold">Premium</h4>
-            <p className="text-2xl font-bold mt-2">₹699 / month</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= FINAL CTA ================= */}
-      <section className="bg-slate-900 text-white py-20 text-center">
-        <h3 className="text-3xl font-bold">
-          Ready to streamline your saree business?
-        </h3>
-        <p className="mt-4 text-slate-300">
-          Start managing operations the professional way.
+        <p className="text-lg md:text-xl text-secondary-500 mb-10 max-w-2xl mx-auto leading-relaxed">
+          Manage your workforce, track inventory, process payroll, and gain real-time analytics. Built specifically for modern textile businesses.
         </p>
 
-        <div className="mt-8 flex justify-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={() => navigate('/login')}
-            className="px-6 py-3 bg-teal-600 rounded-lg font-semibold"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-text-main text-white rounded-full text-base font-semibold hover:bg-black transition-all duration-300 hover:-translate-y-1 shadow-xl shadow-black/10"
           >
-            Get Started
+            Start Managing Now
+            <ArrowRight className="w-5 h-5" />
           </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-text-main border border-border rounded-full text-base font-semibold hover:bg-surface-hover hover:border-secondary-300 transition-all duration-300"
+          >
+            Request Demo
+          </button>
+        </div>
+
+        {/* Dashboard Preview Mockup */}
+        <div className="mt-20 relative mx-auto max-w-5xl perspective-1000">
+          <div className="absolute inset-0 bg-gradient-to-b from-primary-500/10 to-transparent blur-3xl -z-10 transform translate-y-10"></div>
+          <div className="bg-white rounded-2xl md:rounded-[2rem] shadow-2xl shadow-primary-900/10 border border-white/50 overflow-hidden relative">
+            
+            {/* Mock Header */}
+            <div className="bg-surface-hover border-b border-border px-6 py-4 flex items-center justify-between">
+              <div className="flex gap-2">
+                <div className="w-3 h-3 rounded-full bg-rose-400"></div>
+                <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+                <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
+              </div>
+              <div className="h-6 w-48 bg-white rounded-md shadow-sm border border-border"></div>
+            </div>
+            
+            {/* Mock Content */}
+            <div className="p-6 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-6 bg-surface/50">
+              <div className="md:col-span-2 space-y-6">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <div className="h-4 w-32 bg-secondary-200 rounded-full mb-3"></div>
+                    <div className="h-10 w-48 bg-gradient-to-r from-primary-200 to-primary-100 rounded-lg"></div>
+                  </div>
+                  <div className="h-8 w-24 bg-emerald-100 rounded-full"></div>
+                </div>
+                <div className="h-64 bg-white rounded-xl border border-border shadow-soft flex items-end p-6 gap-4">
+                  {[40, 70, 45, 90, 65, 80, 50, 100].map((h, i) => (
+                    <div key={i} className="flex-1 bg-gradient-to-t from-primary-500 to-indigo-400 rounded-t-sm opacity-80" style={{ height: `${h}%` }}></div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="h-32 bg-white rounded-xl border border-border shadow-soft p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-50"></div>
+                    <div className="space-y-2">
+                      <div className="h-3 w-20 bg-secondary-200 rounded-full"></div>
+                      <div className="h-2 w-12 bg-secondary-100 rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="h-8 w-full bg-surface-hover rounded-lg"></div>
+                </div>
+                <div className="h-32 bg-white rounded-xl border border-border shadow-soft p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50"></div>
+                    <div className="space-y-2">
+                      <div className="h-3 w-24 bg-secondary-200 rounded-full"></div>
+                      <div className="h-2 w-16 bg-secondary-100 rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="h-8 w-full bg-surface-hover rounded-lg"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Glass reflection overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 pointer-events-none"></div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= METRICS LOGOS ================= */}
+      <section className="border-y border-border bg-white py-12 relative z-10">
+        <div className="max-w-7xl mx-auto px-6">
+          <p className="text-center text-sm font-semibold text-secondary-400 uppercase tracking-wider mb-8">Trusted by leading textile manufacturers</p>
+          <div className="flex flex-wrap justify-center gap-12 md:gap-24 opacity-60 grayscale">
+            {/* Placeholder Logos */}
+            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Zap className="w-6 h-6" /> LoomCorp</div>
+            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Shield className="w-6 h-6" /> SilkRoute</div>
+            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Layout className="w-6 h-6" /> TexaNova</div>
+            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Activity className="w-6 h-6" /> FabricTech</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= FEATURES SECTION ================= */}
+      <section id="features" className="py-24 relative z-10 bg-surface">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-primary-600 font-semibold tracking-wide uppercase text-sm mb-3">Enterprise Capabilities</h2>
+            <h3 className="text-3xl md:text-4xl font-display font-bold text-text-main mb-4">Everything you need to run your factory</h3>
+            <p className="text-secondary-500 text-lg">Powerful features wrapped in an intuitive, consumer-grade interface.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <div className="bg-white rounded-3xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-300 group">
+              <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                <Users className="w-7 h-7" />
+              </div>
+              <h4 className="text-xl font-bold text-text-main mb-3">Workforce Management</h4>
+              <p className="text-secondary-500 leading-relaxed">
+                Track daily attendance, manage employee profiles, assign roles, and handle shifts without relying on messy spreadsheets.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="bg-white rounded-3xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-300 group">
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                <PieChart className="w-7 h-7" />
+              </div>
+              <h4 className="text-xl font-bold text-text-main mb-3">Inventory Tracking</h4>
+              <p className="text-secondary-500 leading-relaxed">
+                Monitor stock levels in real-time. Track sarees given to workers and log returns to ensure absolute accuracy in your supply chain.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="bg-white rounded-3xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-300 group">
+              <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-amber-600 group-hover:text-white transition-all duration-300">
+                <BarChart3 className="w-7 h-7" />
+              </div>
+              <h4 className="text-xl font-bold text-text-main mb-3">Automated Payroll</h4>
+              <p className="text-secondary-500 leading-relaxed">
+                Automatically calculate salaries and owner payouts based on daily work logs, polishing rates, and attendance records.
+              </p>
+            </div>
+
+            {/* Feature 4 */}
+            <div className="bg-white rounded-3xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-300 group">
+              <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-rose-600 group-hover:text-white transition-all duration-300">
+                <TrendingUp className="w-7 h-7" />
+              </div>
+              <h4 className="text-xl font-bold text-text-main mb-3">Live Analytics</h4>
+              <p className="text-secondary-500 leading-relaxed">
+                Visualize production trends, revenue growth, and worker performance with beautifully designed Recharts dashboards.
+              </p>
+            </div>
+
+            {/* Feature 5 */}
+            <div className="bg-white rounded-3xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-300 group">
+              <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                <Shield className="w-7 h-7" />
+              </div>
+              <h4 className="text-xl font-bold text-text-main mb-3">Role-Based Access</h4>
+              <p className="text-secondary-500 leading-relaxed">
+                Secure JWT authentication with dedicated portals for Admins, Saree Owners, and Employees. Everyone sees only what they need.
+              </p>
+            </div>
+
+            {/* Feature 6 */}
+            <div className="bg-white rounded-3xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-300 group">
+              <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">
+                <Zap className="w-7 h-7" />
+              </div>
+              <h4 className="text-xl font-bold text-text-main mb-3">Lightning Fast</h4>
+              <p className="text-secondary-500 leading-relaxed">
+                Built on a modern React/Vite stack ensuring instant page loads and seamless transitions for maximum productivity.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= CTA SECTION ================= */}
+      <section className="py-24 relative z-10 px-6">
+        <div className="max-w-5xl mx-auto bg-text-main rounded-[3rem] p-10 md:p-16 relative overflow-hidden text-center shadow-2xl">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/20 rounded-full blur-[100px]"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+          
+          <div className="relative z-10">
+            <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-6">
+              Ready to modernize your operations?
+            </h2>
+            <p className="text-xl text-secondary-300 mb-10 max-w-2xl mx-auto">
+              Join hundreds of manufacturers who have transformed their business with NOOL ERP.
+            </p>
+            
+            <button
+              onClick={() => navigate('/login')}
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-text-main rounded-full text-lg font-bold hover:scale-105 transition-all duration-300 shadow-xl shadow-white/10"
+            >
+              Get Started for Free
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            <p className="text-secondary-400 mt-6 text-sm">No credit card required. Setup takes 5 minutes.</p>
+          </div>
         </div>
       </section>
 
       {/* ================= FOOTER ================= */}
-      <footer className="py-10 text-center text-sm text-slate-500">
-        © {new Date().getFullYear()} NOOL ERP. All rights reserved.
+      <footer className="border-t border-border bg-white py-12 relative z-10">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-text-main flex items-center justify-center">
+              <span className="text-white font-display font-bold leading-none">N</span>
+            </div>
+            <span className="text-xl font-display font-bold text-text-main tracking-tight">NOOL</span>
+          </div>
+          
+          <div className="text-secondary-500 text-sm">
+            © {new Date().getFullYear()} Nool ERP Technologies. All rights reserved.
+          </div>
+          
+          <div className="flex gap-6 text-sm font-medium text-secondary-600">
+            <a href="#" className="hover:text-primary-600">Privacy Policy</a>
+            <a href="#" className="hover:text-primary-600">Terms of Service</a>
+            <a href="#" className="hover:text-primary-600">Contact Support</a>
+          </div>
+        </div>
       </footer>
     </div>
   );

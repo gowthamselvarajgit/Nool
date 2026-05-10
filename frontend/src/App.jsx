@@ -17,16 +17,14 @@ import OwnerDashboard from './pages/OwnerDashboard';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DailyWorkManagementPage from './pages/DailyWorkManagementPage';
 import InventoryManagementPage from './pages/InventoryManagementPage';
-import {
-  OwnerProfile,
-  InventoryPage,
-  TransactionsPage,
-  OwnerPaymentsPage,
-  EmployeeProfile,
-  DailyWorkPage,
-  PerformancePage,
-  PaymentsManagementPage,
-} from './pages/PlaceholderPages';
+import OwnerProfile from './pages/OwnerProfile';
+import InventoryPage from './pages/InventoryPage';
+import TransactionsPage from './pages/TransactionsPage';
+import OwnerPaymentsPage from './pages/OwnerPaymentsPage';
+import EmployeeProfile from './pages/EmployeeProfile';
+import DailyWorkPage from './pages/DailyWorkPage';
+import PerformancePage from './pages/PerformancePage';
+import PaymentsManagementPage from './pages/PaymentsManagementPage';
 
 function App() {
   return (

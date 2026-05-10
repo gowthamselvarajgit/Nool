@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, LogOut } from 'lucide-react';
+import { LogOut, Bell } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  const [activeMenu, setActiveMenu] = useState('');
 
   const handleLogout = () => {
     logout();
@@ -42,69 +41,81 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
     ],
   };
 
-  const role = user?.role?.toLowerCase() || 'employee';
-  const items = menuItems[role] || menuItems.employee;
+  const role = user?.role?.toUpperCase() || 'WORKER';
+  const items = menuItems[role] || menuItems.WORKER;
 
   return (
     <>
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
+          className="fixed inset-0 bg-secondary-950/50 backdrop-blur-sm md:hidden z-40 transition-opacity"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 md:relative md:translate-x-0 z-50 overflow-y-auto ${
+        className={`fixed top-0 left-0 h-screen w-72 bg-secondary-900 text-white shadow-2xl transform transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) md:relative md:translate-x-0 z-50 flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="slide-in">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              🎀 NOOL
-            </h1>
-            <p className="text-xs text-gray-600 mt-1">Enterprise Resource Planning</p>
+        <div className="px-8 py-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-primary-500/30">
+              <span className="text-xl">✨</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-white font-display">
+                Nool<span className="text-primary-400">.erp</span>
+              </h1>
+            </div>
           </div>
         </div>
 
         {/* User Info */}
-        <div className="p-4 mx-2 my-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-          <p className="text-xs font-medium text-gray-600">Logged in as</p>
-          <p className="text-sm font-bold text-gray-900 mt-1">{user?.role}</p>
-          {user?.mobileNumber && (
-            <p className="text-xs text-gray-600 mt-1">{user.mobileNumber}</p>
-          )}
+        <div className="px-6 mb-6">
+          <div className="p-4 bg-secondary-800/50 backdrop-blur-md rounded-2xl border border-secondary-700/50">
+            <p className="text-xs font-medium text-secondary-400 uppercase tracking-wider mb-1">Signed in as</p>
+            <p className="text-sm font-bold text-white truncate">{user?.role || 'User'}</p>
+            {user?.mobileNumber && (
+              <p className="text-xs text-secondary-400 mt-1">{user.mobileNumber}</p>
+            )}
+          </div>
         </div>
 
         {/* Navigation */}
-        <nav className="px-2 py-4">
-          {items.map((item, index) => (
-            <a
-              key={index}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-3 mx-2 rounded-lg text-gray-700 hover:bg-indigo-50 transition-all duration-200 group"
-              onClick={() => setActiveMenu(item.label)}
-            >
-              <span className="text-xl group-hover:scale-110 transition-transform duration-200">
-                {item.icon}
-              </span>
-              <span className="font-medium">{item.label}</span>
-            </a>
-          ))}
+        <nav className="flex-1 px-4 overflow-y-auto space-y-1 scrollbar-hide">
+          {items.map((item, index) => {
+            const isActive = location.pathname.includes(item.href);
+            return (
+              <a
+                key={index}
+                href={item.href}
+                className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+                  isActive
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
+                    : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
+                }`}
+              >
+                <span className={`text-xl transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                  {item.icon}
+                </span>
+                <span className="font-medium">{item.label}</span>
+              </a>
+            );
+          })}
         </nav>
 
         {/* Logout Button */}
-        <div className="absolute bottom-6 left-2 right-2 space-y-2">
+        <div className="p-6 mt-auto">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all duration-200 font-medium"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-secondary-800/50 text-secondary-300 rounded-xl hover:bg-danger/10 hover:text-danger hover:border-danger/20 border border-transparent transition-all duration-300 font-medium group"
           >
-            <span>🚪</span>
-            Logout
+            <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            Sign Out
           </button>
         </div>
       </aside>
@@ -116,35 +127,46 @@ export const Header = ({ onMenuToggle }) => {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between h-16 px-6">
+    <header className="sticky top-0 z-40 bg-surface/80 backdrop-blur-xl border-b border-border shadow-soft">
+      <div className="flex items-center justify-between h-20 px-4 md:px-8">
         {/* Menu Button */}
         <button
           onClick={onMenuToggle}
-          className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="md:hidden p-2.5 hover:bg-secondary-50 text-secondary-600 rounded-xl transition-colors"
         >
-          <span className="text-2xl">☰</span>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </button>
 
         {/* Left Spacer */}
-        <div className="hidden md:block" />
+        <div className="hidden md:flex flex-1 items-center gap-4">
+          <div className="relative w-64 lg:w-96">
+            <input 
+              type="text" 
+              placeholder="Quick search..." 
+              className="w-full pl-10 pr-4 py-2.5 bg-secondary-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 transition-all placeholder:text-secondary-400"
+            />
+            <span className="absolute left-3.5 top-3 text-secondary-400 text-sm">🔍</span>
+          </div>
+        </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           {/* Notifications */}
-          <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors group">
-            <span className="text-xl">🔔</span>
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full pulse" />
+          <button className="relative p-2.5 hover:bg-secondary-50 text-secondary-600 rounded-full transition-colors group">
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-2 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-white animate-pulse" />
           </button>
 
           {/* User Menu */}
-          <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-              {user?.role?.charAt(0) || 'U'}
+          <div className="flex items-center gap-3 pl-6 border-l border-border">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-text-main leading-tight">{user?.role || 'User'}</p>
+              <p className="text-xs text-secondary-500 mt-0.5">{user?.mobileNumber || 'Online'}</p>
             </div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium text-gray-900">{user?.role}</p>
-              <p className="text-xs text-gray-600">{user?.mobileNumber}</p>
+            <div className="w-11 h-11 bg-gradient-to-tr from-primary-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-primary-500/20 border-2 border-white">
+              {user?.role?.charAt(0) || 'U'}
             </div>
           </div>
         </div>
@@ -157,14 +179,17 @@ export const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-background overflow-hidden font-sans">
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="flex-1 overflow-auto bg-gradient-to-br from-white via-gray-50 to-white">
-          <div className="p-6">{children}</div>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-4 md:p-8 animate-fade-in">
+            {children}
+          </div>
         </main>
       </div>
     </div>
   );
 };
+

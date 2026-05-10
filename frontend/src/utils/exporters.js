@@ -59,7 +59,7 @@ export const exportToCSV = (data, filename = 'export.csv', columns = null) => {
  * @param {String} filename - Name of the Excel file
  * @param {String} sheetName - Name of the Excel sheet
  */
-export const exportToExcel = (data, filename = 'export', sheetName = 'Sheet1') => {
+export const exportToExcel = (data, filename = 'export') => {
   try {
     if (!data || data.length === 0) {
       console.warn('No data to export');
@@ -114,7 +114,7 @@ export const exportToPDF = async (data, filename = 'export', title = 'Report') =
   try {
     // Dynamically import jsPDF
     const { jsPDF } = await import('jspdf');
-    const autoTable = await import('jspdf-autotable');
+    await import('jspdf-autotable');
 
     if (!data || data.length === 0) {
       console.warn('No data to export');
