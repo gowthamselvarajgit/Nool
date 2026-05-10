@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Menu, LogOut } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
-  const [activeMenu, setActiveMenu] = useState('');
 
   const handleLogout = () => {
     logout();
@@ -13,30 +14,30 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
   };
 
   const menuItems = {
-    admin: [
-      { label: 'Dashboard', icon: '📊', href: '/admin/dashboard' },
-      { label: 'Employees', icon: '👥', href: '/admin/employees' },
-      { label: 'Owners', icon: '🧵', href: '/admin/owners' },
-      { label: 'Attendance', icon: '📍', href: '/admin/attendance' },
-      { label: 'Salary', icon: '💰', href: '/admin/salary' },
-      { label: 'Payments', icon: '💳', href: '/admin/payments' },
-      { label: 'Inventory', icon: '📦', href: '/admin/inventory' },
-      { label: 'Daily Work', icon: '📝', href: '/admin/daily-work' },
-      { label: 'Analytics', icon: '📈', href: '/admin/analytics' },
+    ADMIN: [
+      { label: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
+      { label: 'Employees', href: '/admin/employees', icon: '👥' },
+      { label: 'Owners', href: '/admin/owners', icon: '🧵' },
+      { label: 'Attendance', href: '/admin/attendance', icon: '📍' },
+      { label: 'Salary', href: '/admin/salary', icon: '💰' },
+      { label: 'Payments', href: '/admin/payments', icon: '💳' },
+      { label: 'Inventory', href: '/admin/inventory', icon: '📦' },
+      { label: 'Daily Work', href: '/admin/daily-work', icon: '📝' },
+      { label: 'Analytics', href: '/admin/analytics', icon: '📈' },
     ],
-    employee: [
-      { label: 'Dashboard', icon: '📊', href: '/employee/dashboard' },
-      { label: 'Profile', icon: '👤', href: '/employee/profile' },
-      { label: 'Attendance', icon: '📍', href: '/employee/attendance' },
-      { label: 'Salary', icon: '💰', href: '/employee/salary' },
-      { label: 'Daily Work', icon: '📝', href: '/employee/daily-work' },
+    WORKER: [
+      { label: 'Dashboard', href: '/employee/dashboard', icon: '📊' },
+      { label: 'Profile', href: '/employee/profile', icon: '👤' },
+      { label: 'Attendance', href: '/employee/attendance', icon: '📍' },
+      { label: 'Salary', href: '/employee/salary', icon: '💰' },
+      { label: 'Daily Work', href: '/employee/daily-work', icon: '📝' },
     ],
-    owner: [
-      { label: 'Dashboard', icon: '📊', href: '/owner/dashboard' },
-      { label: 'Profile', icon: '👤', href: '/owner/profile' },
-      { label: 'Inventory', icon: '📦', href: '/owner/inventory' },
-      { label: 'Transactions', icon: '📊', href: '/owner/transactions' },
-      { label: 'Payments', icon: '💳', href: '/owner/payments' },
+    SAREE_OWNER: [
+      { label: 'Dashboard', href: '/owner/dashboard', icon: '📊' },
+      { label: 'Profile', href: '/owner/profile', icon: '👤' },
+      { label: 'Inventory', href: '/owner/inventory', icon: '📦' },
+      { label: 'Transactions', href: '/owner/transactions', icon: '📊' },
+      { label: 'Payments', href: '/owner/payments', icon: '💳' },
     ],
   };
 

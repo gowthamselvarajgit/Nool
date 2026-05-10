@@ -3,97 +3,53 @@ import { MainLayout } from '../components/Layout';
 import {
   Card,
   Button,
+  Input,
   Select,
   Badge,
   Modal,
+  Table,
   Loading,
   ErrorMessage,
-  Input,
+  EmptyState,
 } from '../components/Common';
 import { attendanceService, employeeService } from '../services/api';
-import { formatDate, getAttendanceColor } from '../utils/formatters';
+import { formatDate } from '../utils/formatters';
+import { Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 
-const AttendanceStats = ({ stats }) => {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-      <Card>
-        <p className="text-gray-600 text-sm">Total Records</p>
-        <p className="text-2xl font-bold text-gray-900">{stats.total || 0}</p>
-      </Card>
-      <Card>
-        <p className="text-gray-600 text-sm">Present</p>
-        <p className="text-2xl font-bold text-green-600">{stats.present || 0}</p>
-      </Card>
-      <Card>
-        <p className="text-gray-600 text-sm">Absent</p>
-        <p className="text-2xl font-bold text-red-600">{stats.absent || 0}</p>
-      </Card>
-      <Card>
-        <p className="text-gray-600 text-sm">Leave</p>
-        <p className="text-2xl font-bold text-yellow-600">{stats.leave || 0}</p>
-      </Card>
-      <Card>
-        <p className="text-gray-600 text-sm">Holidays</p>
-        <p className="text-2xl font-bold text-purple-600">{stats.holiday || 0}</p>
-      </Card>
-    </div>
-  );
-};
-
-const AttendanceRow = ({ attendance, employees }) => {
-  const employee = employees.find((e) => e.id === attendance.employeeId);
-  return (
-    <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-      <div>
-        <p className="font-medium text-gray-900">{employee?.name || 'Unknown'}</p>
-        <p className="text-sm text-gray-600">{attendance.date}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <Badge variant={getAttendanceColor(attendance.status)}>
-          {attendance.status}
-        </Badge>
-        {attendance.remarks && (
-          <span className="text-xs text-gray-600">{attendance.remarks}</span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const AttendancePage = () => {
-  const [attendances, setAttendances] = useState([]);
+const AttendancePage = () => {
   const [employees, setEmployees] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showMarkModal, setShowMarkModal] = useState(false);
-  const [stats, setStats] = useState({});
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attendanceStatus, setAttendanceStatus] = useState('PRESENT');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const [empRes, attRes] = await Promise.all([
-        employeeService.getList(0, 100),
-        attendanceService.getList({ pageNo: 0, pageSize: 100 }),
-      ]);
+      // Fetch employees
+      const empResponse = await employeeService.getList(0, 100);
+      const empList = empResponse?.content || [];
+      const mappedEmps = empList.map((e) => ({
+        id: e.employeeId,
+        name: e.employeeName,
+        mobileNumber: e.mobileNumber,
+      }));
+      setEmployees(mappedEmps);
 
-      setEmployees(empRes.data || []);
-      setAttendances(attRes.data || []);
-
-      // Calculate stats
-      const total = attRes.data?.length || 0;
-      const present = attRes.data?.filter((a) => a.status === 'PRESENT').length || 0;
-      const absent = attRes.data?.filter((a) => a.status === 'ABSENT').length || 0;
-      const leave = attRes.data?.filter((a) => a.status === 'LEAVE').length || 0;
-      const holiday = attRes.data?.filter((a) => a.status === 'HOLIDAY').length || 0;
-
-      setStats({ total, present, absent, leave, holiday });
+      // Fetch attendance records for selected date
+      await fetchAttendanceForDate(selectedDate);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -101,146 +57,282 @@ export const AttendancePage = () => {
     }
   };
 
-  if (loading) return <MainLayout><Loading text="Loading attendance data..." /></MainLayout>;
+  const fetchAttendanceForDate = async (date) => {
+    try {
+      const response = await attendanceService.getByDate(date);
+      const records = response?.content || response || [];
+      const mapped = records.map((record) => ({
+        id: record.id || record.attendanceId,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName || 'Unknown',
+        status: record.status,
+        checkInTime: record.checkInTime,
+        checkOutTime: record.checkOutTime,
+        workingHours: record.workingHours,
+        date: record.date,
+      }));
+      setAttendanceRecords(mapped);
+    } catch (err) {
+      console.log('No records found for date:', err.message);
+      setAttendanceRecords([]);
+    }
+  };
+
+  const handleDateChange = async (date) => {
+    setSelectedDate(date);
+    setCurrentPage(1);
+    await fetchAttendanceForDate(date);
+  };
+
+  const handleMarkAttendance = async () => {
+    if (!selectedEmployee) {
+      setError('Please select an employee');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      await attendanceService.markAttendance({
+        employeeId: parseInt(selectedEmployee),
+        status: attendanceStatus,
+        date: selectedDate,
+      });
+
+      setShowModal(false);
+      setSelectedEmployee('');
+      setAttendanceStatus('PRESENT');
+      await fetchAttendanceForDate(selectedDate);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'PRESENT':
+        return 'success';
+      case 'ABSENT':
+        return 'danger';
+      case 'LEAVE':
+        return 'warning';
+      case 'HALF_DAY':
+        return 'info';
+      default:
+        return 'gray';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'PRESENT':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'ABSENT':
+        return <XCircle className="w-4 h-4" />;
+      case 'LEAVE':
+        return <Clock className="w-4 h-4" />;
+      default:
+        return null;
+    }
+  };
+
+  // Statistics
+  const stats = {
+    total: attendanceRecords.length,
+    present: attendanceRecords.filter(r => r.status === 'PRESENT').length,
+    absent: attendanceRecords.filter(r => r.status === 'ABSENT').length,
+    leave: attendanceRecords.filter(r => r.status === 'LEAVE').length,
+  };
+
+  if (loading) return <MainLayout><Loading text="Loading attendance..." /></MainLayout>;
+
+  // Table columns
+  const columns = [
+    {
+      key: 'employeeName',
+      label: 'Employee',
+      render: (value) => <span className="font-medium text-gray-900">{value}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (value) => (
+        <div className="flex items-center gap-2">
+          {getStatusIcon(value)}
+          <Badge variant={getStatusColor(value)}>{value}</Badge>
+        </div>
+      ),
+    },
+    {
+      key: 'checkInTime',
+      label: 'Check In',
+      render: (value) => <span className="text-gray-600">{value || 'N/A'}</span>,
+    },
+    {
+      key: 'checkOutTime',
+      label: 'Check Out',
+      render: (value) => <span className="text-gray-600">{value || 'N/A'}</span>,
+    },
+    {
+      key: 'workingHours',
+      label: 'Working Hours',
+      render: (value) => <span className="font-medium text-gray-900">{value || '-'}</span>,
+    },
+  ];
+
+  // Pagination
+  const totalPages = Math.ceil(attendanceRecords.length / itemsPerPage);
+  const paginatedData = attendanceRecords.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Calculate attendance percentage
+  const attendancePercentage = stats.total > 0 
+    ? Math.round((stats.present / stats.total) * 100) 
+    : 0;
 
   return (
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="slide-down flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">📍 Attendance Management</h1>
-            <p className="text-gray-600 mt-2">Track employee attendance records</p>
-          </div>
-          <Button onClick={() => setShowMarkModal(true)}>
-            ➕ Mark Attendance
-          </Button>
+        <div className="slide-down">
+          <h1 className="text-4xl font-bold text-gray-900">📍 Attendance Management</h1>
+          <p className="text-gray-600 mt-2">Track and manage employee attendance</p>
         </div>
 
-        {error && <ErrorMessage message={error} onRetry={fetchData} />}
+        {/* Error Message */}
+        {error && <ErrorMessage message={error} onRetry={() => fetchAttendanceForDate(selectedDate)} />}
 
-        {/* Statistics */}
-        <AttendanceStats stats={stats} />
-
-        {/* Filter */}
-        <Card className="flex gap-4 items-end">
-          <div className="flex-1">
+        {/* Date Selection and Actions */}
+        <Card className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+          <div className="flex-1 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-600" />
             <Input
-              label="Filter by Date"
               type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="flex-1"
             />
           </div>
-          <Button variant="outline">Search</Button>
+          <Button onClick={() => setShowModal(true)}>
+            ➕ Mark Attendance
+          </Button>
         </Card>
 
-        {/* Attendance List */}
-        <Card>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Records</h3>
-          <div className="space-y-3">
-            {attendances.slice(0, 10).map((att) => (
-              <AttendanceRow
-                key={att.id}
-                attendance={att}
-                employees={employees}
-              />
-            ))}
-          </div>
-        </Card>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <Card>
+            <p className="text-gray-600 text-sm">Total Marked</p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+          </Card>
+          <Card>
+            <p className="text-gray-600 text-sm">Present</p>
+            <p className="text-3xl font-bold text-green-600 mt-1">{stats.present}</p>
+          </Card>
+          <Card>
+            <p className="text-gray-600 text-sm">Absent</p>
+            <p className="text-3xl font-bold text-red-600 mt-1">{stats.absent}</p>
+          </Card>
+          <Card>
+            <p className="text-gray-600 text-sm">On Leave</p>
+            <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.leave}</p>
+          </Card>
+          <Card>
+            <p className="text-gray-600 text-sm">Attendance %</p>
+            <p className="text-3xl font-bold text-blue-600 mt-1">{attendancePercentage}%</p>
+          </Card>
+        </div>
+
+        {/* Attendance Table */}
+        {attendanceRecords.length === 0 ? (
+          <EmptyState message="No attendance records for this date" icon="📍" />
+        ) : (
+          <Card className="overflow-hidden">
+            <Table
+              columns={columns}
+              data={paginatedData}
+              pagination={{
+                currentPage,
+                totalPages,
+                itemsPerPage,
+                totalItems: attendanceRecords.length,
+              }}
+              onPaginationChange={(page) => setCurrentPage(page)}
+            />
+          </Card>
+        )}
       </div>
 
       {/* Mark Attendance Modal */}
       <Modal
-        isOpen={showMarkModal}
-        onClose={() => setShowMarkModal(false)}
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setSelectedEmployee('');
+          setAttendanceStatus('PRESENT');
+          setError('');
+        }}
         title="Mark Attendance"
         size="md"
       >
-        <MarkAttendanceForm
-          employees={employees}
-          onClose={() => setShowMarkModal(false)}
-          onSuccess={() => { setShowMarkModal(false); fetchData(); }}
-        />
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-blue-900 font-medium">
+              📅 {selectedDate ? formatDate(selectedDate) : 'Select date'}
+            </p>
+          </div>
+
+          <Select
+            label="Select Employee"
+            value={selectedEmployee}
+            onChange={(e) => setSelectedEmployee(e.target.value)}
+            options={employees.map(emp => ({
+              value: emp.id.toString(),
+              label: `${emp.name} (${emp.mobileNumber})`,
+            }))}
+            required
+          />
+
+          <Select
+            label="Attendance Status"
+            value={attendanceStatus}
+            onChange={(e) => setAttendanceStatus(e.target.value)}
+            options={[
+              { value: 'PRESENT', label: '✓ Present' },
+              { value: 'ABSENT', label: '✗ Absent' },
+              { value: 'LEAVE', label: '⏱ On Leave' },
+              { value: 'HALF_DAY', label: '◐ Half Day' },
+            ]}
+          />
+
+          <div className="flex gap-2 pt-4">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setShowModal(false);
+                setSelectedEmployee('');
+                setAttendanceStatus('PRESENT');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              loading={isSubmitting}
+              onClick={handleMarkAttendance}
+            >
+              Mark Attendance
+            </Button>
+          </div>
+        </div>
       </Modal>
     </MainLayout>
   );
 };
 
-const MarkAttendanceForm = ({ employees, onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    date: new Date().toISOString().split('T')[0],
-    status: 'PRESENT',
-    remarks: '',
-  });
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setIsLoading(true);
-      await attendanceService.mark(formData);
-      onSuccess();
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Select
-        label="Employee"
-        name="employeeId"
-        value={formData.employeeId}
-        onChange={handleChange}
-        options={employees.map((e) => ({ value: e.id, label: e.name }))}
-        required
-      />
-      <Input
-        label="Date"
-        type="date"
-        name="date"
-        value={formData.date}
-        onChange={handleChange}
-        required
-      />
-      <Select
-        label="Status"
-        name="status"
-        value={formData.status}
-        onChange={handleChange}
-        options={[
-          { value: 'PRESENT', label: 'Present' },
-          { value: 'ABSENT', label: 'Absent' },
-          { value: 'LEAVE', label: 'Leave' },
-          { value: 'WEEKEND', label: 'Weekend' },
-          { value: 'HOLIDAY', label: 'Holiday' },
-        ]}
-      />
-      <Input
-        label="Remarks (Optional)"
-        name="remarks"
-        value={formData.remarks}
-        onChange={handleChange}
-        placeholder="Any additional notes..."
-      />
-
-      <div className="flex gap-2 pt-4">
-        <Button type="submit" isLoading={isLoading} className="flex-1">
-          Mark Attendance
-        </Button>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-};
+export default AttendancePage;

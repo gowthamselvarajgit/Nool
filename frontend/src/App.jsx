@@ -9,24 +9,23 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { EmployeesPage } from './pages/EmployeesPage';
-import { AttendancePage } from './pages/AttendancePage';
-import { EmployeeDashboard } from './pages/EmployeeDashboard';
+import AttendancePage from './pages/AttendancePage';
+import SalaryPage from './pages/SalaryPage';
+import OwnersPage from './pages/OwnersPage';
+import EmployeeDashboard from './pages/EmployeeDashboard';
+import OwnerDashboard from './pages/OwnerDashboard';
+import AnalyticsPage from './pages/AnalyticsPage';
+import DailyWorkManagementPage from './pages/DailyWorkManagementPage';
+import InventoryManagementPage from './pages/InventoryManagementPage';
 import {
-  OwnerDashboard,
   OwnerProfile,
   InventoryPage,
   TransactionsPage,
   OwnerPaymentsPage,
   EmployeeProfile,
-  SalaryPage,
   DailyWorkPage,
   PerformancePage,
-  OwnersManagementPage,
-  InventoryManagementPage,
-  SalaryManagementPage,
   PaymentsManagementPage,
-  DailyWorkManagementPage,
-  AnalyticsPage,
 } from './pages/PlaceholderPages';
 
 function App() {
@@ -68,7 +67,7 @@ function App() {
             path="/admin/owners"
             element={
               <PrivateRoute requiredRole="ADMIN">
-                <OwnersManagementPage />
+                <OwnersPage />
               </PrivateRoute>
             }
           />
@@ -84,7 +83,7 @@ function App() {
             path="/admin/salary"
             element={
               <PrivateRoute requiredRole="ADMIN">
-                <SalaryManagementPage />
+                <SalaryPage />
               </PrivateRoute>
             }
           />
@@ -97,18 +96,18 @@ function App() {
             }
           />
           <Route
-            path="/admin/inventory"
-            element={
-              <PrivateRoute requiredRole="ADMIN">
-                <InventoryManagementPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
             path="/admin/daily-work"
             element={
               <PrivateRoute requiredRole="ADMIN">
                 <DailyWorkManagementPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/inventory"
+            element={
+              <PrivateRoute requiredRole="ADMIN">
+                <InventoryManagementPage />
               </PrivateRoute>
             }
           />

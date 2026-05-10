@@ -7,58 +7,14 @@ import {
   Select,
   Badge,
   Modal,
+  Table,
   Loading,
   ErrorMessage,
   EmptyState,
 } from '../components/Common';
 import { employeeService } from '../services/api';
 import { formatDate, getEmployeeStatusColor, getInitials } from '../utils/formatters';
-
-const EmployeeCard = ({ employee, onEdit, onViewDetails }) => {
-  return (
-    <Card hover className="slide-up">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold">
-            {getInitials(employee.name || 'E')}
-          </div>
-          <div>
-            <h3 className="font-bold text-gray-900">{employee.name}</h3>
-            <p className="text-sm text-gray-600">{employee.mobileNumber}</p>
-          </div>
-        </div>
-        <Badge variant={getEmployeeStatusColor(employee.status)}>
-          {employee.status}
-        </Badge>
-      </div>
-
-      <div className="space-y-2 text-sm mb-4 pb-4 border-b border-gray-200">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Employee ID:</span>
-          <span className="font-medium text-gray-900">#{employee.id}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Joining Date:</span>
-          <span className="font-medium text-gray-900">{formatDate(employee.joiningDate)}</span>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={() => onViewDetails(employee)}
-        >
-          View Details
-        </Button>
-        <Button size="sm" className="flex-1" onClick={() => onEdit(employee)}>
-          Edit
-        </Button>
-      </div>
-    </Card>
-  );
-};
+import { Edit2, Trash2, Eye } from 'lucide-react';
 
 const EmployeeForm = ({ initialData, onSubmit, isLoading }) => {
   const [formData, setFormData] = useState(
@@ -156,8 +112,11 @@ export const EmployeesPage = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchEmployees();
@@ -229,6 +188,21 @@ export const EmployeesPage = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedEmployee) return;
+    try {
+      setIsSubmitting(true);
+      await employeeService.delete(selectedEmployee.id);
+      setShowDeleteModal(false);
+      setSelectedEmployee(null);
+      fetchEmployees();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleEdit = (employee) => {
     // map employee to form initialData shape (no password)
     setSelectedEmployee({
@@ -248,6 +222,81 @@ export const EmployeesPage = () => {
   };
 
   if (loading) return <MainLayout><Loading text="Loading employees..." /></MainLayout>;
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const paginatedData = filteredEmployees.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Table columns configuration
+  const columns = [
+    {
+      key: 'name',
+      label: 'Name',
+      render: (value, row) => (
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white text-xs font-bold">
+            {getInitials(row.name)}
+          </div>
+          <span className="font-medium text-gray-900">{value}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'mobileNumber',
+      label: 'Mobile',
+      render: (value) => <span className="text-gray-600">{value}</span>,
+    },
+    {
+      key: 'joiningDate',
+      label: 'Joining Date',
+      render: (value) => <span className="text-gray-600">{formatDate(value)}</span>,
+    },
+    {
+      key: 'polishingRate',
+      label: 'Rate',
+      render: (value) => <span className="font-medium text-gray-900">₹{value}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (value) => <Badge variant={getEmployeeStatusColor(value)}>{value}</Badge>,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleViewDetails(row)}
+            className="p-1.5 hover:bg-blue-50 rounded transition-colors"
+            title="View details"
+          >
+            <Eye className="w-4 h-4 text-blue-600" />
+          </button>
+          <button
+            onClick={() => handleEdit(row)}
+            className="p-1.5 hover:bg-amber-50 rounded transition-colors"
+            title="Edit"
+          >
+            <Edit2 className="w-4 h-4 text-amber-600" />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedEmployee(row);
+              setShowDeleteModal(true);
+            }}
+            className="p-1.5 hover:bg-red-50 rounded transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4 text-red-600" />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <MainLayout>
@@ -275,7 +324,7 @@ export const EmployeesPage = () => {
         </Card>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <p className="text-gray-600 text-sm">Total Employees</p>
             <p className="text-3xl font-bold text-gray-900 mt-1">{employees.length}</p>
@@ -294,20 +343,23 @@ export const EmployeesPage = () => {
           </Card>
         </div>
 
-        {/* Employee List */}
+        {/* Employee Table */}
         {filteredEmployees.length === 0 ? (
           <EmptyState message="No employees found" icon="👤" />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEmployees.map((employee) => (
-              <EmployeeCard
-                key={employee.id}
-                employee={employee}
-                onEdit={handleEdit}
-                onViewDetails={handleViewDetails}
-              />
-            ))}
-          </div>
+          <Card className="overflow-hidden">
+            <Table
+              columns={columns}
+              data={paginatedData}
+              pagination={{
+                currentPage,
+                totalPages,
+                itemsPerPage,
+                totalItems: filteredEmployees.length,
+              }}
+              onPaginationChange={(page) => setCurrentPage(page)}
+            />
+          </Card>
         )}
       </div>
 
@@ -364,6 +416,42 @@ export const EmployeesPage = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setSelectedEmployee(null); }}
+        title="Delete Employee"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800 font-medium">
+              ⚠️ Are you sure you want to delete <strong>{selectedEmployee?.name}</strong>?
+            </p>
+            <p className="text-red-700 text-sm mt-2">
+              This action cannot be undone. All employee records will be permanently deleted.
+            </p>
+          </div>
+          <div className="flex gap-2 pt-4">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => { setShowDeleteModal(false); setSelectedEmployee(null); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              loading={isSubmitting}
+              onClick={handleDelete}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
       </Modal>
     </MainLayout>
   );

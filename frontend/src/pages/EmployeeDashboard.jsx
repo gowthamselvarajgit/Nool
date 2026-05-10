@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Card, Button, Badge, Loading, ErrorMessage, EmptyState } from '../components/Common';
+import {
+  Card,
+  Button,
+  Badge,
+  Loading,
+  ErrorMessage,
+  StatCard,
+} from '../components/Common';
 import { employeeService, attendanceService } from '../services/api';
-import { formatDate, formatCurrency, getEmployeeStatusColor } from '../utils/formatters';
+import { formatDate } from '../utils/formatters';
+import { CheckCircle, Clock, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
 
-const QuickActionCard = ({ icon, title, description, onClick }) => {
-  return (
-    <Card hover className="cursor-pointer" onClick={onClick}>
-      <div className="flex items-start gap-4">
-        <span className="text-4xl">{icon}</span>
-        <div>
-          <h3 className="font-bold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-600 mt-1">{description}</p>
-        </div>
-      </div>
-    </Card>
-  );
-};
-
-export const EmployeeDashboard = () => {
-  const [profile, setProfile] = useState(null);
-  const [attendance, setAttendance] = useState(null);
+const EmployeeDashboard = () => {
+  const [employeeData, setEmployeeData] = useState(null);
+  const [stats, setStats] = useState({});
+  const [recentAttendance, setRecentAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -32,21 +27,45 @@ export const EmployeeDashboard = () => {
     try {
       setLoading(true);
       setError('');
-      
-      const profileData = await employeeService.getMe();
-      setProfile(profileData);
 
-      // Get today's attendance
-      const today = new Date().toISOString().split('T')[0];
-      const attData = await attendanceService.getList({
-        pageNo: 0,
-        pageSize: 1,
-        date: today,
-      });
+      // Get current employee details from localStorage/context
+      // In real app, would get from user context or auth service
+      const employeeId = localStorage.getItem('employeeId');
       
-      if (attData.data && attData.data.length > 0) {
-        setAttendance(attData.data[0]);
+      if (!employeeId) {
+        setError('Employee ID not found');
+        return;
       }
+
+      // Fetch employee details
+      const empResponse = await employeeService.getById(employeeId);
+      setEmployeeData({
+        id: empResponse.employeeId,
+        name: empResponse.employeeName,
+        mobileNumber: empResponse.mobileNumber,
+        joiningDate: empResponse.joiningDate,
+        polishingRate: empResponse.polishingRate,
+        status: empResponse.status,
+      });
+
+      // Fetch recent attendance
+      const attResponse = await attendanceService.getByEmployeeId(employeeId, 0, 30);
+      const attList = attResponse?.content || [];
+      setRecentAttendance(attList.slice(0, 10));
+
+      // Calculate statistics
+      const present = attList.filter(a => a.status === 'PRESENT').length;
+      const absent = attList.filter(a => a.status === 'ABSENT').length;
+      const leave = attList.filter(a => a.status === 'LEAVE').length;
+      const total = attList.length;
+
+      setStats({
+        presentDays: present,
+        absentDays: absent,
+        leaveDays: leave,
+        totalRecords: total,
+        attendance: total > 0 ? Math.round((present / total) * 100) : 0,
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -58,126 +77,212 @@ export const EmployeeDashboard = () => {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        {/* Welcome Banner */}
+      <div className="space-y-6">
+        {/* Welcome Header */}
         <div className="slide-down">
-          <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Welcome back, {profile?.name}! 👋
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  {profile?.status === 'ACTIVE' 
-                    ? "You're all set for today. Great to see you!" 
-                    : `Your current status is ${profile?.status}`}
-                </p>
-              </div>
-              <Badge variant={getEmployeeStatusColor(profile?.status)}>
-                {profile?.status}
-              </Badge>
-            </div>
-          </Card>
+          <h1 className="text-4xl font-bold text-gray-900">
+            👋 Welcome, {employeeData?.name}
+          </h1>
+          <p className="text-gray-600 mt-2">Here's your work summary and attendance overview</p>
         </div>
 
         {error && <ErrorMessage message={error} onRetry={fetchEmployeeData} />}
 
-        {/* Key Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <p className="text-gray-600 text-sm">Employee ID</p>
-            <p className="text-3xl font-bold text-indigo-600 mt-2">#{profile?.id}</p>
-          </Card>
-          <Card>
-            <p className="text-gray-600 text-sm">Joining Date</p>
-            <p className="text-lg font-bold text-gray-900 mt-2">
-              {formatDate(profile?.joiningDate)}
-            </p>
-          </Card>
-          <Card>
-            <p className="text-gray-600 text-sm">Polishing Rate</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">
-              ₹{profile?.polishingRate || 0}
-            </p>
-          </Card>
-        </div>
-
-        {/* Attendance Status */}
-        <Card>
-          <div className="flex items-center justify-between">
+        {/* Employee Info Card */}
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">📍 Today's Attendance</h3>
-              {attendance ? (
-                <div className="mt-2">
-                  <Badge variant="success" className="mb-2">
-                    ✓ Marked
-                  </Badge>
-                  <p className="text-sm text-gray-600">
-                    Status: <span className="font-medium text-gray-900">{attendance.status}</span>
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-600 mt-2">Not marked yet</p>
-              )}
+              <p className="text-gray-600 text-sm mb-1">Employee ID</p>
+              <p className="text-2xl font-bold text-gray-900">#{employeeData?.id}</p>
             </div>
-            <Button onClick={() => window.location.href = '/employee/attendance'}>
-              Mark Attendance
-            </Button>
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Status</p>
+              <Badge variant={employeeData?.status === 'ACTIVE' ? 'success' : 'danger'}>
+                {employeeData?.status}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Mobile</p>
+              <p className="text-lg font-medium text-gray-900">{employeeData?.mobileNumber}</p>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Polishing Rate</p>
+              <p className="text-lg font-medium text-green-600">₹{employeeData?.polishingRate}/unit</p>
+            </div>
           </div>
         </Card>
 
-        {/* Quick Actions */}
-        <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">⚡ Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <QuickActionCard
-              icon="💰"
-              title="View Salary"
-              description="Check your salary details and payment history"
-              onClick={() => window.location.href = '/employee/salary'}
-            />
-            <QuickActionCard
-              icon="📝"
-              title="Daily Work"
-              description="Log your daily work and productivity"
-              onClick={() => window.location.href = '/employee/daily-work'}
-            />
-            <QuickActionCard
-              icon="👤"
-              title="My Profile"
-              description="Update your personal information"
-              onClick={() => window.location.href = '/employee/profile'}
-            />
-            <QuickActionCard
-              icon="📊"
-              title="Performance"
-              description="View your performance metrics"
-              onClick={() => window.location.href = '/employee/performance'}
-            />
-          </div>
+        {/* Attendance Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatCard
+            icon={<CheckCircle className="w-6 h-6" />}
+            color="success"
+            title="Days Present"
+            value={stats.presentDays}
+            description={`${stats.presentDays} days recorded`}
+          />
+          <StatCard
+            icon={<AlertCircle className="w-6 h-6" />}
+            color="danger"
+            title="Days Absent"
+            value={stats.absentDays}
+            description={`${stats.absentDays} days missed`}
+          />
+          <StatCard
+            icon={<Clock className="w-6 h-6" />}
+            color="warning"
+            title="Leave Days"
+            value={stats.leaveDays}
+            description={`${stats.leaveDays} days approved`}
+          />
+          <StatCard
+            icon={<TrendingUp className="w-6 h-6" />}
+            color="info"
+            title="Attendance Rate"
+            value={`${stats.attendance}%`}
+            description="Overall attendance"
+          />
         </div>
 
-        {/* Information Cards */}
+        {/* Attendance Progress */}
         <Card>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">📋 Important Information</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Attendance Progress</h3>
           <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-              <span className="text-xl">ℹ️</span>
-              <div>
-                <p className="font-medium text-gray-900">Mark Attendance Daily</p>
-                <p className="text-sm text-gray-600">Make sure to mark your attendance before end of the day</p>
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">Present</span>
+                <span className="font-medium text-green-600">{stats.presentDays} days</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(stats.presentDays / stats.totalRecords * 100) || 0}%` }}
+                />
               </div>
             </div>
-            <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
-              <span className="text-xl">✓</span>
-              <div>
-                <p className="font-medium text-gray-900">Update Daily Work</p>
-                <p className="text-sm text-gray-600">Log your daily activities and tasks completed</p>
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">On Leave</span>
+                <span className="font-medium text-yellow-600">{stats.leaveDays} days</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-yellow-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(stats.leaveDays / stats.totalRecords * 100) || 0}%` }}
+                />
               </div>
             </div>
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">Absent</span>
+                <span className="font-medium text-red-600">{stats.absentDays} days</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-red-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(stats.absentDays / stats.totalRecords * 100) || 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Recent Attendance */}
+        <Card>
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-600" />
+            Recent Attendance Records
+          </h3>
+          {recentAttendance.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No attendance records yet</p>
+          ) : (
+            <div className="space-y-2">
+              {recentAttendance.map((record) => (
+                <div
+                  key={record.id || record.attendanceId}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {record.status === 'PRESENT' ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : record.status === 'LEAVE' ? (
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                    )}
+                    <div>
+                      <p className="text-sm text-gray-600">{formatDate(record.date)}</p>
+                      <p className="text-xs text-gray-500">
+                        {record.checkInTime && `Check-in: ${record.checkInTime}`}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={
+                      record.status === 'PRESENT'
+                        ? 'success'
+                        : record.status === 'LEAVE'
+                        ? 'warning'
+                        : 'danger'
+                    }
+                  >
+                    {record.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Quick Links */}
+        <Card>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Links</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="text-left"
+              onClick={() => {
+                // Navigate to attendance page
+                window.location.hash = '#/attendance';
+              }}
+            >
+              📍 View Full Attendance
+            </Button>
+            <Button
+              variant="outline"
+              className="text-left"
+              onClick={() => {
+                // Navigate to salary page
+                window.location.hash = '#/salary';
+              }}
+            >
+              💰 View Salary Details
+            </Button>
+            <Button
+              variant="outline"
+              className="text-left"
+              onClick={() => {
+                // Navigate to daily work
+                window.location.hash = '#/daily-work';
+              }}
+            >
+              📝 Daily Work Records
+            </Button>
+            <Button
+              variant="outline"
+              className="text-left"
+              onClick={() => {
+                // Contact admin
+                alert('Contact your administrator for support');
+              }}
+            >
+              💬 Contact Admin
+            </Button>
           </div>
         </Card>
       </div>
     </MainLayout>
   );
 };
+
+export default EmployeeDashboard;
