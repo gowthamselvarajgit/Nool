@@ -6,8 +6,8 @@ import {
   Badge,
   Loading,
   ErrorMessage,
-  StatCard,
 } from '../components/Common';
+import StatCard from '../components/StatCard';
 import { employeeService, attendanceService } from '../services/api';
 import { formatDate } from '../utils/formatters';
 import { CheckCircle, Clock, TrendingUp, Calendar, AlertCircle } from 'lucide-react';

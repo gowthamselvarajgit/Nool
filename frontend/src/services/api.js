@@ -44,7 +44,7 @@ export const authService = {
   },
 
   logout: async () => {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: headers(),
     });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Card, Button, Input, Select, Modal, Badge, Table } from '../components/Common';
+import { Card, Button, Input, Select, Modal, Badge } from '../components/Common';
+import Table from '../components/Table';
 import { Plus, Edit2, Trash2, Eye, Clock, CheckCircle, AlertCircle, Download } from 'lucide-react';
 
 export default function DailyWorkManagementPage() {

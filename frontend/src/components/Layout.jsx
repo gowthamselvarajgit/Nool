@@ -7,6 +7,7 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [activeMenu, setActiveMenu] = useState('');
 
   const handleLogout = () => {
     logout();

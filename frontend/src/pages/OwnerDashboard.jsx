@@ -4,12 +4,12 @@ import {
   Card,
   Button,
   Badge,
-  Table,
   Loading,
   ErrorMessage,
-  StatCard,
 } from '../components/Common';
-import { sareeOwnerService } from '../services/api';
+import Table from '../components/Table';
+import StatCard from '../components/StatCard';
+import { ownerService } from '../services/api';
 import { formatDate } from '../utils/formatters';
 import { DollarSign, TrendingUp, CreditCard, AlertCircle } from 'lucide-react';
 
@@ -40,7 +40,7 @@ const OwnerDashboard = () => {
       }
 
       // Fetch owner details
-      const ownerResponse = await sareeOwnerService.getById(ownerId);
+      const ownerResponse = await ownerService.getById(ownerId);
       setOwnerData({
         id: ownerResponse.sareeOwnerId,
         name: ownerResponse.ownerName,
@@ -53,7 +53,7 @@ const OwnerDashboard = () => {
       });
 
       // Fetch transactions
-      const transResponse = await sareeOwnerService.getTransactions(ownerId, 0, 50);
+      const transResponse = await ownerService.getTransactions(ownerId, 0, 50);
       const transList = transResponse?.content || [];
       setTransactions(transList);
 

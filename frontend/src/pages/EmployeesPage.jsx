@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
-import {
-  Card,
-  Button,
-  Input,
-  Select,
-  Badge,
-  Modal,
-  Table,
-  Loading,
-  ErrorMessage,
-  EmptyState,
-} from '../components/Common';
+import { Button, Card, Input, Modal, Badge } from '../components/Common';
+import { Table } from '../components/Table';
 import { employeeService } from '../services/api';
 import { formatDate, getEmployeeStatusColor, getInitials } from '../utils/formatters';
 import { Edit2, Trash2, Eye } from 'lucide-react';

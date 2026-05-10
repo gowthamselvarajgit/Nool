@@ -65,10 +65,10 @@ export const LoginPage = () => {
         case 'ADMIN':
           navigate('/admin/dashboard');
           break;
-        case 'EMPLOYEE':
+        case 'WORKER':
           navigate('/employee/dashboard');
           break;
-        case 'OWNER':
+        case 'SAREE_OWNER':
           navigate('/owner/dashboard');
           break;
         default:

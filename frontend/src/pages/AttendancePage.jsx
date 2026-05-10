@@ -7,11 +7,11 @@ import {
   Select,
   Badge,
   Modal,
-  Table,
   Loading,
   ErrorMessage,
   EmptyState,
 } from '../components/Common';
+import { Table } from '../components/Table';
 import { attendanceService, employeeService } from '../services/api';
 import { formatDate } from '../utils/formatters';
 import { Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';

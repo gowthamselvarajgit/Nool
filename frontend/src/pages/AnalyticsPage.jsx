@@ -6,8 +6,8 @@ import {
   Select,
   Loading,
   ErrorMessage,
-  StatCard,
 } from '../components/Common';
+import StatCard from '../components/StatCard';
 import { employeeService, attendanceService, salaryService } from '../services/api';
 import {
   LineChart,

@@ -124,7 +124,7 @@ function App() {
           <Route
             path="/employee/dashboard"
             element={
-              <PrivateRoute requiredRole="EMPLOYEE">
+              <PrivateRoute requiredRole="WORKER">
                 <EmployeeDashboard />
               </PrivateRoute>
             }
@@ -132,7 +132,7 @@ function App() {
           <Route
             path="/employee/profile"
             element={
-              <PrivateRoute requiredRole="EMPLOYEE">
+              <PrivateRoute requiredRole="WORKER">
                 <EmployeeProfile />
               </PrivateRoute>
             }
@@ -140,7 +140,7 @@ function App() {
           <Route
             path="/employee/attendance"
             element={
-              <PrivateRoute requiredRole="EMPLOYEE">
+              <PrivateRoute requiredRole="WORKER">
                 <AttendancePage />
               </PrivateRoute>
             }
@@ -148,7 +148,7 @@ function App() {
           <Route
             path="/employee/salary"
             element={
-              <PrivateRoute requiredRole="EMPLOYEE">
+              <PrivateRoute requiredRole="WORKER">
                 <SalaryPage />
               </PrivateRoute>
             }
@@ -156,7 +156,7 @@ function App() {
           <Route
             path="/employee/daily-work"
             element={
-              <PrivateRoute requiredRole="EMPLOYEE">
+              <PrivateRoute requiredRole="WORKER">
                 <DailyWorkPage />
               </PrivateRoute>
             }
@@ -164,7 +164,7 @@ function App() {
           <Route
             path="/employee/performance"
             element={
-              <PrivateRoute requiredRole="EMPLOYEE">
+              <PrivateRoute requiredRole="WORKER">
                 <PerformancePage />
               </PrivateRoute>
             }
@@ -174,7 +174,7 @@ function App() {
           <Route
             path="/owner/dashboard"
             element={
-              <PrivateRoute requiredRole="OWNER">
+              <PrivateRoute requiredRole="SAREE_OWNER">
                 <OwnerDashboard />
               </PrivateRoute>
             }
@@ -182,7 +182,7 @@ function App() {
           <Route
             path="/owner/profile"
             element={
-              <PrivateRoute requiredRole="OWNER">
+              <PrivateRoute requiredRole="SAREE_OWNER">
                 <OwnerProfile />
               </PrivateRoute>
             }
@@ -190,7 +190,7 @@ function App() {
           <Route
             path="/owner/inventory"
             element={
-              <PrivateRoute requiredRole="OWNER">
+              <PrivateRoute requiredRole="SAREE_OWNER">
                 <InventoryPage />
               </PrivateRoute>
             }
@@ -198,7 +198,7 @@ function App() {
           <Route
             path="/owner/transactions"
             element={
-              <PrivateRoute requiredRole="OWNER">
+              <PrivateRoute requiredRole="SAREE_OWNER">
                 <TransactionsPage />
               </PrivateRoute>
             }
@@ -206,7 +206,7 @@ function App() {
           <Route
             path="/owner/payments"
             element={
-              <PrivateRoute requiredRole="OWNER">
+              <PrivateRoute requiredRole="SAREE_OWNER">
                 <OwnerPaymentsPage />
               </PrivateRoute>
             }

@@ -7,12 +7,12 @@ import {
   Select,
   Badge,
   Modal,
-  Table,
   Loading,
   ErrorMessage,
   EmptyState,
 } from '../components/Common';
-import { sareeOwnerService } from '../services/api';
+import Table from '../components/Table';
+import { ownerService } from '../services/api';
 import { formatDate, getInitials } from '../utils/formatters';
 import { Edit2, Trash2, Eye, DollarSign } from 'lucide-react';
 
@@ -52,7 +52,7 @@ const OwnerManagementPage = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await sareeOwnerService.getList(0, 100);
+      const response = await ownerService.getList(0, 100);
       const list = response?.content || [];
       const mapped = list.map((owner) => ({
         id: owner.sareeOwnerId,
@@ -79,7 +79,7 @@ const OwnerManagementPage = () => {
       setIsSubmitting(true);
       if (selectedOwner) {
         // Update
-        await sareeOwnerService.update({
+        await ownerService.update({
           sareeOwnerId: selectedOwner.id,
           ownerName: formData.ownerName,
           mobileNumber: formData.mobileNumber,
@@ -88,7 +88,7 @@ const OwnerManagementPage = () => {
         });
       } else {
         // Create
-        await sareeOwnerService.create({
+        await ownerService.create({
           ownerName: formData.ownerName,
           mobileNumber: formData.mobileNumber,
           email: formData.email,
@@ -109,7 +109,7 @@ const OwnerManagementPage = () => {
     if (!selectedOwner) return;
     try {
       setIsSubmitting(true);
-      await sareeOwnerService.delete(selectedOwner.id);
+      await ownerService.delete(selectedOwner.id);
       setShowDeleteModal(false);
       setSelectedOwner(null);
       fetchOwners();

@@ -32,9 +32,9 @@ export const PublicRoute = ({ children }) => {
     switch (user?.role) {
       case 'ADMIN':
         return <Navigate to="/admin/dashboard" replace />;
-      case 'EMPLOYEE':
+      case 'WORKER':
         return <Navigate to="/employee/dashboard" replace />;
-      case 'OWNER':
+      case 'SAREE_OWNER':
         return <Navigate to="/owner/dashboard" replace />;
       default:
         return <Navigate to="/" replace />;
