@@ -24,6 +24,7 @@ public class GlobalExceptionHandler {
                 .timeStamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
                 .error("Not Found")
+                .message(exception.getMessage())
                 .path(request.getRequestURI())
                 .build();
 
@@ -92,7 +93,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
-    @ExceptionHandler(IllegalAccessException.class)
+    @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception, HttpServletRequest request){
         ApiErrorResponse errorResponse = ApiErrorResponse.builder()
                 .timeStamp(LocalDateTime.now())

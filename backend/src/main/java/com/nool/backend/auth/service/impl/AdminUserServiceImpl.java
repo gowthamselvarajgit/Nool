@@ -6,6 +6,7 @@ import com.nool.backend.auth.repository.AuthUserRepository;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.enums.Role;
 import com.nool.backend.repository.auth.UserProfileRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional
     public void createEmployeeUser(String mobileNumber, String rawPassword, Long employeeId) {
         User user = User.builder()
                 .mobileNumber(mobileNumber)
@@ -35,6 +37,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    @Transactional
     public void createOwnerUser(String mobileNumber, String rawPassword, Long ownerId) {
         User user = User.builder()
                 .mobileNumber(mobileNumber)

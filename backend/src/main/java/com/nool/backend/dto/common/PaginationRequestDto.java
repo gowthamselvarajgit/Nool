@@ -16,4 +16,6 @@ public class PaginationRequestDto {
     private String sortBy = "createdAt";
 
     private String sortingDirection = "DESC";
+
+    private String searchKeyword = "";
 }

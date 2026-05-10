@@ -1,5 +1,11 @@
 package com.nool.backend.auth.service.impl;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
 import com.nool.backend.auth.dto.AuthLoginRequestDto;
 import com.nool.backend.auth.dto.AuthLoginResponseDto;
 import com.nool.backend.auth.entity.User;
@@ -8,12 +14,8 @@ import com.nool.backend.auth.repository.AuthUserRepository;
 import com.nool.backend.auth.security.JwtUtil;
 import com.nool.backend.auth.service.AuthService;
 import com.nool.backend.exception.BadRequestException;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -39,14 +41,16 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // ✅ Prepare JWT claims
+        UserProfile profile = user.getUserProfile();
+        
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().name());
+        claims.put("employeeId", profile != null ? profile.getEmployeeId() : null);
+        claims.put("ownerId", profile != null ? profile.getOwnerId() : null);
 
         // ✅ Generate JWT
         String token = jwtUtil.generateToken(claims, user.getMobileNumber());
-
-        UserProfile profile = user.getUserProfile();
 
         return AuthLoginResponseDto.builder()
                 .token(token)

@@ -99,7 +99,10 @@ public class EmployeeServiceImpl implements EmployeeService {
                 paginationRequestDto.getSortBy()
                 );
 
-        Page<Employee> page = employeeRepository.findAll(pageRequest);
+        String keyword = paginationRequestDto.getSearchKeyword();
+        Page<Employee> page = (keyword != null && !keyword.isBlank())
+                ? employeeRepository.searchEmployees(keyword, pageRequest)
+                : employeeRepository.findAll(pageRequest);
 
         return PaginationResponseDto.<EmployeeListResponse>builder()
                 .content(

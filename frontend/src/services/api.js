@@ -13,6 +13,24 @@ const headers = (token = null) => {
   return h;
 };
 
+const handleResponse = async (response) => {
+  if (response.status === 401) {
+    // Auto logout on 401nool_token
+    localStorage.removeItem('nool_token');
+    localStorage.removeItem('nool_user');
+    window.location.href = '/login';
+    return;
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const message = errorData?.message || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+};
 // Auth Services
 export const authService = {
   login: async (mobileNumber, password) => {
@@ -22,10 +40,7 @@ export const authService = {
       body: JSON.stringify({ mobileNumber, password }),
     });
 
-    if (!response.ok) {
-      throw new Error('Invalid credentials');
-    }
-    return await response.json();
+    return await handleResponse(response);
   },
 
   logout: async () => {
@@ -33,6 +48,7 @@ export const authService = {
       method: 'POST',
       headers: headers(),
     });
+    return await handleResponse(response);
   },
 
   validate: async () => {
@@ -40,7 +56,7 @@ export const authService = {
       method: 'GET',
       headers: headers(),
     });
-    return await response.json();
+    return await handleResponse(response);
   },
 };
 
@@ -52,8 +68,7 @@ export const employeeService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create employee');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getById: async (id) => {
@@ -61,8 +76,7 @@ export const employeeService = {
       method: 'GET',
       headers: headers(),
     });
-    if (!response.ok) throw new Error('Employee not found');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getMe: async () => {
@@ -70,8 +84,7 @@ export const employeeService = {
       method: 'GET',
       headers: headers(),
     });
-    if (!response.ok) throw new Error('Failed to fetch profile');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   update: async (data) => {
@@ -80,7 +93,7 @@ export const employeeService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update employee');
+    return await handleResponse(response);
   },
 
   getList: async (pageNo = 0, pageSize = 10, searchKeyword = '') => {
@@ -89,8 +102,7 @@ export const employeeService = {
       headers: headers(),
       body: JSON.stringify({ pageNo, pageSize, searchKeyword }),
     });
-    if (!response.ok) throw new Error('Failed to fetch employees');
-    return await response.json();
+    return await handleResponse(response);
   },
 };
 
@@ -102,8 +114,7 @@ export const attendanceService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to mark attendance');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getById: async (id) => {
@@ -111,8 +122,7 @@ export const attendanceService = {
       method: 'GET',
       headers: headers(),
     });
-    if (!response.ok) throw new Error('Attendance not found');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getList: async (filters) => {
@@ -121,8 +131,7 @@ export const attendanceService = {
       headers: headers(),
       body: JSON.stringify(filters),
     });
-    if (!response.ok) throw new Error('Failed to fetch attendance');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getSummary: async (startDate, endDate) => {
@@ -131,8 +140,7 @@ export const attendanceService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch summary');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getEmployeeSummary: async (employeeId, startDate, endDate) => {
@@ -144,8 +152,7 @@ export const attendanceService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch summary');
-    return await response.json();
+    return await handleResponse(response);
   },
 };
 
@@ -157,8 +164,7 @@ export const salaryService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create salary payment');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getHistory: async (employeeId, startDate, endDate) => {
@@ -170,8 +176,7 @@ export const salaryService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch salary history');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getSummary: async (startDate, endDate) => {
@@ -180,8 +185,7 @@ export const salaryService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch salary summary');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getEmployeeSummary: async (employeeId, startDate, endDate) => {
@@ -193,8 +197,7 @@ export const salaryService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch employee salary summary');
-    return await response.json();
+    return await handleResponse(response);
   },
 };
 
@@ -205,8 +208,7 @@ export const dashboardService = {
       method: 'GET',
       headers: headers(),
     });
-    if (!response.ok) throw new Error('Failed to fetch dashboard summary');
-    return await response.json();
+        return await handleResponse(response);
   },
 
   getRevenueAnalytics: async (startDate, endDate) => {
@@ -215,8 +217,7 @@ export const dashboardService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch revenue analytics');
-    return await response.json();
+        return await handleResponse(response);
   },
 
   getMonthlyRevenue: async (month, year) => {
@@ -225,8 +226,7 @@ export const dashboardService = {
       headers: headers(),
       body: JSON.stringify({ month, year }),
     });
-    if (!response.ok) throw new Error('Failed to fetch monthly revenue');
-    return await response.json();
+    return await handleResponse(response);
   },
 
   getWorkforceAnalytics: async (startDate, endDate) => {
@@ -235,8 +235,7 @@ export const dashboardService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch workforce analytics');
-    return await response.json();
+    return await handleResponse(response);
   },
 };
 
@@ -248,8 +247,8 @@ export const ownerService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create owner');
-    return await response.json();
+        return await handleResponse(response);
+
   },
 
   getById: async (id) => {
@@ -257,8 +256,8 @@ export const ownerService = {
       method: 'GET',
       headers: headers(),
     });
-    if (!response.ok) throw new Error('Owner not found');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getMe: async () => {
@@ -266,8 +265,8 @@ export const ownerService = {
       method: 'GET',
       headers: headers(),
     });
-    if (!response.ok) throw new Error('Failed to fetch profile');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   update: async (data) => {
@@ -276,7 +275,7 @@ export const ownerService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update owner');
+    return await handleResponse(response);
   },
 
   getList: async (pageNo = 0, pageSize = 10, searchKeyword = '') => {
@@ -285,8 +284,8 @@ export const ownerService = {
       headers: headers(),
       body: JSON.stringify({ pageNo, pageSize, searchKeyword }),
     });
-    if (!response.ok) throw new Error('Failed to fetch owners');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 };
 
@@ -298,8 +297,8 @@ export const inventoryService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create transaction');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getTransactions: async (filters) => {
@@ -308,8 +307,8 @@ export const inventoryService = {
       headers: headers(),
       body: JSON.stringify(filters),
     });
-    if (!response.ok) throw new Error('Failed to fetch transactions');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getSummary: async (startDate, endDate) => {
@@ -318,8 +317,8 @@ export const inventoryService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch inventory summary');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getOwnerSummary: async (ownerId, startDate, endDate) => {
@@ -331,8 +330,8 @@ export const inventoryService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch owner summary');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getMySummary: async (startDate, endDate) => {
@@ -341,8 +340,8 @@ export const inventoryService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch my summary');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 };
 
@@ -354,8 +353,8 @@ export const ownerPaymentService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create owner payment');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getHistory: async (ownerId, startDate, endDate) => {
@@ -367,8 +366,8 @@ export const ownerPaymentService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch payment history');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getSummary: async (startDate, endDate) => {
@@ -377,8 +376,8 @@ export const ownerPaymentService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch payment summary');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getOwnerSummary: async (ownerId, startDate, endDate) => {
@@ -390,8 +389,8 @@ export const ownerPaymentService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch owner payment summary');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 };
 
@@ -404,7 +403,8 @@ export const dailyWorkService = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to create daily work record');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getList: async (filters) => {
@@ -413,8 +413,8 @@ export const dailyWorkService = {
       headers: headers(),
       body: JSON.stringify(filters),
     });
-    if (!response.ok) throw new Error('Failed to fetch daily work records');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getSummary: async (startDate, endDate) => {
@@ -423,8 +423,8 @@ export const dailyWorkService = {
       headers: headers(),
       body: JSON.stringify({ startDate, endDate }),
     });
-    if (!response.ok) throw new Error('Failed to fetch daily work summary');
-    return await response.json();
+    return await handleResponse(response);
+
   },
 
   getEmployeeSummary: async (employeeId, startDate, endDate) => {
@@ -436,7 +436,6 @@ export const dailyWorkService = {
         body: JSON.stringify({ startDate, endDate }),
       }
     );
-    if (!response.ok) throw new Error('Failed to fetch employee daily work summary');
-    return await response.json();
+    return await handleResponse(response);
   },
 };

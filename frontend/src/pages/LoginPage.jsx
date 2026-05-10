@@ -56,6 +56,8 @@ export const LoginPage = () => {
       login(response.token, {
         role: response.role,
         mobileNumber: formData.mobileNumber,
+        employeeId: response.employeeId || null,
+        sareeOwnerId: response.sareeOwnerId || null,
       });
 
       // Route based on role
@@ -123,12 +125,12 @@ export const LoginPage = () => {
               required
             />
 
-            {/* Demo Credentials Info */}
+            {/* Demo Credentials Info
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
               <p className="font-medium mb-2">Demo Credentials:</p>
               <p>Mobile: 9876543210</p>
               <p>Password: Admin@123</p>
-            </div>
+            </div> */}
 
             {/* Submit Button */}
             <Button
