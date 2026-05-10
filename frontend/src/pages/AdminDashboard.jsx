@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../components/Layout';
+import {MainLayout} from '../components/Layout';
 import Card from '../components/Card';
 import StatCard from '../components/StatCard';
 import Button from '../components/Button';
