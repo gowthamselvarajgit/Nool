@@ -31,16 +31,10 @@ export const LandingPage = () => {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/login')}
-            className="text-sm font-semibold text-secondary-700 hover:text-primary-600 transition-colors px-4 py-2"
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => navigate('/login')}
             className="group relative inline-flex items-center justify-center gap-2 text-sm font-semibold text-white px-6 py-2.5 rounded-full overflow-hidden transition-all duration-300 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 hover:-translate-y-0.5"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-primary-600 to-indigo-600 transition-transform duration-300 group-hover:scale-[1.02]"></div>
-            <span className="relative">Get Started</span>
+            <span className="relative">Sign In</span>
             <ArrowRight className="relative w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
@@ -57,14 +51,14 @@ export const LandingPage = () => {
         </div>
 
         <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold text-text-main tracking-tight leading-[1.1] mb-8 max-w-4xl mx-auto">
-          The Operating System for <br className="hidden md:block" />
+          Kanchana Textiles <br className="hidden md:block" />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-indigo-600">
-            Saree Manufacturing
+            Management Suite
           </span>
         </h1>
 
         <p className="text-lg md:text-xl text-secondary-500 mb-10 max-w-2xl mx-auto leading-relaxed">
-          Manage your workforce, track inventory, process payroll, and gain real-time analytics. Built specifically for modern textile businesses.
+          Streamlined operations for workforce management, inventory tracking, payroll processing, and real-time analytics. Designed for Kanchana Textiles.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -72,21 +66,15 @@ export const LandingPage = () => {
             onClick={() => navigate('/login')}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-text-main text-white rounded-full text-base font-semibold hover:bg-black transition-all duration-300 hover:-translate-y-1 shadow-xl shadow-black/10"
           >
-            Start Managing Now
+            Sign In to Dashboard
             <ArrowRight className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-text-main border border-border rounded-full text-base font-semibold hover:bg-surface-hover hover:border-secondary-300 transition-all duration-300"
-          >
-            Request Demo
           </button>
         </div>
 
         {/* Dashboard Preview Mockup */}
-        <div className="mt-20 relative mx-auto max-w-5xl perspective-1000">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary-500/10 to-transparent blur-3xl -z-10 transform translate-y-10"></div>
-          <div className="bg-white rounded-2xl md:rounded-[2rem] shadow-2xl shadow-primary-900/10 border border-white/50 overflow-hidden relative">
+        <div className="mt-20 relative mx-auto max-w-6xl perspective-1000">
+          <div className="absolute inset-0 bg-gradient-to-b from-primary-500/20 to-transparent blur-3xl -z-10 transform translate-y-10"></div>
+          <div className="bg-white rounded-2xl md:rounded-[2rem] shadow-2xl shadow-primary-900/20 border border-white/50 overflow-hidden relative transform scale-100 hover:scale-[1.02] transition-transform duration-300">
             
             {/* Mock Header */}
             <div className="bg-surface-hover border-b border-border px-6 py-4 flex items-center justify-between">
@@ -108,9 +96,9 @@ export const LandingPage = () => {
                   </div>
                   <div className="h-8 w-24 bg-emerald-100 rounded-full"></div>
                 </div>
-                <div className="h-64 bg-white rounded-xl border border-border shadow-soft flex items-end p-6 gap-4">
+                <div className="h-72 bg-white rounded-xl border border-border shadow-soft flex items-end p-6 gap-4">
                   {[40, 70, 45, 90, 65, 80, 50, 100].map((h, i) => (
-                    <div key={i} className="flex-1 bg-gradient-to-t from-primary-500 to-indigo-400 rounded-t-sm opacity-80" style={{ height: `${h}%` }}></div>
+                    <div key={i} className="flex-1 bg-gradient-to-t from-primary-500 to-indigo-400 rounded-t-sm opacity-90" style={{ height: `${h}%` }}></div>
                   ))}
                 </div>
               </div>
@@ -147,13 +135,13 @@ export const LandingPage = () => {
       {/* ================= METRICS LOGOS ================= */}
       <section className="border-y border-border bg-white py-12 relative z-10">
         <div className="max-w-7xl mx-auto px-6">
-          <p className="text-center text-sm font-semibold text-secondary-400 uppercase tracking-wider mb-8">Trusted by leading textile manufacturers</p>
-          <div className="flex flex-wrap justify-center gap-12 md:gap-24 opacity-60 grayscale">
-            {/* Placeholder Logos */}
-            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Zap className="w-6 h-6" /> LoomCorp</div>
-            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Shield className="w-6 h-6" /> SilkRoute</div>
-            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Layout className="w-6 h-6" /> TexaNova</div>
-            <div className="text-xl font-display font-bold text-secondary-600 flex items-center gap-2"><Activity className="w-6 h-6" /> FabricTech</div>
+          <p className="text-center text-sm font-semibold text-secondary-400 uppercase tracking-wider mb-8">Powering operations for</p>
+          <div className="flex flex-wrap justify-center gap-12 md:gap-24">
+            {/* Kanchana Textiles Logo */}
+            <div className="text-2xl font-display font-bold text-primary-600 flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white font-bold">K</div>
+              Kanchana Textiles
+            </div>
           </div>
         </div>
       </section>
@@ -245,20 +233,20 @@ export const LandingPage = () => {
           
           <div className="relative z-10">
             <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-6">
-              Ready to modernize your operations?
+              Ready to access your dashboard?
             </h2>
             <p className="text-xl text-secondary-300 mb-10 max-w-2xl mx-auto">
-              Join hundreds of manufacturers who have transformed their business with NOOL ERP.
+              Sign in to Kanchana Textiles management suite and streamline your operations.
             </p>
             
             <button
               onClick={() => navigate('/login')}
               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-text-main rounded-full text-lg font-bold hover:scale-105 transition-all duration-300 shadow-xl shadow-white/10"
             >
-              Get Started for Free
+              Sign In Now
               <ArrowRight className="w-5 h-5" />
             </button>
-            <p className="text-secondary-400 mt-6 text-sm">No credit card required. Setup takes 5 minutes.</p>
+            <p className="text-secondary-400 mt-6 text-sm">Use your credentials provided by the administrator.</p>
           </div>
         </div>
       </section>
@@ -267,14 +255,14 @@ export const LandingPage = () => {
       <footer className="border-t border-border bg-white py-12 relative z-10">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-text-main flex items-center justify-center">
-              <span className="text-white font-display font-bold leading-none">N</span>
+            <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
+              <span className="text-white font-display font-bold leading-none">K</span>
             </div>
-            <span className="text-xl font-display font-bold text-text-main tracking-tight">NOOL</span>
+            <span className="text-xl font-display font-bold text-text-main tracking-tight">Kanchana Textiles</span>
           </div>
           
           <div className="text-secondary-500 text-sm">
-            © {new Date().getFullYear()} Nool ERP Technologies. All rights reserved.
+            © {new Date().getFullYear()} Kanchana Textiles. All rights reserved.
           </div>
           
           <div className="flex gap-6 text-sm font-medium text-secondary-600">

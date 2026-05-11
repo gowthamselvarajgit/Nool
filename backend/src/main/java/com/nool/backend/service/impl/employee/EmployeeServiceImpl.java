@@ -1,6 +1,7 @@
 package com.nool.backend.service.impl.employee;
 
 import com.nool.backend.auth.security.CurrentUserUtil;
+import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.employee.*;
@@ -26,8 +27,10 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
+    private final AdminUserService adminUserService;
 
     @Override
+    @Transactional
     public EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto) {
         if (employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
             throw new DuplicateResourceException("Employee with this mobile number already exists");
@@ -41,6 +44,13 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .status(EmployeeStatus.ACTIVE).build();
 
         Employee saved = employeeRepository.save(employee);
+
+        // Create associated user account with login credentials
+        adminUserService.createEmployeeUser(
+            requestDto.getMobileNumber(),
+            requestDto.getPassword(),
+            saved.getId()
+        );
 
         return EmployeeResponseDto.builder()
                 .employeeId(saved.getId())

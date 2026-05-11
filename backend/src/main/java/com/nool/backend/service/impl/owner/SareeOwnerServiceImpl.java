@@ -1,6 +1,7 @@
 package com.nool.backend.service.impl.owner;
 
 import com.nool.backend.auth.security.CurrentUserUtil;
+import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.dto.owner.*;
@@ -25,7 +26,9 @@ import java.util.stream.Collectors;
 public class SareeOwnerServiceImpl implements SareeOwnerService {
 
     private final SareeOwnerRepository sareeOwnerRepository;
+    private final AdminUserService adminUserService;
     @Override
+    @Transactional
     public SareeOwnerResponseDto createOwner(CreateSareeOwnerRequestDto requestDto) {
 
         if (sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
@@ -40,6 +43,13 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .build();
 
         SareeOwner saved = sareeOwnerRepository.save(sareeOwner);
+
+        // Create associated user account with login credentials
+        adminUserService.createOwnerUser(
+            requestDto.getMobileNumber(),
+            requestDto.getPassword(),
+            saved.getId()
+        );
 
         return SareeOwnerResponseDto.builder()
                 .ownerId(saved.getId())

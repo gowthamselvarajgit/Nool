@@ -34,26 +34,43 @@ export const DailyWorkPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const employeeId = user?.employeeId || 'EMP-102';
-
-        // Mock delay for UI
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        setSummary({
-          totalPolished: 450,
-          averagePerDay: 18,
-          daysWorked: 25
+        setLoading(true);
+        const response = await dailyWorkService.getMyWorkSummary({
+          startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          endDate: new Date()
         });
 
-        // Mock data
-        const mockData = Array.from({ length: 10 }).map((_, i) => ({
-          workId: i + 1,
-          date: new Date(Date.now() - (i * 86400000)).toISOString(),
-          sareesPolished: Math.floor(Math.random() * 15) + 10,
-          status: i < 2 ? 'PENDING_APPROVAL' : 'APPROVED'
+        // Calculate summary from response
+        const totalFresh = response.totalFreshSareesPolished || 0;
+        const totalRePolish = response.totalRePolishSareesPolished || 0;
+        const daysWorked = response.totalWorkDays || 0;
+        const total = totalFresh + totalRePolish;
+
+        setSummary({
+          totalFresh,
+          totalRePolish,
+          totalPolished: total,
+          averagePerDay: daysWorked > 0 ? Math.round(total / daysWorked) : 0,
+          daysWorked
+        });
+
+        // Fetch work logs list
+        const logsResponse = await dailyWorkService.getWorkLogsList({
+          pageNo: 0,
+          pageSize: 10,
+          searchKeyword: ''
+        });
+
+        const mappedLogs = (logsResponse.content || []).map(log => ({
+          workId: log.id,
+          date: log.workDate,
+          freshCount: log.freshCount,
+          rePolishCount: log.rePolishCount,
+          totalWork: log.freshCount + log.rePolishCount,
+          remarks: log.remarks
         }));
 
-        setWorkLogs(mockData);
+        setWorkLogs(mappedLogs);
       } catch (err) {
         setError(err.message || 'Failed to load work data');
       } finally {
@@ -78,7 +95,9 @@ export const DailyWorkPage = () => {
   // Chart Data
   const chartData = workLogs.slice(0, 7).reverse().map(log => ({
     name: new Date(log.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-    polished: log.sareesPolished
+    fresh: log.freshCount,
+    rePolish: log.rePolishCount,
+    total: log.totalWork
   }));
 
   return (
@@ -113,8 +132,9 @@ export const DailyWorkPage = () => {
               <CheckCircle2 className="w-7 h-7" />
             </div>
             <div className="z-10">
-              <p className="text-sm font-medium text-secondary-500 mb-1">Total Polished</p>
+              <p className="text-sm font-medium text-secondary-500 mb-1">Total Polished (This Month)</p>
               <p className="text-3xl font-display font-bold text-text-main">{summary?.totalPolished}</p>
+              <p className="text-xs text-secondary-400 mt-1">{summary?.totalFresh} Fresh + {summary?.totalRePolish} Re-polish</p>
             </div>
           </div>
           
@@ -126,6 +146,7 @@ export const DailyWorkPage = () => {
             <div className="z-10">
               <p className="text-sm font-medium text-secondary-500 mb-1">Average per Day</p>
               <p className="text-3xl font-display font-bold text-text-main">{summary?.averagePerDay}</p>
+              <p className="text-xs text-secondary-400 mt-1">Sarees polished</p>
             </div>
           </div>
           
@@ -137,6 +158,7 @@ export const DailyWorkPage = () => {
             <div className="z-10">
               <p className="text-sm font-medium text-secondary-500 mb-1">Days Worked</p>
               <p className="text-3xl font-display font-bold text-text-main">{summary?.daysWorked}</p>
+              <p className="text-xs text-secondary-400 mt-1">This month</p>
             </div>
           </div>
         </div>
@@ -146,8 +168,8 @@ export const DailyWorkPage = () => {
           <Card className="lg:col-span-2 !p-0 overflow-hidden flex flex-col">
             <div className="p-6 border-b border-border flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-bold text-text-main font-display">Productivity Trend</h3>
-                <p className="text-sm text-secondary-500">Last 7 days performance</p>
+                <h3 className="text-lg font-bold text-text-main font-display">Polishing Breakdown</h3>
+                <p className="text-sm text-secondary-500">Fresh vs Re-polish - Last 7 days</p>
               </div>
             </div>
             <div className="p-6 h-[300px] w-full">
@@ -157,17 +179,8 @@ export const DailyWorkPage = () => {
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                   <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                  <Bar dataKey="polished" radius={[6, 6, 0, 0]} maxBarSize={40}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill="url(#colorIndigo)" />
-                    ))}
-                  </Bar>
-                  <defs>
-                    <linearGradient id="colorIndigo" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6366f1" />
-                      <stop offset="100%" stopColor="#4f46e5" />
-                    </linearGradient>
-                  </defs>
+                  <Bar dataKey="fresh" stackId="a" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={40} name="Fresh" />
+                  <Bar dataKey="rePolish" stackId="a" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={40} name="Re-polish" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -185,26 +198,24 @@ export const DailyWorkPage = () => {
             <div className="overflow-y-auto max-h-[300px] scrollbar-hide divide-y divide-border/50">
               {workLogs.map((log) => (
                 <div key={log.workId} className="flex items-center justify-between p-5 hover:bg-surface-hover transition-colors group">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1">
                     <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100 shadow-sm">
                       {new Date(log.date).getDate()}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="font-bold text-text-main">
                         {new Date(log.date).toLocaleDateString('en-IN', {
                           weekday: 'short', month: 'short',
                         })}
                       </p>
-                      <Badge variant={log.status === 'APPROVED' ? 'success' : 'warning'} className="text-[10px] px-2 py-0.5 mt-1">
-                        {log.status === 'APPROVED' ? 'Approved' : 'Pending'}
-                      </Badge>
+                      <p className="text-xs text-secondary-500 mt-1">Fresh: {log.freshCount} | Re-polish: {log.rePolishCount}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-text-main text-lg mb-0.5">
-                      {log.sareesPolished}
+                      {log.totalWork}
                     </p>
-                    <p className="text-xs font-medium text-secondary-500 uppercase">sarees</p>
+                    <p className="text-xs font-medium text-secondary-500 uppercase">total</p>
                   </div>
                 </div>
               ))}

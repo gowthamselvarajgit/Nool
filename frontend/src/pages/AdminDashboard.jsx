@@ -80,40 +80,23 @@ export const AdminDashboard = () => {
     try {
       setLoading(true);
       setError('');
-      // In a real app, this would be an actual API call
-      // const data = await dashboardService.getSummary();
-      
-      // Simulating API delay and mock data for demonstration of UI
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const data = await dashboardService.getSummary();
       setSummary({
-        totalEmployees: 142, employeeTrend: '+12%',
-        activeProjects: 24, projectTrend: '+5%',
-        monthlyRevenue: '12.4L', revenueTrend: '+18%',
-        totalTransactions: 856, transactionTrend: '-2%',
-        presentToday: 135,
-        onLeave: 5,
-        absent: 2,
-        // Mock data for charts
-        revenueData: [
-          { name: 'Jan', revenue: 4000, expenses: 2400 },
-          { name: 'Feb', revenue: 3000, expenses: 1398 },
-          { name: 'Mar', revenue: 2000, expenses: 9800 },
-          { name: 'Apr', revenue: 2780, expenses: 3908 },
-          { name: 'May', revenue: 1890, expenses: 4800 },
-          { name: 'Jun', revenue: 2390, expenses: 3800 },
-        ],
-        employeeStatus: [
-          { name: 'Active', value: 120, color: '#10b981' },
-          { name: 'On Leave', value: 15, color: '#f59e0b' },
-          { name: 'Inactive', value: 7, color: '#ef4444' },
-        ],
-        departmentData: [
-          { name: 'Weaving', workers: 45 },
-          { name: 'Dyeing', workers: 30 },
-          { name: 'Design', workers: 20 },
-          { name: 'Packaging', workers: 25 },
-          { name: 'Sales', workers: 22 },
-        ]
+        totalEmployees: data.totalEmployees || 0,
+        activeEmployees: data.activeEmployees || 0,
+        inactiveEmployees: data.inactiveEmployees || 0,
+        todayFreshWork: data.todayFreshWork || 0,
+        todayRepolishWork: data.todayRepolishWork || 0,
+        monthFreshWork: data.monthFreshWork || 0,
+        monthRepolishWork: data.monthRepolishWork || 0,
+        todayRevenue: data.todayRevenue || 0,
+        monthRevenue: data.monthRevenue || 0,
+        totalRevenue: data.totalRevenue || 0,
+        totalSareesReceived: data.totalSareesReceived || 0,
+        totalSareesReturned: data.totalSareesReturned || 0,
+        sareesInHand: data.sareesInHand || 0,
+        totalSalaryPaid: data.totalSalaryPaid || 0,
+        pendingSalary: data.pendingSalary || 0,
       });
     } catch (err) {
       setError(err.message || 'Failed to load dashboard');
@@ -187,79 +170,75 @@ export const AdminDashboard = () => {
                 title="Total Workforce"
                 value={summary?.totalEmployees || 0}
                 icon={Users}
-                trend={summary?.employeeTrend || '+0%'}
-                trendUp={summary?.employeeTrend?.startsWith('+')}
+                trend={`${summary?.activeEmployees || 0} Active`}
+                trendUp={true}
                 color="primary"
               />
               <StatCard
-                title="Active Projects"
-                value={summary?.activeProjects || 0}
+                title="Today's Fresh Sarees"
+                value={summary?.todayFreshWork || 0}
                 icon={Briefcase}
-                trend={summary?.projectTrend || '+0%'}
-                trendUp={summary?.projectTrend?.startsWith('+')}
+                trend={`Month: ${summary?.monthFreshWork || 0}`}
+                trendUp={true}
                 color="success"
               />
               <StatCard
                 title="Monthly Revenue"
-                value={`₹${summary?.monthlyRevenue || 0}`}
+                value={`₹${(summary?.monthRevenue || 0).toLocaleString('en-IN')}`}
                 icon={DollarSign}
-                trend={summary?.revenueTrend || '+0%'}
-                trendUp={summary?.revenueTrend?.startsWith('+')}
+                trend={`Total: ₹${(summary?.totalRevenue || 0).toLocaleString('en-IN')}`}
+                trendUp={true}
                 color="info"
               />
               <StatCard
-                title="Transactions"
-                value={summary?.totalTransactions || 0}
+                title="Sarees In Hand"
+                value={summary?.sareesInHand || 0}
                 icon={Activity}
-                trend={summary?.transactionTrend || '+0%'}
-                trendUp={summary?.transactionTrend?.startsWith('+')}
+                trend={`${summary?.totalSareesReceived || 0} Received`}
+                trendUp={true}
                 color="warning"
               />
             </div>
 
             {/* Main Charts Row */}
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Revenue Area Chart */}
+              {/* Polishing Work Overview */}
               <Card className="lg:col-span-2 !p-0 overflow-hidden flex flex-col">
                 <div className="p-6 pb-2 border-b border-border/50">
-                  <h3 className="text-lg font-bold text-text-main font-display">Revenue Overview</h3>
-                  <p className="text-sm text-secondary-500">Monthly income vs expenses</p>
+                  <h3 className="text-lg font-bold text-text-main font-display">Saree Polishing Overview</h3>
+                  <p className="text-sm text-secondary-500">Fresh vs Re-polish sarees this month</p>
                 </div>
                 <div className="flex-1 p-6 h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={summary?.revenueData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
+                    <BarChart data={[
+                      { name: 'Today', fresh: summary?.todayFreshWork || 0, rePolish: summary?.todayRepolishWork || 0 },
+                      { name: 'This Month', fresh: summary?.monthFreshWork || 0, rePolish: summary?.monthRepolishWork || 0 }
+                    ]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={40}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
                       <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                      <RechartsTooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
-                      <Area type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorExpenses)" />
-                    </AreaChart>
+                      <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
+                      <Bar dataKey="fresh" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="rePolish" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
-              {/* Employee Status Donut */}
+              {/* Saree Inventory Status */}
               <Card className="!p-0 overflow-hidden flex flex-col">
                 <div className="p-6 pb-2 border-b border-border/50">
-                  <h3 className="text-lg font-bold text-text-main font-display">Workforce Status</h3>
-                  <p className="text-sm text-secondary-500">Current availability</p>
+                  <h3 className="text-lg font-bold text-text-main font-display">Saree Inventory</h3>
+                  <p className="text-sm text-secondary-500">Transaction summary</p>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-6 h-80 relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={summary?.employeeStatus || []}
+                        data={[
+                          { name: 'In Hand', value: summary?.sareesInHand || 0, color: '#10b981' },
+                          { name: 'Returned', value: summary?.totalSareesReturned || 0, color: '#6366f1' }
+                        ]}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -268,87 +247,79 @@ export const AdminDashboard = () => {
                         dataKey="value"
                         stroke="none"
                       >
-                        {(summary?.employeeStatus || []).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                        <Cell fill="#10b981" />
+                        <Cell fill="#6366f1" />
                       </Pie>
                       <RechartsTooltip content={<CustomTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                   {/* Center Text */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
-                    <span className="text-3xl font-bold text-text-main">{summary?.totalEmployees || 0}</span>
-                    <span className="text-xs text-secondary-500 font-medium">Total</span>
+                    <span className="text-3xl font-bold text-text-main">{summary?.totalSareesReceived || 0}</span>
+                    <span className="text-xs text-secondary-500 font-medium">Received</span>
                   </div>
                   {/* Legend */}
                   <div className="flex flex-wrap justify-center gap-4 mt-2">
-                    {(summary?.employeeStatus || []).map((entry, idx) => (
-                      <div key={idx} className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-                        <span className="text-xs font-medium text-secondary-600">{entry.name}</span>
-                      </div>
-                    ))}
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                      <span className="text-xs font-medium text-secondary-600">In Hand: {summary?.sareesInHand || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
+                      <span className="text-xs font-medium text-secondary-600">Returned: {summary?.totalSareesReturned || 0}</span>
+                    </div>
                   </div>
                 </div>
               </Card>
             </div>
 
-            {/* Secondary Charts & Actions Row */}
+            {/* Secondary Row - Salary & Quick Actions */}
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Department Bar Chart */}
-              <Card className="lg:col-span-2 !p-0 overflow-hidden flex flex-col">
-                <div className="p-6 pb-2 border-b border-border/50 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-bold text-text-main font-display">Department Distribution</h3>
-                    <p className="text-sm text-secondary-500">Workers per department</p>
-                  </div>
-                  <Button variant="ghost" size="sm">View All</Button>
+              {/* Salary Summary */}
+              <Card className="lg:col-span-2 !p-0 overflow-hidden">
+                <div className="p-6 pb-2 border-b border-border/50">
+                  <h3 className="text-lg font-bold text-text-main font-display">Salary Management</h3>
+                  <p className="text-sm text-secondary-500">Payroll summary</p>
                 </div>
-                <div className="flex-1 p-6 h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={summary?.departmentData || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={32}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                      <RechartsTooltip content={<CustomTooltip />} cursor={{fill: '#f1f5f9'}} />
-                      <Bar dataKey="workers" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="p-6 space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-6 rounded-2xl border border-emerald-200">
+                      <p className="text-sm text-emerald-700 font-medium mb-1">Salary Paid (This Month)</p>
+                      <p className="text-3xl font-bold text-emerald-900">₹{(summary?.totalSalaryPaid || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-rose-50 to-rose-100/50 p-6 rounded-2xl border border-rose-200">
+                      <p className="text-sm text-rose-700 font-medium mb-1">Pending Salary</p>
+                      <p className="text-3xl font-bold text-rose-900">₹{(summary?.pendingSalary || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
                 </div>
               </Card>
 
-              {/* Quick Actions & Recent Activity Stack */}
+              {/* Quick Actions & Salary Card */}
               <div className="space-y-6">
-                {/* Attendance Summary */}
+                {/* Today's Overview */}
                 <Card className="bg-gradient-to-br from-primary-600 to-indigo-700 !border-none !p-0 overflow-hidden text-white shadow-lg shadow-primary-500/20">
                   <div className="p-6 relative">
                     <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full border-4 border-white/10 blur-[1px]"></div>
                     <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full border-4 border-white/10 blur-[1px]"></div>
                     
                     <h3 className="text-lg font-bold mb-4 relative z-10 flex items-center gap-2">
-                      <Users className="w-5 h-5 text-primary-200" />
-                      Today's Attendance
+                      <Activity className="w-5 h-5 text-primary-200" />
+                      Today's Work
                     </h3>
                     
-                    <div className="space-y-4 relative z-10">
+                    <div className="space-y-3 relative z-10">
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-primary-100">Present</span>
-                          <span className="font-bold">{summary?.presentToday || 0}</span>
-                        </div>
-                        <div className="w-full bg-black/20 rounded-full h-1.5">
-                          <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: '85%' }}></div>
+                          <span className="text-primary-100">Fresh Sarees</span>
+                          <span className="font-bold">{summary?.todayFreshWork || 0}</span>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
+                      <div className="grid grid-cols-1 gap-3 pt-2 border-t border-white/10">
                         <div>
-                          <p className="text-xs text-primary-200 mb-0.5">On Leave</p>
-                          <p className="text-xl font-bold">{summary?.onLeave || 0}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-primary-200 mb-0.5">Absent</p>
-                          <p className="text-xl font-bold">{summary?.absent || 0}</p>
+                          <p className="text-xs text-primary-200 mb-0.5">Re-Polish Sarees</p>
+                          <p className="text-lg font-bold">{summary?.todayRepolishWork || 0}</p>
                         </div>
                       </div>
                     </div>
@@ -364,7 +335,7 @@ export const AdminDashboard = () => {
                     {[
                       { icon: Users, label: 'Add Employee', color: 'text-primary-600', bg: 'bg-primary-50' },
                       { icon: DollarSign, label: 'Process Payroll', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                      { icon: Activity, label: 'Update Inventory', color: 'text-amber-600', bg: 'bg-amber-50' },
+                      { icon: Activity, label: 'Add Daily Work', color: 'text-amber-600', bg: 'bg-amber-50' },
                     ].map((action, idx) => (
                       <button key={idx} className="w-full flex items-center gap-3 p-3 hover:bg-surface-hover rounded-xl transition-colors group text-left">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.bg} ${action.color} group-hover:scale-105 transition-transform`}>

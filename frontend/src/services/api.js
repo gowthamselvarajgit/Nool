@@ -104,6 +104,14 @@ export const employeeService = {
     });
     return await handleResponse(response);
   },
+
+  delete: async (employeeId) => {
+    const response = await fetch(`${API_BASE_URL}/employees/${employeeId}`, {
+      method: 'DELETE',
+      headers: headers(),
+    });
+    return await handleResponse(response);
+  },
 };
 
 // Attendance Services
@@ -121,6 +129,19 @@ export const attendanceService = {
     const response = await fetch(`${API_BASE_URL}/attendance/${id}`, {
       method: 'GET',
       headers: headers(),
+    });
+    return await handleResponse(response);
+  },
+
+  getByDate: async (date) => {
+    const response = await fetch(`${API_BASE_URL}/attendance/list`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ 
+        pageNo: 0,
+        pageSize: 100,
+        attendanceDate: date
+      }),
     });
     return await handleResponse(response);
   },
@@ -417,6 +438,15 @@ export const dailyWorkService = {
 
   },
 
+  getWorkLogsList: async (filters) => {
+    const response = await fetch(`${API_BASE_URL}/employee-daily-working/list`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(filters),
+    });
+    return await handleResponse(response);
+  },
+
   getSummary: async (startDate, endDate) => {
     const response = await fetch(`${API_BASE_URL}/employee-daily-working/summary`, {
       method: 'POST',
@@ -425,6 +455,15 @@ export const dailyWorkService = {
     });
     return await handleResponse(response);
 
+  },
+
+  getMyWorkSummary: async (dateRange) => {
+    const response = await fetch(`${API_BASE_URL}/employee-daily-working/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(dateRange),
+    });
+    return await handleResponse(response);
   },
 
   getEmployeeSummary: async (employeeId, startDate, endDate) => {

@@ -16,4 +16,7 @@ public class CreateSareeOwnerRequestDto {
             message = "Mobile number must be a valid 10-digit Indian mobile number"
     )
     private String mobileNumber;
+
+    @NotBlank(message = "Password is required")
+    private String password;
 }
