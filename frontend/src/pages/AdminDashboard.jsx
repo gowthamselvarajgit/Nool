@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Button, Badge } from '../components/Common';
-import { Users, TrendingUp, Calendar, DollarSign, AlertCircle, ArrowUpRight, ArrowDownRight, Briefcase, Activity, ChevronRight } from 'lucide-react';
+import { Users, TrendingUp, Calendar, DollarSign, AlertCircle, ArrowUpRight, ArrowDownRight, Briefcase, Activity, ChevronRight, Bell, Search, Download, FileText } from 'lucide-react';
 import { dashboardService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
@@ -68,9 +70,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [dateRange, setDateRange] = useState('30days');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
@@ -96,13 +101,73 @@ export const AdminDashboard = () => {
         totalSareesReturned: data.totalSareesReturned || 0,
         sareesInHand: data.sareesInHand || 0,
         totalSalaryPaid: data.totalSalaryPaid || 0,
-        pendingSalary: data.pendingSalary || 0,
+        pendingSalary: Math.max(0, data.pendingSalary || 0), // Ensure no negative values
       });
     } catch (err) {
       setError(err.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle date range change
+  const handleDateRangeChange = (range) => {
+    setDateRange(range);
+    // Trigger refresh based on selected range
+    fetchDashboardData();
+  };
+
+  // Handle report download as Excel
+  const handleDownloadReport = () => {
+    try {
+      // Create worksheet data
+      const worksheetData = [
+        ['Admin Dashboard Report'],
+        [`Generated: ${new Date().toLocaleString()}`],
+        [`Date Range: ${dateRange}`],
+        [],
+        ['Key Metrics'],
+        ['Metric', 'Value'],
+        ['Total Employees', summary?.totalEmployees || 0],
+        ['Active Employees', summary?.activeEmployees || 0],
+        ['Inactive Employees', summary?.inactiveEmployees || 0],
+        ['Today Fresh Sarees', summary?.todayFreshWork || 0],
+        ['Today Re-Polish Sarees', summary?.todayRepolishWork || 0],
+        ['Month Fresh Sarees', summary?.monthFreshWork || 0],
+        ['Month Re-Polish Sarees', summary?.monthRepolishWork || 0],
+        ['Today Revenue', `₹${(summary?.todayRevenue || 0).toLocaleString('en-IN')}`],
+        ['Month Revenue', `₹${(summary?.monthRevenue || 0).toLocaleString('en-IN')}`],
+        ['Total Revenue', `₹${(summary?.totalRevenue || 0).toLocaleString('en-IN')}`],
+        ['Total Sarees Received', summary?.totalSareesReceived || 0],
+        ['Total Sarees Returned', summary?.totalSareesReturned || 0],
+        ['Sarees In Hand', summary?.sareesInHand || 0],
+        ['Total Salary Paid', `₹${(summary?.totalSalaryPaid || 0).toLocaleString('en-IN')}`],
+        ['Pending Salary', `₹${(summary?.pendingSalary || 0).toLocaleString('en-IN')}`],
+      ];
+
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Set column widths
+      worksheet['!cols'] = [
+        { wch: 25 },
+        { wch: 20 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Dashboard');
+      
+      const fileName = `admin-report-${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (err) {
+      console.error('Failed to download report:', err);
+      alert('Failed to download report');
+    }
+  };
+
+  // Handle search
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    // Add search functionality here
   };
 
   if (error) {
@@ -127,21 +192,73 @@ export const AdminDashboard = () => {
   return (
     <MainLayout>
       <div className="space-y-8 pb-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-text-main tracking-tight mb-2">
-              Overview
-            </h1>
-            <p className="text-secondary-500 font-medium">Here's what's happening with your business today.</p>
+        {/* Header Section - ONLY ONE */}
+        <div className="bg-surface rounded-2xl p-6 border border-border shadow-soft">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-display font-bold text-text-main tracking-tight mb-2">
+                Overview
+              </h1>
+              <p className="text-secondary-500 font-medium">Here's what's happening with your business today.</p>
+            </div>
+            <div className="flex gap-3 items-center">
+              {/* Search Icon in Header */}
+              <div className="relative hidden md:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-surface-hover border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm w-48"
+                />
+              </div>
+              
+              {/* Notification Bell - ONLY ONE */}
+              <button 
+                onClick={() => alert('Notifications: No new alerts')}
+                className="p-2 hover:bg-surface-hover rounded-lg transition-colors relative group"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5 text-secondary-600 group-hover:text-primary-600 transition-colors" />
+                <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full"></span>
+              </button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="secondary" className="bg-white">
-              <Calendar className="w-4 h-4 mr-2" />
-              Last 30 Days
-            </Button>
-            <Button variant="primary">
-              Download Report
+
+          {/* Search Bar for Mobile */}
+          <div className="relative w-full md:hidden mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
+            <input
+              type="text"
+              placeholder="Search employees, sarees..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-surface-hover border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            />
+          </div>
+
+          {/* Date Range & Download Controls */}
+          <div className="flex gap-2 flex-wrap items-center">
+            <div className="flex gap-2 flex-wrap">
+              {['7days', '30days', '90days', 'All'].map((range) => (
+                <Button
+                  key={range}
+                  onClick={() => handleDateRangeChange(range)}
+                  variant={dateRange === range ? 'primary' : 'secondary'}
+                  className={`text-sm ${dateRange === range ? 'bg-primary-600 text-white' : 'bg-white'}`}
+                >
+                  {range === '7days' ? 'Last 7 Days' : range === '30days' ? 'Last 30 Days' : range === '90days' ? 'Last 90 Days' : 'All Time'}
+                </Button>
+              ))}
+            </div>
+            <Button 
+              onClick={handleDownloadReport}
+              variant="primary" 
+              className="ml-auto text-sm flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Download Excel
             </Button>
           </div>
         </div>
@@ -232,43 +349,55 @@ export const AdminDashboard = () => {
                   <p className="text-sm text-secondary-500">Transaction summary</p>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-6 h-80 relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'In Hand', value: summary?.sareesInHand || 0, color: '#10b981' },
-                          { name: 'Returned', value: summary?.totalSareesReturned || 0, color: '#6366f1' }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={85}
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        <Cell fill="#10b981" />
-                        <Cell fill="#6366f1" />
-                      </Pie>
-                      <RechartsTooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Center Text */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
-                    <span className="text-3xl font-bold text-text-main">{summary?.totalSareesReceived || 0}</span>
-                    <span className="text-xs text-secondary-500 font-medium">Received</span>
-                  </div>
-                  {/* Legend */}
-                  <div className="flex flex-wrap justify-center gap-4 mt-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-                      <span className="text-xs font-medium text-secondary-600">In Hand: {summary?.sareesInHand || 0}</span>
+                  {(summary?.sareesInHand || 0) > 0 || (summary?.totalSareesReturned || 0) > 0 ? (
+                    <>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'In Hand', value: summary?.sareesInHand || 0, color: '#10b981' },
+                              { name: 'Returned', value: summary?.totalSareesReturned || 0, color: '#6366f1' }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={85}
+                            paddingAngle={5}
+                            dataKey="value"
+                            stroke="none"
+                          >
+                            <Cell fill="#10b981" />
+                            <Cell fill="#6366f1" />
+                          </Pie>
+                          <RechartsTooltip content={<CustomTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Center Text */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-3xl font-bold text-text-main">{summary?.totalSareesReceived || 0}</span>
+                        <span className="text-xs text-secondary-500 font-medium">Received</span>
+                      </div>
+                      {/* Legend */}
+                      <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                          <span className="text-xs font-medium text-secondary-600">In Hand: {summary?.sareesInHand || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
+                          <span className="text-xs font-medium text-secondary-600">Returned: {summary?.totalSareesReturned || 0}</span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-3">
+                      <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center">
+                        <Activity className="w-8 h-8 text-secondary-400" />
+                      </div>
+                      <p className="text-sm text-secondary-500 font-medium">No inventory data yet</p>
+                      <p className="text-xs text-secondary-400 text-center">Start receiving sarees to see inventory</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
-                      <span className="text-xs font-medium text-secondary-600">Returned: {summary?.totalSareesReturned || 0}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </Card>
             </div>
@@ -333,11 +462,15 @@ export const AdminDashboard = () => {
                   </div>
                   <div className="p-2">
                     {[
-                      { icon: Users, label: 'Add Employee', color: 'text-primary-600', bg: 'bg-primary-50' },
-                      { icon: DollarSign, label: 'Process Payroll', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                      { icon: Activity, label: 'Add Daily Work', color: 'text-amber-600', bg: 'bg-amber-50' },
+                      { icon: Users, label: 'Add Employee', color: 'text-primary-600', bg: 'bg-primary-50', action: () => navigate('/admin/employees') },
+                      { icon: DollarSign, label: 'Process Payroll', color: 'text-emerald-600', bg: 'bg-emerald-50', action: () => navigate('/admin/salary') },
+                      { icon: Activity, label: 'Add Daily Work', color: 'text-amber-600', bg: 'bg-amber-50', action: () => navigate('/admin/daily-work') },
                     ].map((action, idx) => (
-                      <button key={idx} className="w-full flex items-center gap-3 p-3 hover:bg-surface-hover rounded-xl transition-colors group text-left">
+                      <button 
+                        key={idx} 
+                        onClick={action.action}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-surface-hover rounded-xl transition-colors group text-left"
+                      >
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.bg} ${action.color} group-hover:scale-105 transition-transform`}>
                           <action.icon className="w-5 h-5" />
                         </div>
