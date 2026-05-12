@@ -7,12 +7,17 @@ import com.nool.backend.dto.inventory.OwnerInventorySummaryDto;
 import com.nool.backend.dto.inventory.SareeInventorySummaryDto;
 import com.nool.backend.dto.inventory.SareeTransactionRequestDto;
 import com.nool.backend.dto.inventory.SareeTransactionResponseDto;
-import com.nool.backend.repository.owner.SareeTransactionRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import com.nool.backend.dto.inventory.SareeTransactionReturnDto;
 
 public interface SareeInventoryService {
+
     SareeTransactionResponseDto recordSareeTransaction(SareeTransactionRequestDto requestDto);
+
+    // Adds a partial return row — can be called multiple times until fully returned
+    SareeTransactionResponseDto addPartialReturn(Long transactionId, SareeTransactionReturnDto dto);
+
+    // Legacy PATCH compat — delegates to addPartialReturn
+    SareeTransactionResponseDto recordReturn(Long transactionId, SareeTransactionReturnDto dto);
 
     PaginationResponseDto<SareeTransactionResponseDto> getSareeTransactionList(Long ownerId, PaginationRequestDto paginationRequestDto);
 
@@ -20,14 +25,7 @@ public interface SareeInventoryService {
 
     SareeInventorySummaryDto getOverallInventorySummary(DateRangeDto dateRangeDto);
 
-    PaginationResponseDto<SareeTransactionResponseDto>
-    getMySareeTransactionList(
-            PaginationRequestDto paginationRequestDto
-    );
+    PaginationResponseDto<SareeTransactionResponseDto> getMySareeTransactionList(PaginationRequestDto paginationRequestDto);
 
-    OwnerInventorySummaryDto
-    getMyInventorySummary(
-            DateRangeDto dateRangeDto
-    );
-
+    OwnerInventorySummaryDto getMyInventorySummary(DateRangeDto dateRangeDto);
 }

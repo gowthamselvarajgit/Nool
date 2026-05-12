@@ -22,6 +22,7 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
       { label: 'Salary', href: '/admin/salary', icon: '💰' },
       { label: 'Payments', href: '/admin/payments', icon: '💳' },
       { label: 'Inventory', href: '/admin/inventory', icon: '📦' },
+      { label: 'Inv. Report', href: '/admin/inventory-report', icon: '📋' },
       { label: 'Daily Work', href: '/admin/daily-work', icon: '📝' },
       { label: 'Analytics', href: '/admin/analytics', icon: '📈' },
     ],

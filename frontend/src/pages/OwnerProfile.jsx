@@ -14,20 +14,12 @@ export const OwnerProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        setLoading(true);
+        // ✅ getMe() returns SareeOwnerResponseDto: { ownerId, ownerName, mobileNumber, ownerStatus }
         const data = await ownerService.getMe();
         setProfile(data);
       } catch (err) {
-        // Fallback for UI demonstration if API fails
-        setProfile({
-          sareeOwnerId: user?.sareeOwnerId || 'OWN-205',
-          ownerName: 'Rajesh Kumar',
-          mobileNumber: '+91 9876543210',
-          joiningDate: '2023-03-12',
-          status: 'ACTIVE',
-          email: 'rajesh.kumar@example.com',
-          companyName: 'RK Textiles'
-        });
-        // setError(err.message || 'Failed to load profile');
+        setError(err.message || 'Failed to load profile');
       } finally {
         setLoading(false);
       }
@@ -104,7 +96,6 @@ export const OwnerProfile = () => {
               <User className="w-5 h-5 text-primary-600" />
               Contact Information
             </h3>
-            
             <div className="space-y-6">
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -112,17 +103,16 @@ export const OwnerProfile = () => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Mobile Number</p>
-                  <p className="text-lg font-medium text-text-main">{profile?.mobileNumber}</p>
+                  <p className="text-lg font-medium text-text-main">{profile?.mobileNumber || '—'}</p>
                 </div>
               </div>
-              
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                  <Mail className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Email Address</p>
-                  <p className="text-lg font-medium text-text-main">{profile?.email || 'Not provided'}</p>
+                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Owner Name</p>
+                  <p className="text-lg font-medium text-text-main">{profile?.ownerName || '—'}</p>
                 </div>
               </div>
             </div>
@@ -131,33 +121,25 @@ export const OwnerProfile = () => {
           <Card className="hover:shadow-card transition-shadow">
             <h3 className="text-lg font-bold text-text-main font-display mb-6 flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-indigo-600" />
-              Business Details
+              Account Status
             </h3>
-            
             <div className="space-y-6">
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                   <Building className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Company / Trade Name</p>
-                  <p className="text-lg font-medium text-text-main">{profile?.companyName || 'Individual Owner'}</p>
+                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Owner Status</p>
+                  <p className="text-lg font-medium text-text-main">{profile?.ownerStatus ?? 'N/A'}</p>
                 </div>
               </div>
-              
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <Calendar className="w-5 h-5" />
+                  <Shield className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Partner Since</p>
-                  <p className="text-lg font-medium text-text-main">
-                    {profile?.joiningDate
-                      ? new Date(profile.joiningDate).toLocaleDateString('en-IN', {
-                          day: 'numeric', month: 'long', year: 'numeric',
-                        })
-                      : '—'}
-                  </p>
+                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">System Role</p>
+                  <p className="text-lg font-medium text-text-main">{user?.role || 'SAREE_OWNER'}</p>
                 </div>
               </div>
             </div>

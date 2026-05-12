@@ -355,12 +355,12 @@ export const ownerService = {
     return handleResponse(response);
   },
 
-  // Backend: PATCH /owners/status → { ownerId, ownerStatus }
-  updateStatus: async (ownerId, ownerStatus) => {
+  // Backend: PATCH /owners/status → { ownerId, status }
+  updateStatus: async (ownerId, status) => {
     const response = await fetch(`${API_BASE_URL}/owners/status`, {
       method: 'PATCH',
       headers: headers(),
-      body: JSON.stringify({ ownerId, ownerStatus }),
+      body: JSON.stringify({ ownerId, status }),  // DTO field is 'status', not 'ownerStatus'
     });
     return handleResponse(response);
   },
@@ -434,6 +434,26 @@ export const inventoryService = {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /inventory/transaction/{id}/returns → partial return (can be called multiple times)
+  addPartialReturn: async (transactionId, data) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/transaction/${transactionId}/returns`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  // Legacy PATCH (kept for backward compat)
+  recordReturn: async (transactionId, data) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/transaction/${transactionId}/return`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify(data),
     });
     return handleResponse(response);
   },

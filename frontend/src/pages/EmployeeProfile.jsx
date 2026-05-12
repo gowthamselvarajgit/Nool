@@ -14,21 +14,12 @@ export const EmployeeProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        setLoading(true);
+        // ✅ EmployeeResponseDto: { employeeId, employeeName, joiningDate, polishingRate, status, mobileNumber }
         const data = await employeeService.getMe();
         setProfile(data);
       } catch (err) {
-        // Fallback for UI demonstration if API fails
-        setProfile({
-          employeeId: user?.employeeId || 'EMP-102',
-          employeeName: 'John Doe',
-          mobileNumber: '+91 9876543210',
-          joiningDate: '2023-01-15',
-          polishingRate: 25,
-          status: 'ACTIVE',
-          role: 'Weaver',
-          performanceScore: 92
-        });
-        // setError(err.message || 'Failed to load profile');
+        setError(err.message || 'Failed to load profile');
       } finally {
         setLoading(false);
       }

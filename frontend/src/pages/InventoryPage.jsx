@@ -39,25 +39,22 @@ export const InventoryPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const ownerId = user?.sareeOwnerId || 'OWN-205'; // Fallback for testing
+        setLoading(true);
 
-        // Mock data for UI demonstration to ensure it always renders beautifully
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        setSummary({
-          totalGiven: 1250,
-          totalReturned: 980,
-          pendingCount: 270
-        });
-
-        setTransactions([
-          { transactionId: 1, transactionDate: new Date().toISOString(), employeeName: 'Ramesh Kumar', sareeCount: 45, transactionType: 'GIVEN' },
-          { transactionId: 2, transactionDate: new Date(Date.now() - 86400000).toISOString(), employeeName: 'Suresh Das', sareeCount: 30, transactionType: 'RETURNED' },
-          { transactionId: 3, transactionDate: new Date(Date.now() - 172800000).toISOString(), employeeName: 'Kalaivani M', sareeCount: 50, transactionType: 'GIVEN' },
-          { transactionId: 4, transactionDate: new Date(Date.now() - 259200000).toISOString(), employeeName: 'Ramesh Kumar', sareeCount: 40, transactionType: 'RETURNED' },
-          { transactionId: 5, transactionDate: new Date(Date.now() - 345600000).toISOString(), employeeName: 'Anitha S', sareeCount: 25, transactionType: 'GIVEN' },
+        // ✅ Real API — no ownerId needed (JWT-based, SAREE_OWNER role uses /my-summary and /transactions)
+        const [summaryRes, txRes] = await Promise.all([
+          inventoryService.getMySummary(firstDay, lastDay).catch(() => null),
+          inventoryService.getMyTransactions(0, 20).catch(() => ({ content: [] })),
         ]);
 
+        // ✅ OwnerInventorySummaryDto: totalSareesReceived, totalSareesReturned, sareesInHand
+        setSummary({
+          totalGiven: summaryRes?.totalSareesReceived ?? 0,
+          totalReturned: summaryRes?.totalSareesReturned ?? 0,
+          pendingCount: summaryRes?.sareesInHand ?? 0,
+        });
+
+        setTransactions(txRes?.content || []);
       } catch (err) {
         setError(err.message || 'Failed to load inventory data');
       } finally {
@@ -81,13 +78,19 @@ export const InventoryPage = () => {
 
   const returnRate = summary?.totalGiven ? Math.round((summary.totalReturned / summary.totalGiven) * 100) : 0;
 
-  // Mock chart data based on summary
-  const chartData = [
-    { name: 'Week 1', given: 300, returned: 200 },
-    { name: 'Week 2', given: 400, returned: 350 },
-    { name: 'Week 3', given: 350, returned: 280 },
-    { name: 'Week 4', given: 200, returned: 150 },
-  ];
+  // Build chart from actual transactions grouped by week
+  const chartData = (() => {
+    const weeks = { 'Week 1': { given: 0, returned: 0 }, 'Week 2': { given: 0, returned: 0 }, 'Week 3': { given: 0, returned: 0 }, 'Week 4': { given: 0, returned: 0 } };
+    transactions.forEach(tx => {
+      const date = tx.receivedDate ? new Date(tx.receivedDate) : null;
+      if (!date) return;
+      const day = date.getDate();
+      const wk = day <= 7 ? 'Week 1' : day <= 14 ? 'Week 2' : day <= 21 ? 'Week 3' : 'Week 4';
+      weeks[wk].given += tx.receivedQuantity || 0;
+      weeks[wk].returned += tx.returnedQuantity || 0;
+    });
+    return Object.entries(weeks).map(([name, v]) => ({ name, ...v }));
+  })();
 
   return (
     <MainLayout>
@@ -240,35 +243,37 @@ export const InventoryPage = () => {
             </div>
           ) : (
             <div className="divide-y divide-border/50">
+              {/* ✅ SareeTransactionResponseDto: transactionId, receivedDate, receivedQuantity, returnedDate, returnedQuantity, remarks */}
               {transactions.map((tx) => (
                 <div key={tx.transactionId} className="flex items-center justify-between px-6 py-4 hover:bg-surface-hover transition-colors group">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${
-                      tx.transactionType === 'GIVEN' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      tx.receivedQuantity ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                     }`}>
-                      {tx.transactionType === 'GIVEN' ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+                      {tx.receivedQuantity ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
                     </div>
                     <div>
                       <p className="font-bold text-text-main group-hover:text-primary-600 transition-colors">
-                        {tx.employeeName || 'Worker'}
+                        TXN #{tx.transactionId}
                       </p>
                       <p className="text-sm text-secondary-500 font-medium flex items-center gap-1.5">
                         <Calendar className="w-3 h-3" />
-                        {new Date(tx.transactionDate).toLocaleDateString('en-IN', {
-                          day: 'numeric', month: 'short', year: 'numeric',
-                        })}
+                        {tx.receivedDate
+                          ? new Date(tx.receivedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : tx.returnedDate
+                          ? new Date(tx.returnedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : '—'}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-text-main text-lg">{tx.sareeCount} <span className="text-sm font-medium text-secondary-500">sarees</span></p>
-                    <span className={`inline-block mt-0.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      tx.transactionType === 'GIVEN'
-                        ? 'bg-indigo-100/50 text-indigo-700'
-                        : 'bg-emerald-100/50 text-emerald-700'
-                    }`}>
-                      {tx.transactionType}
-                    </span>
+                    {tx.receivedQuantity != null && (
+                      <p className="font-bold text-indigo-600">{tx.receivedQuantity} <span className="text-sm font-medium text-secondary-500">given</span></p>
+                    )}
+                    {tx.returnedQuantity != null && (
+                      <p className="font-bold text-emerald-600">{tx.returnedQuantity} <span className="text-sm font-medium text-secondary-500">returned</span></p>
+                    )}
+                    {tx.remarks && <p className="text-xs text-secondary-400 mt-0.5">{tx.remarks}</p>}
                   </div>
                 </div>
               ))}

@@ -16,7 +16,7 @@ import EmployeeDashboard from './pages/EmployeeDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DailyWorkManagementPage from './pages/DailyWorkManagementPage';
-import InventoryManagementPage from './pages/InventoryManagementPage';
+import { InventoryManagementPage } from './pages/InventoryManagementPage';
 import OwnerProfile from './pages/OwnerProfile';
 import InventoryPage from './pages/InventoryPage';
 import TransactionsPage from './pages/TransactionsPage';
@@ -25,6 +25,7 @@ import EmployeeProfile from './pages/EmployeeProfile';
 import DailyWorkPage from './pages/DailyWorkPage';
 import PerformancePage from './pages/PerformancePage';
 import PaymentsManagementPage from './pages/PaymentsManagementPage';
+import InventoryReportPage from './pages/InventoryReportPage';
 
 function App() {
   return (
@@ -106,6 +107,14 @@ function App() {
             element={
               <PrivateRoute requiredRole="ADMIN">
                 <InventoryManagementPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin/inventory-report"
+            element={
+              <PrivateRoute requiredRole="ADMIN">
+                <InventoryReportPage />
               </PrivateRoute>
             }
           />

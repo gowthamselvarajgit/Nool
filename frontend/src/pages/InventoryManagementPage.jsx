@@ -1,359 +1,379 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { MainLayout } from '../components/Layout';
-import { Card, Button, Input, Select, Modal } from '../components/Common';
-import { Table } from '../components/Table';
+import { Card, Button, Input, Modal, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { inventoryService, ownerService } from '../services/api';
 import { formatDate } from '../utils/formatters';
-import { Plus, RefreshCw, Package, AlertCircle, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Plus, RefreshCw, Package, ArrowDownCircle, ArrowUpCircle, RotateCcw, Download, CheckCircle, ChevronRight } from 'lucide-react';
 
 export const InventoryManagementPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [owners, setOwners] = useState([]);
-  const [overallSummary, setOverallSummary] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedTx, setSelectedTx] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterOwner, setFilterOwner] = useState('');
-  const itemsPerPage = 10;
 
-  // ✅ Matches SareeTransactionRequestDto exactly
-  const [formData, setFormData] = useState({
-    ownerId: '',
-    receivedDate: '',
-    receivedQuantity: '',
-    returnedDate: '',
-    returnedQuantity: '',
-    remarks: '',
-  });
+  // Computed summary from transactions (avoids stale backend legacy data)
+  const summary = {
+    received: transactions.reduce((s, t) => s + (t.receivedQuantity ?? 0), 0),
+    returned: transactions.reduce((s, t) => s + (t.totalReturned ?? 0), 0),
+    inHand: transactions.reduce((s, t) => s + (t.sareesInHand ?? 0), 0),
+  };
 
-  // Date range for overall summary
   const today = new Date().toISOString().split('T')[0];
-  const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  const [receiptForm, setReceiptForm] = useState({ ownerId: '', receivedDate: today, receivedQuantity: '', remarks: '' });
+  const [returnForm, setReturnForm] = useState({ returnedDate: today, returnedQuantity: '', remarks: '' });
+
+  useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
   async function fetchAll() {
     try {
-      setLoading(true);
-      setError('');
-      const [ownerRes, summaryRes] = await Promise.all([
-        ownerService.getList(0, 200),
-        inventoryService.getOverallSummary(firstDayOfMonth, today).catch(() => null),
-      ]);
-      // ✅ Owner mapping: ownerId, ownerName
-      setOwners((ownerRes?.content || []).map(o => ({ id: o.ownerId, name: o.ownerName })));
-      if (summaryRes) setOverallSummary(summaryRes);
-      await fetchTransactions();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      setLoading(true); setError('');
+      const ownerRes = await ownerService.getList(0, 200);
+      const ownerList = ownerRes?.content || [];
+      setOwners(ownerList.map(o => ({ id: o.ownerId, name: o.ownerName })));
+      await loadTx(ownerList, filterOwner);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
   }
 
-  async function fetchTransactions() {
+  async function loadTx(ownerList, ownerFilter) {
     try {
       setLoading(true);
-      // Fetch all owner transactions by fetching from each loaded owner
-      // or use a combined fetch — backend has per-owner endpoint
-      // We'll fetch my transactions (admin context) using the list endpoint  
-      const response = await inventoryService.getMyTransactions(0, 200);
-      // ✅ SareeTransactionResponseDto: transactionId, ownerId, ownerName, receivedDate, receivedQuantity, returnedDate, returnedQuantity, remarks
-      setTransactions(response?.content || []);
-    } catch (err) {
-      // Fallback: if my-transactions not accessible for admin, fetch per owner
-      setTransactions([]);
-    } finally {
-      setLoading(false);
-    }
+      let all = [];
+      if (ownerFilter) {
+        const res = await inventoryService.getOwnerTransactions(parseInt(ownerFilter), 0, 200);
+        all = res?.content || [];
+      } else {
+        const ids = (ownerList.length ? ownerList : owners).slice(0, 15).map(o => o.id);
+        if (!ids.length) { setTransactions([]); return; }
+        const results = await Promise.allSettled(ids.map(id => inventoryService.getOwnerTransactions(id, 0, 100)));
+        all = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value?.content || []);
+        all.sort((a, b) => (b.receivedDate || '').localeCompare(a.receivedDate || ''));
+      }
+      setTransactions(all);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
   }
 
-  async function fetchOwnerTransactions(ownerId) {
-    try {
-      setLoading(true);
-      const response = await inventoryService.getOwnerTransactions(ownerId, 0, 200);
-      setTransactions(response?.content || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => { if (owners.length) loadTx(owners, filterOwner); }, [owners]); // eslint-disable-line
 
-  const handleFilterOwnerChange = (ownerId) => {
-    setFilterOwner(ownerId);
-    setCurrentPage(1);
-    if (ownerId) {
-      fetchOwnerTransactions(ownerId);
-    } else {
-      fetchTransactions();
-    }
-  };
-
-  const handleAddTransaction = async () => {
-    if (!formData.ownerId) { setError('Please select an owner'); return; }
-    if (!formData.receivedDate && !formData.returnedDate) { setError('Enter at least received date or returned date'); return; }
+  // ── Receipt ───────────────────────────────────────────────────────────────
+  const handleAddReceipt = async () => {
+    if (!receiptForm.ownerId) { setError('Please select an owner'); return; }
+    if (!receiptForm.receivedDate) { setError('Date required'); return; }
+    if (!receiptForm.receivedQuantity || Number(receiptForm.receivedQuantity) <= 0) { setError('Quantity must be > 0'); return; }
     try {
-      setSubmitting(true);
-      setError('');
-      // ✅ Correct DTO
+      setSubmitting(true); setError('');
       await inventoryService.createTransaction({
-        ownerId: parseInt(formData.ownerId),
-        receivedDate: formData.receivedDate || null,
-        receivedQuantity: formData.receivedQuantity ? parseInt(formData.receivedQuantity) : null,
-        returnedDate: formData.returnedDate || null,
-        returnedQuantity: formData.returnedQuantity ? parseInt(formData.returnedQuantity) : null,
-        remarks: formData.remarks || null,
+        ownerId: parseInt(receiptForm.ownerId),
+        receivedDate: receiptForm.receivedDate,
+        receivedQuantity: parseInt(receiptForm.receivedQuantity),
+        remarks: receiptForm.remarks || null,
       });
-      setShowModal(false);
-      setFormData({ ownerId: '', receivedDate: '', receivedQuantity: '', returnedDate: '', returnedQuantity: '', remarks: '' });
-      if (filterOwner) fetchOwnerTransactions(filterOwner);
-      else fetchTransactions();
-      // Refresh summary
-      const summaryRes = await inventoryService.getOverallSummary(firstDayOfMonth, today).catch(() => null);
-      if (summaryRes) setOverallSummary(summaryRes);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
+      setShowReceiptModal(false);
+      setReceiptForm({ ownerId: '', receivedDate: today, receivedQuantity: '', remarks: '' });
+      await fetchAll();
+    } catch (err) { setError(err.message); }
+    finally { setSubmitting(false); }
   };
 
-  // Filter by search
-  const filteredTx = transactions.filter(t =>
-    (t.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // ── Partial return ────────────────────────────────────────────────────────
+  const handleAddReturn = async () => {
+    if (!returnForm.returnedDate) { setError('Date required'); return; }
+    const qty = parseInt(returnForm.returnedQuantity);
+    if (!qty || qty <= 0) { setError('Quantity must be > 0'); return; }
+    const inHand = selectedTx?.sareesInHand ?? 0;
+    if (qty > inHand) { setError(`Cannot return more than ${inHand} in hand`); return; }
+    try {
+      setSubmitting(true); setError('');
+      await inventoryService.addPartialReturn(selectedTx.transactionId, {
+        returnedDate: returnForm.returnedDate,
+        returnedQuantity: qty,
+        remarks: returnForm.remarks || null,
+      });
+      setShowReturnModal(false);
+      setShowDetailModal(false);
+      setSelectedTx(null);
+      setReturnForm({ returnedDate: today, returnedQuantity: '', remarks: '' });
+      await fetchAll();
+    } catch (err) { setError(err.message); }
+    finally { setSubmitting(false); }
+  };
 
-  const totalPages = Math.ceil(filteredTx.length / itemsPerPage);
-  const paginatedTx = filteredTx.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const openReturn = (tx) => {
+    setSelectedTx(tx);
+    setReturnForm({ returnedDate: today, returnedQuantity: '', remarks: '' });
+    setError('');
+    setShowDetailModal(false);
+    setShowReturnModal(true);
+  };
 
-  // ✅ Columns match SareeTransactionResponseDto
-  const tableColumns = [
-    {
-      key: 'ownerName',
-      label: 'Owner',
-      render: (value) => (
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-            {(value || '?').charAt(0)}
-          </div>
-          <span className="font-medium text-gray-900">{value}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'receivedDate',
-      label: 'Received Date',
-      render: (value) => value ? (
-        <div className="flex items-center gap-1">
-          <ArrowDownCircle className="w-4 h-4 text-green-500" />
-          <span className="text-gray-700">{formatDate(value)}</span>
-        </div>
-      ) : <span className="text-gray-400">—</span>,
-    },
-    {
-      key: 'receivedQuantity',
-      label: 'Received',
-      render: (value) => value != null
-        ? <span className="font-semibold text-green-600">{value}</span>
-        : <span className="text-gray-400">—</span>,
-    },
-    {
-      key: 'returnedDate',
-      label: 'Returned Date',
-      render: (value) => value ? (
-        <div className="flex items-center gap-1">
-          <ArrowUpCircle className="w-4 h-4 text-blue-500" />
-          <span className="text-gray-700">{formatDate(value)}</span>
-        </div>
-      ) : <span className="text-gray-400">—</span>,
-    },
-    {
-      key: 'returnedQuantity',
-      label: 'Returned',
-      render: (value) => value != null
-        ? <span className="font-semibold text-blue-600">{value}</span>
-        : <span className="text-gray-400">—</span>,
-    },
-    {
-      key: 'remarks',
-      label: 'Remarks',
-      render: (value) => <span className="text-gray-500 text-sm">{value || '—'}</span>,
-    },
-  ];
+  const openDetail = (tx) => { setSelectedTx(tx); setShowDetailModal(true); };
+
+  // ── Excel ─────────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    const rows = transactions.map((tx, i) => ({
+      '#': i + 1,
+      'Owner': tx.ownerName,
+      'Received Date': formatDate(tx.receivedDate),
+      'Qty Received': tx.receivedQuantity ?? 0,
+      'Total Returned': tx.totalReturned ?? 0,
+      'In Hand': tx.sareesInHand ?? 0,
+      'Status': tx.fullyReturned ? 'Fully Returned' : (tx.totalReturned ?? 0) > 0 ? 'Partial' : 'Pending',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 4 }, { wch: 20 }, { wch: 15 }, { wch: 13 }, { wch: 14 }, { wch: 10 }, { wch: 15 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    XLSX.writeFile(wb, `Inventory_${today}.xlsx`);
+  };
+
+  // ── Status helpers ────────────────────────────────────────────────────────
+  const statusBadge = (tx) => {
+    if (tx.fullyReturned) return { label: '✓ Fully Returned', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    if ((tx.totalReturned ?? 0) > 0) return { label: '⟳ Partial', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
+    return { label: '⏳ Pending', cls: 'bg-amber-100 text-amber-700 border-amber-200' };
+  };
+
+  if (loading) return <MainLayout><Loading text="Loading inventory..." /></MainLayout>;
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="slide-down">
-          <h1 className="text-4xl font-bold text-gray-900">📦 Saree Inventory</h1>
-          <p className="text-gray-600 mt-2">Track sarees received from and returned to owners</p>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900">📦 Inventory Management</h1>
+            <p className="text-gray-500 mt-1">Click any card to view details or add a return</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={fetchAll}><RefreshCw className="w-4 h-4 mr-1" />Refresh</Button>
+            <Button variant="outline" onClick={handleExport} disabled={!transactions.length}><Download className="w-4 h-4 mr-1" />Excel</Button>
+            <Button onClick={() => { setError(''); setShowReceiptModal(true); }}><Plus className="w-4 h-4 mr-1" />New Receipt</Button>
+          </div>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-            <p className="text-red-700 text-sm">{error}</p>
-            <button onClick={() => setError('')} className="ml-auto text-red-500 hover:text-red-700 font-bold">✕</button>
+        {error && <ErrorMessage message={error} onRetry={fetchAll} />}
+
+        {/* Summary strip */}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { icon: ArrowDownCircle, color: 'text-indigo-500', bg: 'bg-indigo-50', label: 'Total Received', value: summary.received },
+            { icon: ArrowUpCircle, color: 'text-emerald-500', bg: 'bg-emerald-50', label: 'Total Returned', value: summary.returned },
+            { icon: Package, color: 'text-amber-500', bg: 'bg-amber-50', label: 'In Hand', value: summary.inHand },
+          ].map((s, i) => (
+            <div key={i} className={`rounded-2xl p-5 ${s.bg} flex items-center gap-4`}>
+              <s.icon className={`w-8 h-8 ${s.color} flex-shrink-0`} />
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                <p className="text-sm text-gray-500">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Owner filter */}
+        <div className="flex gap-3 items-center">
+          <select
+            value={filterOwner}
+            onChange={e => { setFilterOwner(e.target.value); loadTx(owners, e.target.value); }}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+          >
+            <option value="">All Owners</option>
+            {owners.map(o => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+          </select>
+          <span className="text-sm text-gray-500">{transactions.length} transactions</span>
+        </div>
+
+        {/* ── Transaction Cards ── */}
+        {!transactions.length ? (
+          <EmptyState message="No transactions found" icon="📦" />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {transactions.map(tx => {
+              const badge = statusBadge(tx);
+              const pct = tx.receivedQuantity > 0
+                ? Math.round(((tx.totalReturned ?? 0) / tx.receivedQuantity) * 100)
+                : 0;
+              return (
+                <div
+                  key={tx.transactionId}
+                  onClick={() => openDetail(tx)}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group p-5 flex flex-col gap-4"
+                >
+                  {/* Card header */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">{tx.ownerName}</p>
+                      <p className="text-sm text-indigo-600 font-medium">{formatDate(tx.receivedDate)}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${badge.cls}`}>{badge.label}</span>
+                  </div>
+
+                  {/* Qty stats */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-indigo-50 rounded-xl p-2.5">
+                      <p className="text-xl font-bold text-indigo-700">{tx.receivedQuantity ?? 0}</p>
+                      <p className="text-xs text-indigo-500">Received</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-2.5">
+                      <p className="text-xl font-bold text-emerald-700">{tx.totalReturned ?? 0}</p>
+                      <p className="text-xs text-emerald-500">Returned</p>
+                    </div>
+                    <div className={`rounded-xl p-2.5 ${(tx.sareesInHand ?? 0) > 0 ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                      <p className={`text-xl font-bold ${(tx.sareesInHand ?? 0) > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
+                        {tx.sareesInHand ?? 0}
+                      </p>
+                      <p className={`text-xs ${(tx.sareesInHand ?? 0) > 0 ? 'text-amber-500' : 'text-gray-400'}`}>In Hand</p>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Return progress</span><span>{pct}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-emerald-500' : 'bg-indigo-400'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-gray-400">
+                      {(tx.returns?.length ?? 0)} return{(tx.returns?.length ?? 0) !== 1 ? 's' : ''} recorded
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {!tx.fullyReturned && (
+                        <button
+                          onClick={e => { e.stopPropagation(); openReturn(tx); }}
+                          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors border border-indigo-200"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Add Return
+                        </button>
+                      )}
+                      {tx.fullyReturned && <CheckCircle className="w-5 h-5 text-emerald-500" />}
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 transition-colors" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-
-        {/* Summary Cards — from backend */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total Received (Month)</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">
-                  {overallSummary?.totalSareesReceived ?? '—'}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <ArrowDownCircle className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </Card>
-          <Card className="border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total Returned (Month)</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">
-                  {overallSummary?.totalSareesReturned ?? '—'}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ArrowUpCircle className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-          <Card className="border-l-4 border-amber-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">In Hand</p>
-                <p className="text-3xl font-bold text-amber-600 mt-1">
-                  {overallSummary?.sareesInHand ?? '—'}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-amber-600" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Controls */}
-        <Card>
-          <div className="flex flex-col md:flex-row gap-4">
-            <Input
-              placeholder="Search by owner name..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="flex-1"
-            />
-            <Select
-              value={filterOwner}
-              onChange={(e) => handleFilterOwnerChange(e.target.value)}
-              options={[
-                { value: '', label: 'All Owners' },
-                ...owners.map(o => ({ value: o.id.toString(), label: o.name })),
-              ]}
-              className="md:w-52"
-            />
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={fetchAll}>
-                <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-              </Button>
-              <Button onClick={() => setShowModal(true)}>
-                <Plus className="w-4 h-4 mr-1" /> New Transaction
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Transactions Table */}
-        <Card>
-          {loading ? (
-            <div className="text-center py-12"><p className="text-gray-500">Loading transactions...</p></div>
-          ) : paginatedTx.length > 0 ? (
-            <>
-              <Table columns={tableColumns} data={paginatedTx} />
-              <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredTx.length)} of {filteredTx.length}
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
-                  <Button variant="outline" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No transactions found</p>
-            </div>
-          )}
-        </Card>
       </div>
 
-      {/* Add Transaction Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => { setShowModal(false); setError(''); setFormData({ ownerId: '', receivedDate: '', receivedQuantity: '', returnedDate: '', returnedQuantity: '', remarks: '' }); }}
-        title="New Saree Transaction"
-        size="md"
-      >
+      {/* ── Detail Modal ── */}
+      <Modal isOpen={showDetailModal} onClose={() => setShowDetailModal(false)} title="📦 Transaction Detail" size="lg">
+        {selectedTx && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xl font-bold text-gray-900">{selectedTx.ownerName}</p>
+                <p className="text-indigo-600">Received {selectedTx.receivedQuantity} sarees on {formatDate(selectedTx.receivedDate)}</p>
+              </div>
+              {!selectedTx.fullyReturned && (
+                <Button onClick={() => { setShowDetailModal(false); openReturn(selectedTx); }}>
+                  <RotateCcw className="w-4 h-4 mr-1" /> Add Return
+                </Button>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Received', value: selectedTx.receivedQuantity, color: 'indigo' },
+                { label: 'Returned', value: selectedTx.totalReturned ?? 0, color: 'emerald' },
+                { label: 'In Hand', value: selectedTx.sareesInHand ?? 0, color: 'amber' },
+              ].map((s, i) => (
+                <div key={i} className={`bg-${s.color}-50 rounded-xl p-4 text-center`}>
+                  <p className={`text-2xl font-bold text-${s.color}-700`}>{s.value}</p>
+                  <p className={`text-xs text-${s.color}-500 font-medium`}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Return history */}
+            <div>
+              <p className="font-semibold text-gray-700 mb-2">Return History</p>
+              {(selectedTx.returns?.length ?? 0) === 0 ? (
+                <p className="text-sm text-gray-400 italic text-center py-4">No returns recorded yet</p>
+              ) : (
+                <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="grid grid-cols-3 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <span>#</span><span>Date</span><span className="text-right">Qty Returned</span>
+                  </div>
+                  {selectedTx.returns.map((r, i) => (
+                    <div key={i} className="grid grid-cols-3 px-4 py-3 text-sm items-center">
+                      <span className="text-gray-400">{i + 1}</span>
+                      <span className="text-emerald-700 font-medium">{formatDate(r.returnedDate)}</span>
+                      <span className="text-right font-bold text-emerald-700">−{r.returnedQuantity}</span>
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-3 px-4 py-3 bg-gray-50 font-bold text-sm border-t-2 border-gray-200">
+                    <span className="col-span-2 text-gray-700">Total Returned</span>
+                    <span className="text-right text-emerald-700">{selectedTx.totalReturned ?? 0}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Receipt Modal ── */}
+      <Modal isOpen={showReceiptModal} onClose={() => { setShowReceiptModal(false); setError(''); }} title="📥 New Receipt">
         <div className="space-y-4">
-          <Select
-            label="Owner *"
-            value={formData.ownerId}
-            onChange={(e) => setFormData(prev => ({ ...prev, ownerId: e.target.value }))}
-            options={[{ value: '', label: '— Select Owner —' }, ...owners.map(o => ({ value: o.id.toString(), label: o.name }))]}
-            required
-          />
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-green-800 text-sm font-semibold mb-3 flex items-center gap-2">
-              <ArrowDownCircle className="w-4 h-4" /> Received from Owner
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Received Date" type="date" value={formData.receivedDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, receivedDate: e.target.value }))} />
-              <Input label="Quantity" type="number" value={formData.receivedQuantity} placeholder="0" min="0"
-                onChange={(e) => setFormData(prev => ({ ...prev, receivedQuantity: e.target.value }))} />
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-blue-800 text-sm font-semibold mb-3 flex items-center gap-2">
-              <ArrowUpCircle className="w-4 h-4" /> Returned to Owner
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Return Date" type="date" value={formData.returnedDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, returnedDate: e.target.value }))} />
-              <Input label="Quantity" type="number" value={formData.returnedQuantity} placeholder="0" min="0"
-                onChange={(e) => setFormData(prev => ({ ...prev, returnedQuantity: e.target.value }))} />
-            </div>
-          </div>
-
-          <Input label="Remarks" value={formData.remarks} placeholder="Optional notes"
-            onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))} />
-
+          <select value={receiptForm.ownerId} onChange={e => setReceiptForm(f => ({ ...f, ownerId: e.target.value }))}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+            <option value="">Select owner...</option>
+            {owners.map(o => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+          </select>
+          <Input label="Received Date" type="date" value={receiptForm.receivedDate} onChange={e => setReceiptForm(f => ({ ...f, receivedDate: e.target.value }))} required />
+          <Input label="Quantity Received" type="number" min="1" value={receiptForm.receivedQuantity} onChange={e => setReceiptForm(f => ({ ...f, receivedQuantity: e.target.value }))} placeholder="e.g. 100" required />
+          <Input label="Remarks (optional)" value={receiptForm.remarks} onChange={e => setReceiptForm(f => ({ ...f, remarks: e.target.value }))} />
           {error && <p className="text-red-600 text-sm">{error}</p>}
-
-          <div className="flex gap-3 pt-2">
-            <Button onClick={handleAddTransaction} loading={submitting} className="flex-1">Save Transaction</Button>
-            <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
+          <div className="flex gap-2 pt-2">
+            <Button className="flex-1" onClick={handleAddReceipt} isLoading={submitting}>Save</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setShowReceiptModal(false)}>Cancel</Button>
           </div>
         </div>
+      </Modal>
+
+      {/* ── Return Modal ── */}
+      <Modal isOpen={showReturnModal} onClose={() => { setShowReturnModal(false); setError(''); }} title="📤 Record Return">
+        {selectedTx && (
+          <div className="space-y-4">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm">
+              <p className="font-bold text-indigo-800">{selectedTx.ownerName}</p>
+              <p className="text-indigo-600 mt-1">
+                Received {selectedTx.receivedQuantity} · Returned {selectedTx.totalReturned ?? 0} ·
+                <strong className="text-amber-700"> {selectedTx.sareesInHand} in hand</strong>
+              </p>
+            </div>
+            <Input label="Return Date" type="date" value={returnForm.returnedDate} onChange={e => setReturnForm(f => ({ ...f, returnedDate: e.target.value }))} required />
+            <Input label={`Quantity to Return (max ${selectedTx.sareesInHand})`} type="number" min="1" max={selectedTx.sareesInHand}
+              value={returnForm.returnedQuantity} onChange={e => setReturnForm(f => ({ ...f, returnedQuantity: e.target.value }))} placeholder={`Up to ${selectedTx.sareesInHand}`} required />
+            <Input label="Remarks (optional)" value={returnForm.remarks} onChange={e => setReturnForm(f => ({ ...f, remarks: e.target.value }))} />
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <div className="flex gap-2 pt-2">
+              <Button className="flex-1" onClick={handleAddReturn} isLoading={submitting}>Save Return</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowReturnModal(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </MainLayout>
   );
 };
-
-export default InventoryManagementPage;

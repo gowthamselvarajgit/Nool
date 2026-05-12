@@ -109,12 +109,29 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception, HttpServletRequest request){
 
+        String path = request.getRequestURI();
+        String message;
+
+        if (path.contains("/attendance")) {
+            message = "Duplicate attendance. Attendance already marked for this employee on this date.";
+        } else if (path.contains("/inventory") || path.contains("/transaction")) {
+            message = "Duplicate or invalid transaction data. A transaction with the same details may already exist.";
+        } else if (path.contains("/salary")) {
+            message = "Duplicate salary record. A payment for this period may already exist.";
+        } else if (path.contains("/owner")) {
+            message = "Duplicate entry. An owner with this mobile number may already exist.";
+        } else if (path.contains("/employee")) {
+            message = "Duplicate entry. An employee with this mobile number may already exist.";
+        } else {
+            message = "Data conflict: duplicate or invalid entry detected.";
+        }
+
         ApiErrorResponse errorResponse = ApiErrorResponse.builder()
                 .timeStamp(LocalDateTime.now())
                 .status(HttpStatus.CONFLICT.value())
                 .error("Conflict")
-                .message("Duplicate attendance. Attendance already marked for this employee on this date.")
-                .path(request.getRequestURI())
+                .message(message)
+                .path(path)
                 .build();
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);

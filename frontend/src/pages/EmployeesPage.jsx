@@ -4,7 +4,7 @@ import { Button, Card, Input, Modal, Badge, Select, Loading, ErrorMessage, Empty
 import { Table } from '../components/Table';
 import { employeeService } from '../services/api';
 import { formatDate, getEmployeeStatusColor, getInitials } from '../utils/formatters';
-import { Edit2, Trash2, Eye } from 'lucide-react';
+import { Edit2, Trash2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const EmployeeForm = ({ initialData, onSubmit, isLoading }) => {
   const [formData, setFormData] = useState(
@@ -155,6 +155,7 @@ export const EmployeesPage = () => {
           employeeName: formData.name,
           polishingRate: Number(formData.polishingRate),
           mobileNumber: formData.mobileNumber,
+          status: formData.status,
         });
       } else {
         // Create expects: employeeName, joiningDate, polishingRate, mobileNumber, password
@@ -184,11 +185,18 @@ export const EmployeesPage = () => {
       setShowDeleteModal(false);
       setSelectedEmployee(null);
       fetchEmployees();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setIsSubmitting(false); }
+  };
+
+  // Toggle employee ACTIVE <-> INACTIVE
+  const handleToggleStatus = async (employee) => {
+    try {
+      setError('');
+      const newStatus = employee.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      await employeeService.updateStatus(employee.id, newStatus);
+      fetchEmployees();
+    } catch (err) { setError(`Status update failed: ${err.message}`); }
   };
 
   const handleEdit = (employee) => {
@@ -256,29 +264,23 @@ export const EmployeesPage = () => {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleViewDetails(row)}
-            className="p-1.5 hover:bg-blue-50 rounded transition-colors"
-            title="View details"
-          >
+        <div className="flex items-center gap-1">
+          <button onClick={() => handleViewDetails(row)} className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors" title="View details">
             <Eye className="w-4 h-4 text-blue-600" />
           </button>
-          <button
-            onClick={() => handleEdit(row)}
-            className="p-1.5 hover:bg-amber-50 rounded transition-colors"
-            title="Edit"
-          >
+          <button onClick={() => handleEdit(row)} className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
             <Edit2 className="w-4 h-4 text-amber-600" />
           </button>
           <button
-            onClick={() => {
-              setSelectedEmployee(row);
-              setShowDeleteModal(true);
-            }}
-            className="p-1.5 hover:bg-red-50 rounded transition-colors"
-            title="Delete"
+            onClick={() => handleToggleStatus(row)}
+            className={`p-1.5 rounded-lg transition-colors ${row.status === 'ACTIVE' ? 'hover:bg-red-50' : 'hover:bg-green-50'}`}
+            title={row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
           >
+            {row.status === 'ACTIVE'
+              ? <ToggleRight className="w-5 h-5 text-green-600" />
+              : <ToggleLeft className="w-5 h-5 text-gray-400" />}
+          </button>
+          <button onClick={() => { setSelectedEmployee(row); setShowDeleteModal(true); }} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
             <Trash2 className="w-4 h-4 text-red-600" />
           </button>
         </div>
@@ -389,7 +391,6 @@ export const EmployeesPage = () => {
             <div className="space-y-3">
               <DetailRow label="Employee ID" value={`#${selectedEmployee.id}`} />
               <DetailRow label="Mobile" value={selectedEmployee.mobileNumber} />
-              <DetailRow label="Email" value={selectedEmployee.email || 'N/A'} />
               <DetailRow label="Joining Date" value={formatDate(selectedEmployee.joiningDate)} />
               <DetailRow label="Polishing Rate" value={`₹${selectedEmployee.polishingRate || 0} per unit`} />
             </div>
