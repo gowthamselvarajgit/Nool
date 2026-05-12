@@ -47,35 +47,44 @@ const AnalyticsPage = () => {
       const employees = empResponse?.content || [];
       
       setEmployeeStats({
-        total: employees.length || 42,
-        active: employees.filter(e => e.status === 'ACTIVE').length || 38,
-        inactive: employees.filter(e => e.status === 'INACTIVE').length || 3,
-        onLeave: employees.filter(e => e.status === 'ON_LEAVE').length || 1,
+        total: employees.length,
+        active: employees.filter(e => e.status === 'ACTIVE').length,
+        inactive: employees.filter(e => e.status === 'INACTIVE').length,
+        onLeave: employees.filter(e => e.status === 'ON_LEAVE').length,
       });
 
-      // Fetch attendance data for the month
+      // Fetch attendance data for the month using correct method
       const startDate = `${selectedMonth}-01`;
       const endDate = `${selectedMonth}-31`;
-      const attResponse = await attendanceService.getByDateRange(startDate, endDate);
-      const attList = attResponse?.content || [];
-
-      // Process attendance data for chart
-      const dailyAttendance = {};
-      attList.forEach(record => {
-        const date = record.date.split('T')[0].slice(8);
-        if (!dailyAttendance[date]) {
-          dailyAttendance[date] = { date, present: 0, absent: 0, leave: 0 };
-        }
-        if (record.status === 'PRESENT') dailyAttendance[date].present++;
-        else if (record.status === 'ABSENT') dailyAttendance[date].absent++;
-        else if (record.status === 'LEAVE') dailyAttendance[date].leave++;
-      });
-
-      const attendanceChartData = Object.values(dailyAttendance).sort((a, b) => 
-        parseInt(a.date) - parseInt(b.date)
-      );
+      let attendanceChartData = [];
       
-      // Use mock if no real data
+      try {
+        const attResponse = await attendanceService.getByDateRange(startDate, endDate);
+        const attList = attResponse?.content || attResponse || [];
+
+        // Process attendance data for chart
+        const dailyAttendance = {};
+        attList.forEach(record => {
+          // Backend may return 'attendanceDate' or 'date'
+          const dateStr = record.attendanceDate || record.date || '';
+          const day = dateStr ? dateStr.toString().slice(-2) : '';
+          if (!day) return;
+          if (!dailyAttendance[day]) {
+            dailyAttendance[day] = { date: day, present: 0, absent: 0, leave: 0 };
+          }
+          if (record.status === 'PRESENT') dailyAttendance[day].present++;
+          else if (record.status === 'ABSENT') dailyAttendance[day].absent++;
+          else if (record.status === 'LEAVE' || record.status === 'HALF_DAY') dailyAttendance[day].leave++;
+        });
+        attendanceChartData = Object.values(dailyAttendance).sort((a, b) =>
+          parseInt(a.date) - parseInt(b.date)
+        );
+      } catch (_attErr) {
+        // Use mock data if attendance API fails
+        attendanceChartData = [];
+      }
+      
+      // Use mock data if no real data returned
       setAttendanceData(attendanceChartData.length > 0 ? attendanceChartData : [
         { date: '01', present: 35, absent: 5, leave: 2 },
         { date: '05', present: 38, absent: 3, leave: 1 },
@@ -87,13 +96,13 @@ const AnalyticsPage = () => {
       ]);
 
       setSalaryData([
-        { date: '1st', amount: Math.random() * 500000 + 300000 },
-        { date: '5th', amount: Math.random() * 500000 + 300000 },
-        { date: '10th', amount: Math.random() * 500000 + 300000 },
-        { date: '15th', amount: Math.random() * 500000 + 300000 },
-        { date: '20th', amount: Math.random() * 500000 + 300000 },
-        { date: '25th', amount: Math.random() * 500000 + 300000 },
-        { date: '30th', amount: Math.random() * 500000 + 300000 },
+        { date: '1st', amount: 450000 },
+        { date: '5th', amount: 520000 },
+        { date: '10th', amount: 380000 },
+        { date: '15th', amount: 610000 },
+        { date: '20th', amount: 430000 },
+        { date: '25th', amount: 580000 },
+        { date: '30th', amount: 490000 },
       ]);
 
       setRevenueData([
@@ -102,7 +111,7 @@ const AnalyticsPage = () => {
         { name: 'Services', value: 20 },
       ]);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to load analytics');
     } finally {
       setLoading(false);
     }

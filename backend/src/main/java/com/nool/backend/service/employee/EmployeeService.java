@@ -16,4 +16,6 @@ public interface EmployeeService {
     PaginationResponseDto<EmployeeListResponse> getEmployeeList(PaginationRequestDto paginationRequestDto);
 
     EmployeeResponseDto getMyProfile();
+
+    void deleteEmployee(Long employeeId);
 }

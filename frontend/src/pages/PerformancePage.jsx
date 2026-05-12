@@ -33,27 +33,41 @@ export const PerformancePage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const employeeId = user?.employeeId || 'EMP-102';
+        setLoading(true);
+        // ✅ Real data from backend
+        const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const toDate = new Date().toISOString().split('T')[0];
 
-        // Mock delay for UI
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const [summaryRes, logsRes] = await Promise.all([
+          dailyWorkService.getMyWorkSummary(fromDate, toDate).catch(() => null),
+          dailyWorkService.getList(0, 50).catch(() => ({ content: [] })),
+        ]);
+
+        const totalFresh = summaryRes?.totalFreshCount ?? summaryRes?.totalFreshSareesPolished ?? 0;
+        const totalRePolish = summaryRes?.totalRePolishCount ?? summaryRes?.totalRePolishSareesPolished ?? 0;
+        const daysWorked = summaryRes?.totalWorkDays ?? 0;
+        const currentTotal = totalFresh + totalRePolish;
+        const monthlyTarget = daysWorked > 0 ? Math.round((currentTotal / daysWorked) * 26) : 100;
+
+        // Build history from last 6 logs grouped (show actual recent days)
+        const logs = logsRes?.content || [];
+        const history = logs.slice(0, 6).reverse().map((log, i) => ({
+          month: log.workDate
+            ? new Date(log.workDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+            : `Day ${i + 1}`,
+          value: (log.freshCount || 0) + (log.rePolishCount || 0),
+        }));
 
         setPerformance({
-          monthlyTarget: 1000,
-          currentTotal: 840,
-          currentStreak: 12,
-          qualityScore: 98.5,
-          monthlyEarnings: 21000,
-          history: [
-            { month: 'Jan', value: 750 },
-            { month: 'Feb', value: 820 },
-            { month: 'Mar', value: 800 },
-            { month: 'Apr', value: 910 },
-            { month: 'May', value: 890 },
-            { month: 'Jun', value: 840 },
-          ]
+          monthlyTarget: monthlyTarget || 100,
+          currentTotal,
+          currentStreak: daysWorked,   // streak = days with work logged
+          qualityScore: totalFresh > 0
+            ? Math.round((totalFresh / (currentTotal || 1)) * 100)
+            : 0,
+          monthlyEarnings: summaryRes?.totalEarning ?? summaryRes?.totalEarnings ?? 0,
+          history: history.length > 0 ? history : [{ month: 'No Data', value: 0 }],
         });
-
       } catch (err) {
         setError(err.message || 'Failed to load performance data');
       } finally {

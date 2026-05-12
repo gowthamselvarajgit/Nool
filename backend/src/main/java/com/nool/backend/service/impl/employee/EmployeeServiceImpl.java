@@ -120,6 +120,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                                 EmployeeListResponse.builder()
                                         .employeeId(employee.getId())
                                         .employeeName(employee.getName())
+                                        .mobileNumber(employee.getMobileNumber())
                                         .joiningDate(employee.getJoiningDate())
                                         .polishingRate(employee.getPolishRate())
                                         .status(employee.getStatus().name()).build()
@@ -148,5 +149,17 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .mobileNumber(employee.getMobileNumber())
                 .status(employee.getStatus().name())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteEmployee(Long employeeId) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
+        // Delete linked user account if exists
+        if (employee.getUser() != null) {
+            userRepository.delete(employee.getUser());
+        }
+        employeeRepository.delete(employee);
     }
 }

@@ -36,29 +36,30 @@ export const getInitials = (name) => {
 
 export const getAttendanceColor = (status) => {
   const colors = {
-    PRESENT: 'bg-green-100 text-green-800',
-    ABSENT: 'bg-red-100 text-red-800',
-    LEAVE: 'bg-yellow-100 text-yellow-800',
-    WEEKEND: 'bg-blue-100 text-blue-800',
-    HOLIDAY: 'bg-purple-100 text-purple-800',
+    PRESENT: 'success',
+    ABSENT: 'error',
+    LEAVE: 'warning',
+    HALF_DAY: 'info',
+    WEEKEND: 'info',
+    HOLIDAY: 'primary',
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+  return colors[status] || 'default';
 };
 
 export const getEmployeeStatusColor = (status) => {
   const colors = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    INACTIVE: 'bg-gray-100 text-gray-800',
-    ON_LEAVE: 'bg-yellow-100 text-yellow-800',
+    ACTIVE: 'success',
+    INACTIVE: 'default',
+    ON_LEAVE: 'warning',
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+  return colors[status] || 'default';
 };
 
 export const getOwnerStatusColor = (status) => {
   const colors = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    INACTIVE: 'bg-gray-100 text-gray-800',
-    SUSPENDED: 'bg-red-100 text-red-800',
+    ACTIVE: 'success',
+    INACTIVE: 'default',
+    SUSPENDED: 'error',
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+  return colors[status] || 'default';
 };

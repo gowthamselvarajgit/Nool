@@ -133,37 +133,56 @@ export const Table = ({
         </table>
       </div>
 
-      {/* Pagination */}
-      {pagination && (
-        <div className="px-6 py-4 border-t border-border bg-surface-hover/30 flex items-center justify-between">
-          <p className="text-sm text-secondary-500 font-medium">
-            Showing <span className="text-text-main font-bold">{pagination.page * pagination.pageSize - pagination.pageSize + 1}</span> to{' '}
-            <span className="text-text-main font-bold">{Math.min(pagination.page * pagination.pageSize, pagination.total)}</span> of <span className="text-text-main font-bold">{pagination.total}</span>
-          </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={pagination.page === 1}
-              onClick={() => onPaginationChange?.(pagination.page - 1)}
-              className="!py-1.5 !px-3"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Previous</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={pagination.page * pagination.pageSize >= pagination.total}
-              onClick={() => onPaginationChange?.(pagination.page + 1)}
-              className="!py-1.5 !px-3"
-            >
-              <span className="hidden sm:inline">Next</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+      {/* Pagination — supports both {page,pageSize,total} and {currentPage,itemsPerPage,totalItems} */}
+      {pagination && (() => {
+        // Normalize pagination keys — support legacy key names used across pages
+        const currentPage = pagination.page ?? pagination.currentPage ?? 1;
+        const pageSize = pagination.pageSize ?? pagination.itemsPerPage ?? 10;
+        const total = pagination.total ?? pagination.totalItems ?? 0;
+        const totalPages = pagination.totalPages ?? Math.ceil(total / pageSize) ?? 1;
+
+        const from = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+        const to = Math.min(currentPage * pageSize, total);
+
+        return (
+          <div className="px-6 py-4 border-t border-border bg-surface-hover/30 flex items-center justify-between gap-4 flex-wrap">
+            <p className="text-sm text-secondary-500 font-medium">
+              Showing{' '}
+              <span className="text-text-main font-bold">{from}</span>
+              {' '}–{' '}
+              <span className="text-text-main font-bold">{to}</span>
+              {' '}of{' '}
+              <span className="text-text-main font-bold">{total}</span>
+              {' '}results
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={currentPage <= 1}
+                onClick={() => onPaginationChange?.(currentPage - 1)}
+                className="!py-1.5 !px-3"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Previous</span>
+              </Button>
+              <span className="text-sm text-secondary-600 font-medium px-2">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={currentPage >= totalPages}
+                onClick={() => onPaginationChange?.(currentPage + 1)}
+                className="!py-1.5 !px-3"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

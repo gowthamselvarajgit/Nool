@@ -35,15 +35,21 @@ export const DailyWorkPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await dailyWorkService.getMyWorkSummary({
-          startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-          endDate: new Date()
-        });
+        // ✅ Correct date strings for fromDate/toDate params
+        const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const toDate = new Date().toISOString().split('T')[0];
 
-        // Calculate summary from response
-        const totalFresh = response.totalFreshSareesPolished || 0;
-        const totalRePolish = response.totalRePolishSareesPolished || 0;
-        const daysWorked = response.totalWorkDays || 0;
+        // ✅ Correct method: getMyWorkSummary(fromDate, toDate)
+        // ✅ Correct method: getList(page, size) instead of non-existent getWorkLogsList
+        const [summaryRes, logsRes] = await Promise.all([
+          dailyWorkService.getMyWorkSummary(fromDate, toDate).catch(() => null),
+          dailyWorkService.getList(0, 30).catch(() => ({ content: [] })),
+        ]);
+
+        // ✅ Map summary — field names from EmployeeDailyWorkSummaryDto
+        const totalFresh = summaryRes?.totalFreshCount ?? summaryRes?.totalFreshSareesPolished ?? 0;
+        const totalRePolish = summaryRes?.totalRePolishCount ?? summaryRes?.totalRePolishSareesPolished ?? 0;
+        const daysWorked = summaryRes?.totalWorkDays ?? 0;
         const total = totalFresh + totalRePolish;
 
         setSummary({
@@ -51,23 +57,17 @@ export const DailyWorkPage = () => {
           totalRePolish,
           totalPolished: total,
           averagePerDay: daysWorked > 0 ? Math.round(total / daysWorked) : 0,
-          daysWorked
+          daysWorked,
         });
 
-        // Fetch work logs list
-        const logsResponse = await dailyWorkService.getWorkLogsList({
-          pageNo: 0,
-          pageSize: 10,
-          searchKeyword: ''
-        });
-
-        const mappedLogs = (logsResponse.content || []).map(log => ({
-          workId: log.id,
-          date: log.workDate,
-          freshCount: log.freshCount,
-          rePolishCount: log.rePolishCount,
-          totalWork: log.freshCount + log.rePolishCount,
-          remarks: log.remarks
+        // ✅ Map logs — fields from EmployeeDailyWorkListDto: workId, employeeId, employeeName, workDate, freshCount, rePolishCount, todayEarning
+        const mappedLogs = (logsRes?.content || []).map(log => ({
+          workId: log.workId,
+          date: log.workDate,   // ✅ workDate is the correct field
+          freshCount: log.freshCount || 0,
+          rePolishCount: log.rePolishCount || 0,
+          totalWork: (log.freshCount || 0) + (log.rePolishCount || 0),
+          todayEarning: log.todayEarning || 0,
         }));
 
         setWorkLogs(mappedLogs);

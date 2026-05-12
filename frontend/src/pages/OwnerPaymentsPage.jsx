@@ -35,28 +35,29 @@ export const OwnerPaymentsPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const ownerId = user?.sareeOwnerId || 'OWN-205';
+        setLoading(true);
+        const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const toDate = new Date().toISOString().split('T')[0];
 
-        // Mock delay for UI
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // ✅ Real API calls — ownerPaymentService uses /owner-payments endpoints
+        const [historyRes, summaryRes] = await Promise.all([
+          ownerPaymentService.getMyHistory(0, 20).catch(() => ({ content: [] })),
+          ownerPaymentService.getMySummary(fromDate, toDate).catch(() => null),
+        ]);
+
+        const paymentList = historyRes?.content || [];
+        setPayments(paymentList);
+
+        // ✅ OwnerPaymentSummaryDto fields: totalAmountPaid, pendingAmount
+        const totalPaid = summaryRes?.totalAmountPaid
+          ?? paymentList.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+        const lastPayment = paymentList[0];
 
         setSummary({
-          totalPaid: 450000,
-          pendingAmount: 125000,
-          lastPaymentDate: new Date(Date.now() - 259200000).toISOString()
+          totalPaid,
+          pendingAmount: summaryRes?.pendingAmount ?? 0,
+          lastPaymentDate: lastPayment?.paymentDate ?? null,
         });
-
-        // Mock payment history
-        const mockData = Array.from({ length: 8 }).map((_, i) => ({
-          paymentId: i + 1,
-          paymentDate: new Date(Date.now() - (i * 86400000 * 4)).toISOString(),
-          paymentMode: ['Bank Transfer', 'UPI', 'Cash', 'Cheque'][i % 4],
-          amount: Math.floor(Math.random() * 50000) + 10000,
-          status: i === 0 ? 'PENDING' : 'PAID',
-          referenceNo: `REF${10000 + i}`
-        }));
-
-        setPayments(mockData);
       } catch (err) {
         setError(err.message || 'Failed to load payment data');
       } finally {
@@ -78,11 +79,13 @@ export const OwnerPaymentsPage = () => {
     );
   }
 
-  // Chart Data from mock payments
+  // Chart Data — uses correct DTO fields: amountPaid, paymentDate
   const chartData = payments.slice(0, 6).reverse().map(p => ({
-    name: new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-    amount: p.amount,
-    status: p.status
+    name: p.paymentDate
+      ? new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+      : '—',
+    amount: p.amountPaid || 0,
+    mode: p.paymentMode || 'CASH'
   }));
 
   return (
@@ -196,7 +199,7 @@ export const OwnerPaymentsPage = () => {
                   <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={50}>
                     {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.status === 'PAID' ? '#6366f1' : '#f43f5e'} />
+                      <Cell key={`cell-${index}`} fill="#6366f1" />
                     ))}
                   </Bar>
                 </BarChart>
@@ -225,28 +228,28 @@ export const OwnerPaymentsPage = () => {
                 {payments.map((payment) => (
                   <div key={payment.paymentId} className="flex items-center justify-between p-5 hover:bg-surface-hover transition-colors group">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${
-                        payment.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'
-                      }`}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm bg-emerald-50 text-emerald-600 border border-emerald-100">
                         <CreditCard className="w-5 h-5" />
                       </div>
                       <div>
                         <p className="font-bold text-text-main group-hover:text-primary-600 transition-colors">
-                          {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
-                            day: 'numeric', month: 'short', year: 'numeric',
-                          })}
+                          {payment.paymentDate
+                            ? new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+                                day: 'numeric', month: 'short', year: 'numeric',
+                              })
+                            : '—'}
                         </p>
-                        <p className="text-xs text-secondary-500 font-medium font-mono mt-0.5">
-                          {payment.referenceNo}
+                        <p className="text-xs text-secondary-500 font-medium mt-0.5">
+                          {payment.paymentMode || 'CASH'}{payment.remarks ? ` • ${payment.remarks}` : ''}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-text-main mb-1">
-                        ₹{payment.amount?.toLocaleString()}
+                        ₹{(payment.amountPaid || 0)?.toLocaleString()}
                       </p>
-                      <Badge variant={payment.status === 'PAID' ? 'success' : 'danger'} className="text-[10px] px-2 py-0.5">
-                        {payment.status}
+                      <Badge variant="success" className="text-[10px] px-2 py-0.5">
+                        PAID
                       </Badge>
                     </div>
                   </div>

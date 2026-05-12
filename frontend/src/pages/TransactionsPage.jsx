@@ -19,28 +19,22 @@ export const TransactionsPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const ownerId = user?.sareeOwnerId || 'OWN-205';
+        setLoading(true);
 
-        // Mock delay for UI
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // ✅ Real API calls — no localStorage fallback needed (uses JWT token)
+        const [txRes, summaryRes] = await Promise.all([
+          inventoryService.getMyTransactions(0, 50).catch(() => ({ content: [] })),
+          inventoryService.getMySummary(firstDay, lastDay).catch(() => null),
+        ]);
 
+        setTransactions(txRes?.content || []);
+
+        // ✅ Map OwnerInventorySummaryDto fields
         setSummary({
-          totalGiven: 1250,
-          totalReturned: 980,
-          pendingCount: 270
+          totalGiven: summaryRes?.totalSareesReceived ?? 0,
+          totalReturned: summaryRes?.totalSareesReturned ?? 0,
+          pendingCount: summaryRes?.sareesInHand ?? 0,
         });
-
-        // Mock data
-        const mockData = Array.from({ length: 15 }).map((_, i) => ({
-          transactionId: i + 1,
-          transactionDate: new Date(Date.now() - (i * 86400000)).toISOString(),
-          employeeName: ['Ramesh Kumar', 'Suresh Das', 'Kalaivani M', 'Anitha S', 'Vikram V'][i % 5],
-          sareeCount: Math.floor(Math.random() * 50) + 10,
-          transactionType: i % 2 === 0 ? 'GIVEN' : 'RETURNED',
-          status: 'COMPLETED'
-        }));
-
-        setTransactions(mockData);
       } catch (err) {
         setError(err.message || 'Failed to load transactions');
       } finally {
@@ -142,60 +136,43 @@ export const TransactionsPage = () => {
             <table className="min-w-full divide-y divide-border">
               <thead>
                 <tr className="bg-surface-hover/50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Date & Time</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Transaction ID</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Worker Name</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">Quantity</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">Status</th>
+                  {/* ✅ SareeTransactionResponseDto fields */}
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Received Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Received Qty</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Returned Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Returned Qty</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Remarks</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-border/50">
                 {transactions.map((tx) => (
                   <tr key={tx.transactionId} className="hover:bg-surface-hover transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-text-main">
-                        {new Date(tx.transactionDate).toLocaleDateString('en-IN', {
-                          day: 'numeric', month: 'short', year: 'numeric',
-                        })}
-                      </div>
-                      <div className="text-xs text-secondary-500">
-                        {new Date(tx.transactionDate).toLocaleTimeString('en-IN', {
-                          hour: '2-digit', minute: '2-digit'
-                        })}
-                      </div>
+                      <span className="text-sm font-mono text-secondary-500 bg-secondary-50 px-2 py-1 rounded">#{tx.transactionId}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
+                      {tx.receivedDate ? new Date(tx.receivedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-secondary-500 font-mono bg-secondary-50 px-2 py-1 rounded inline-block">
-                        TXN-{tx.transactionId.toString().padStart(4, '0')}
+                      <div className="flex items-center gap-2">
+                        <ArrowUpRight className="w-4 h-4 text-indigo-500" />
+                        <span className="text-sm font-bold text-indigo-700">{tx.receivedQuantity ?? '—'}</span>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
+                      {tx.returnedDate ? new Date(tx.returnedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs">
-                          {tx.employeeName.charAt(0)}
+                      {tx.returnedQuantity != null ? (
+                        <div className="flex items-center gap-2">
+                          <ArrowDownRight className="w-4 h-4 text-emerald-500" />
+                          <span className="text-sm font-bold text-emerald-700">{tx.returnedQuantity}</span>
                         </div>
-                        <span className="text-sm font-semibold text-text-main">{tx.employeeName}</span>
-                      </div>
+                      ) : <span className="text-secondary-400 text-sm">—</span>}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold ${
-                        tx.transactionType === 'GIVEN'
-                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                          : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                      }`}>
-                        {tx.transactionType === 'GIVEN' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {tx.transactionType}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="text-sm font-bold text-text-main">{tx.sareeCount}</div>
-                      <div className="text-xs text-secondary-500">sarees</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <Badge variant="success" className="px-2.5 py-1">
-                        {tx.status}
-                      </Badge>
+                    <td className="px-6 py-4 text-sm text-secondary-500">
+                      {tx.remarks || '—'}
                     </td>
                   </tr>
                 ))}

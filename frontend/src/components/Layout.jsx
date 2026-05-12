@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Bell } from 'lucide-react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { LogOut, Bell, X } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
@@ -88,11 +88,12 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
         {/* Navigation */}
         <nav className="flex-1 px-4 overflow-y-auto space-y-1 scrollbar-hide">
           {items.map((item, index) => {
-            const isActive = location.pathname.includes(item.href);
+            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
             return (
-              <a
+              <Link
                 key={index}
-                href={item.href}
+                to={item.href}
+                onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-300 group ${
                   isActive
                     ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
@@ -103,7 +104,7 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
                   {item.icon}
                 </span>
                 <span className="font-medium">{item.label}</span>
-              </a>
+              </Link>
             );
           })}
         </nav>
@@ -125,52 +126,76 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
 
 export const Header = ({ onMenuToggle }) => {
   const { user } = useAuth();
+  const [showNotifications, setShowNotifications] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-surface/80 backdrop-blur-xl border-b border-border shadow-soft">
-      <div className="flex items-center justify-between h-20 px-4 md:px-8">
-        {/* Menu Button */}
+      <div className="flex items-center justify-between h-16 md:h-20 px-4 md:px-8">
+        {/* Menu Button (Mobile) */}
         <button
           onClick={onMenuToggle}
           className="md:hidden p-2.5 hover:bg-secondary-50 text-secondary-600 rounded-xl transition-colors"
+          aria-label="Toggle menu"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
 
-        {/* Left Spacer */}
-        <div className="hidden md:flex flex-1 items-center gap-4">
-          <div className="relative w-64 lg:w-96">
-            <input 
-              type="text" 
-              placeholder="Quick search..." 
-              className="w-full pl-10 pr-4 py-2.5 bg-secondary-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 transition-all placeholder:text-secondary-400"
-            />
-            <span className="absolute left-3.5 top-3 text-secondary-400 text-sm">🔍</span>
-          </div>
+        {/* Page title / spacer on desktop */}
+        <div className="hidden md:flex flex-1 items-center">
+          <span className="text-sm text-secondary-400 font-medium">Nool ERP</span>
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 md:gap-6">
           {/* Notifications */}
-          <button className="relative p-2.5 hover:bg-secondary-50 text-secondary-600 rounded-full transition-colors group">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-white animate-pulse" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2.5 hover:bg-secondary-50 text-secondary-600 rounded-full transition-colors group"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-white animate-pulse" />
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-72 bg-surface border border-border rounded-2xl shadow-elevated z-50 overflow-hidden animate-fade-in">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <h3 className="font-bold text-text-main text-sm">Notifications</h3>
+                  <button onClick={() => setShowNotifications(false)} className="p-1 hover:bg-surface-hover rounded-lg transition-colors">
+                    <X className="w-4 h-4 text-secondary-500" />
+                  </button>
+                </div>
+                <div className="p-4 text-center text-sm text-secondary-500 py-8">
+                  <Bell className="w-8 h-8 text-secondary-300 mx-auto mb-2" />
+                  No new notifications
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User Menu */}
-          <div className="flex items-center gap-3 pl-6 border-l border-border">
+          <div className="flex items-center gap-3 pl-4 md:pl-6 border-l border-border">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-text-main leading-tight">{user?.role || 'User'}</p>
+              <p className="text-sm font-bold text-text-main leading-tight">
+                {user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'WORKER' ? 'Employee' : user?.role === 'SAREE_OWNER' ? 'Saree Owner' : 'User'}
+              </p>
               <p className="text-xs text-secondary-500 mt-0.5">{user?.mobileNumber || 'Online'}</p>
             </div>
-            <div className="w-11 h-11 bg-gradient-to-tr from-primary-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-primary-500/20 border-2 border-white">
+            <div className="w-9 h-9 md:w-11 md:h-11 bg-gradient-to-tr from-primary-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-primary-500/20 border-2 border-white text-sm">
               {user?.role?.charAt(0) || 'U'}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Close notification on outside click */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+      )}
     </header>
   );
 };

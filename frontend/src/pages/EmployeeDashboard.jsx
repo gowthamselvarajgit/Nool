@@ -75,103 +75,52 @@ const EmployeeDashboard = () => {
       setLoading(true);
       setError('');
 
-      // Simulating API loading time for demonstration
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const today = new Date().toISOString().split('T')[0];
+      const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
-      const employeeId = localStorage.getItem('employeeId') || 'EMP-102'; // Using fallback for testing UI
-      
+      // ✅ Fetch real employee profile
+      const profile = await employeeService.getMe();
+      setEmployeeData({
+        id: profile.employeeId,
+        name: profile.employeeName,
+        mobileNumber: profile.mobileNumber,
+        status: profile.status,
+        polishingRate: profile.polishingRate,
+        joiningDate: profile.joiningDate,
+        role: 'Worker',
+      });
+
+      // ✅ Fetch attendance summary for this month using correct API
+      let presentDays = 0, absentDays = 0, leaveDays = 0;
       try {
-        // Fetch employee profile data from backend
-        const profileResponse = await employeeService.getMe();
-        setEmployeeData(profileResponse.data);
+        const summaryRes = await attendanceService.getMySummary(fromDate, today);
+        presentDays = summaryRes?.presentDays ?? summaryRes?.totalPresent ?? 0;
+        absentDays = summaryRes?.absentDays ?? summaryRes?.totalAbsent ?? 0;
+        leaveDays = summaryRes?.leaveDays ?? summaryRes?.totalLeave ?? 0;
+      } catch (_) { /* ignore — will show zeros */ }
 
-        // Fetch recent daily work records
-        const now = new Date();
-        const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
-        
-        const dailyWorkResponse = await employeeService.getMyWorkSummary?.(startDate, now);
-        
-        // Calculate statistics from daily work records
-        let presentDays = 0;
-        let totalWorked = 0;
-        let freshCount = 0;
-        let rePolishCount = 0;
-        
-        if (dailyWorkResponse?.data) {
-          presentDays = dailyWorkResponse.data.length;
-          dailyWorkResponse.data.forEach(record => {
-            totalWorked += record.totalCount || 0;
-            freshCount += record.freshCount || 0;
-            rePolishCount += record.rePolishCount || 0;
-          });
-        }
+      const totalDays = presentDays + absentDays + leaveDays;
+      const attendancePct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
-        // Build statistics object
-        setStats({
-          presentDays: presentDays,
-          absentDays: Math.max(0, 25 - presentDays - 2),
-          leaveDays: 2,
-          totalRecords: 25,
-          attendance: Math.round((presentDays / 25) * 100),
-          chartData: [
-            { name: 'Present', value: presentDays, color: '#10b981' },
-            { name: 'Leave', value: 2, color: '#f59e0b' },
-            { name: 'Absent', value: Math.max(0, 25 - presentDays - 2), color: '#ef4444' }
-          ],
-          totalWorked: totalWorked,
-          freshCount: freshCount,
-          rePolishCount: rePolishCount
-        });
+      setStats({
+        presentDays,
+        absentDays,
+        leaveDays,
+        totalDays,
+        attendance: attendancePct,
+        chartData: [
+          { name: 'Present', value: presentDays || 0, color: '#10b981' },
+          { name: 'Leave', value: leaveDays || 0, color: '#f59e0b' },
+          { name: 'Absent', value: absentDays || 0, color: '#ef4444' },
+        ],
+      });
 
-        // Format recent attendance from daily work
-        const recentWork = (dailyWorkResponse?.data || []).slice(0, 4).map((record, index) => ({
-          id: index + 1,
-          date: record.workDate,
-          status: 'PRESENT',
-          freshCount: record.freshCount || 0,
-          rePolishCount: record.rePolishCount || 0,
-          totalCount: record.totalCount || 0
-        }));
-        setRecentAttendance(recentWork);
-        
-      } catch (apiError) {
-        // If API calls fail, use fallback mock data
-        setEmployeeData({
-          id: employeeId,
-          name: 'John Doe',
-          mobileNumber: '+91 9876543210',
-          joiningDate: '2023-01-15',
-          polishingRate: 25,
-          status: 'ACTIVE',
-          role: 'Weaver',
-          performanceScore: 92
-        });
-
-        // Mock recent attendance
-        const mockAttendance = [
-          { id: 1, date: new Date().toISOString(), status: 'PRESENT', freshCount: 12, rePolishCount: 8, totalCount: 20 },
-          { id: 2, date: new Date(Date.now() - 86400000).toISOString(), status: 'PRESENT', freshCount: 10, rePolishCount: 9, totalCount: 19 },
-          { id: 3, date: new Date(Date.now() - 86400000 * 2).toISOString(), status: 'PRESENT', freshCount: 15, rePolishCount: 5, totalCount: 20 },
-          { id: 4, date: new Date(Date.now() - 86400000 * 3).toISOString(), status: 'PRESENT', freshCount: 11, rePolishCount: 10, totalCount: 21 },
-        ];
-        setRecentAttendance(mockAttendance);
-
-        // Mock statistics
-        setStats({
-          presentDays: 22,
-          absentDays: 1,
-          leaveDays: 2,
-          totalRecords: 25,
-          attendance: 88,
-          chartData: [
-            { name: 'Present', value: 22, color: '#10b981' },
-            { name: 'Leave', value: 2, color: '#f59e0b' },
-            { name: 'Absent', value: 1, color: '#ef4444' }
-          ],
-          totalWorked: 80,
-          freshCount: 48,
-          rePolishCount: 32
-        });
+      // ✅ Fetch recent attendance records (latest 10)
+      try {
+        const attRes = await attendanceService.getList(0, 10);
+        setRecentAttendance(attRes?.content || []);
+      } catch (_) {
+        setRecentAttendance([]);
       }
 
     } catch (err) {
@@ -252,10 +201,10 @@ const EmployeeDashboard = () => {
               </div>
 
               <div className="flex flex-col justify-center border-l border-white/10 pl-8">
-                <p className="text-primary-100 text-sm mb-1">Performance Score</p>
+                <p className="text-primary-100 text-sm mb-1">Attendance Rate</p>
                 <div className="flex items-end gap-2">
-                  <p className="text-3xl font-display font-bold">{employeeData?.performanceScore}</p>
-                  <p className="text-primary-200 text-sm mb-1">/100</p>
+                  <p className="text-3xl font-display font-bold">{stats.attendance ?? 0}</p>
+                  <p className="text-primary-200 text-sm mb-1">%</p>
                 </div>
               </div>
 
@@ -376,10 +325,10 @@ const EmployeeDashboard = () => {
                         </div>
                         <div>
                           <p className="font-bold text-text-main group-hover:text-primary-600 transition-colors">
-                            {formatDate(record.date)}
+                            {formatDate(record.attendanceDate)}
                           </p>
                           <p className="text-sm text-secondary-500 font-medium">
-                            {record.checkInTime ? `In: ${record.checkInTime} ${record.checkOutTime ? `• Out: ${record.checkOutTime}` : ''}` : 'No time recorded'}
+                            {record.employeeName || 'Attendance Record'}
                           </p>
                         </div>
                       </div>

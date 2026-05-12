@@ -1,238 +1,335 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Card, Loading, ErrorMessage, Badge, Button } from '../components/Common';
-import { useAuth } from '../hooks/useAuth';
-import { ownerPaymentService } from '../services/api';
-import { CreditCard, Banknote, Search, Filter, Plus, ArrowUpRight, ArrowDownRight, MoreVertical } from 'lucide-react';
+import { Card, Loading, ErrorMessage, Badge, Button, Select, Input, Modal } from '../components/Common';
+import { ownerPaymentService, ownerService } from '../services/api';
+import { formatDate } from '../utils/formatters';
+import { CreditCard, Banknote, RefreshCw, Plus, ArrowUpRight } from 'lucide-react';
+
+const today = new Date().toISOString().split('T')[0];
+const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
 export const PaymentsManagementPage = () => {
-  const { user } = useAuth();
   const [payments, setPayments] = useState([]);
-  const [summary, setSummary] = useState(null);
+  const [owners, setOwners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedOwner, setSelectedOwner] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
-  const now = new Date();
-  const monthName = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+  const [payForm, setPayForm] = useState({
+    ownerId: '',
+    amountPaid: '',
+    paymentMode: 'CASH',
+    paymentDate: today,
+    remarks: '',
+  });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Mock delay for UI
-        await new Promise(resolve => setTimeout(resolve, 800));
+  useEffect(() => { fetchAll(); }, []);
 
-        setSummary({
-          totalPaidThisMonth: 1250000,
-          pendingAmount: 340000,
-          totalOwners: 12
-        });
-
-        // Mock payment history across multiple owners
-        const mockData = Array.from({ length: 10 }).map((_, i) => ({
-          paymentId: 1000 + i,
-          ownerName: ['Rajesh Kumar', 'Meena Textiles', 'Velu Handlooms', 'Suresh Silks', 'Anand Sarees'][i % 5],
-          paymentDate: new Date(Date.now() - (i * 86400000 * 2)).toISOString(),
-          paymentMode: ['Bank Transfer', 'UPI', 'Cash', 'Cheque'][i % 4],
-          amount: Math.floor(Math.random() * 80000) + 20000,
-          status: i < 3 ? 'PENDING' : 'COMPLETED',
-          referenceNo: `TRX-${10000 + i}`
-        }));
-
-        setPayments(mockData);
-      } catch (err) {
-        setError(err.message || 'Failed to load payments');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  if (loading) return <MainLayout><Loading text="Loading payments data..." /></MainLayout>;
-  
-  if (error) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <ErrorMessage message={error} />
-        </div>
-      </MainLayout>
-    );
+  async function fetchAll() {
+    try {
+      setLoading(true);
+      setError('');
+      const ownerRes = await ownerService.getList(0, 200);
+      // ✅ ownerId, ownerName, ownerStatus
+      setOwners((ownerRes?.content || []).map(o => ({ id: o.ownerId, name: o.ownerName })));
+      await fetchPayments('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  async function fetchPayments(ownerId) {
+    try {
+      setLoading(true);
+      if (ownerId) {
+        // ✅ Fetch per-owner history using correct PaginationRequestDto
+        const res = await ownerPaymentService.getOwnerHistory(ownerId, 0, 100);
+        setPayments(res?.content || []);
+      } else {
+        // Show my payment history for admin context — or try each owner
+        // For admin: fetch from first available owner or show empty
+        setPayments([]);
+      }
+    } catch (err) {
+      setError(err.message);
+      setPayments([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleOwnerChange(ownerId) {
+    setSelectedOwner(ownerId);
+    setCurrentPage(1);
+    await fetchPayments(ownerId);
+  }
+
+  async function handleRecordPayment() {
+    const { ownerId, amountPaid, paymentMode, paymentDate } = payForm;
+    if (!ownerId || !amountPaid || !paymentDate) {
+      setError('Please fill all required fields');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setError('');
+      // ✅ Correct DTO: ownerId, amountPaid, paymentMode, paymentDate, remarks
+      await ownerPaymentService.create({
+        ownerId: parseInt(ownerId),
+        amountPaid: parseFloat(amountPaid),
+        paymentMode,
+        paymentDate,
+        remarks: payForm.remarks,
+      });
+      setShowModal(false);
+      setPayForm({ ownerId: '', amountPaid: '', paymentMode: 'CASH', paymentDate: today, remarks: '' });
+      if (selectedOwner) await fetchPayments(selectedOwner);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Stats
+  const totalPaid = payments.reduce((s, p) => s + (p.amountPaid || 0), 0);
+  const totalPayments = payments.length;
+
+  const totalPages = Math.ceil(payments.length / itemsPerPage);
+  const paginatedPayments = payments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  if (loading && owners.length === 0) return <MainLayout><Loading text="Loading payments..." /></MainLayout>;
 
   return (
     <MainLayout>
-      <div className="space-y-6 pb-8 max-w-7xl mx-auto">
+      <div className="space-y-6 pb-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 animate-fade-in">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-600 text-sm font-semibold mb-3">
-              <CreditCard className="w-4 h-4" />
-              Admin Portal
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-sm font-semibold mb-2">
+              <CreditCard className="w-4 h-4" /> Owner Payments
             </div>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-text-main tracking-tight mb-2">
-              Payments Management
-            </h1>
-            <p className="text-secondary-500 font-medium">Manage payouts to all Saree Owners</p>
+            <h1 className="text-3xl font-bold text-gray-900">Payments Management</h1>
+            <p className="text-gray-500 mt-1">Record and track all owner payments</p>
           </div>
-          
-          <Button className="flex items-center gap-2 shadow-lg shadow-primary-500/20 w-full md:w-auto">
-            <Plus className="w-5 h-5" />
-            Record New Payment
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={fetchAll}>
+              <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+            </Button>
+            <Button onClick={() => setShowModal(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Record Payment
+            </Button>
+          </div>
         </div>
 
-        {/* Top Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Disbursed Card */}
-          <div className="bg-surface rounded-3xl p-6 border border-border shadow-soft relative overflow-hidden group">
-            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl group-hover:bg-emerald-500/20 transition-colors"></div>
-            <div className="flex justify-between items-start relative z-10">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm flex items-center gap-2">
+            ⚠️ {error}
+            <button onClick={() => setError('')} className="ml-auto font-bold text-red-400 hover:text-red-600">✕</button>
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm relative overflow-hidden">
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-emerald-400/10 blur-xl" />
+            <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-secondary-500 mb-1">Total Disbursed ({monthName})</p>
-                <div className="flex items-end gap-1 mb-2">
-                  <span className="text-2xl font-bold text-text-main mb-1">₹</span>
-                  <h3 className="text-4xl font-display font-bold text-text-main">{summary?.totalPaidThisMonth?.toLocaleString()}</h3>
-                </div>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  <ArrowUpRight className="w-3 h-3" /> Paid Out
+                <p className="text-xs text-gray-500 font-medium mb-1">Total Payments Loaded</p>
+                <h3 className="text-3xl font-bold text-gray-900">{totalPayments}</h3>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md mt-2">
+                  <ArrowUpRight className="w-3 h-3" /> Records
                 </span>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                <Banknote className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                <Banknote className="w-5 h-5" />
               </div>
             </div>
           </div>
 
-          {/* Pending Card */}
-          <div className="bg-surface rounded-3xl p-6 border border-border shadow-soft relative overflow-hidden group">
-            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-rose-500/10 blur-2xl group-hover:bg-rose-500/20 transition-colors"></div>
-            <div className="flex justify-between items-start relative z-10">
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm relative overflow-hidden">
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-blue-400/10 blur-xl" />
+            <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-secondary-500 mb-1">Total Pending</p>
-                <div className="flex items-end gap-1 mb-2">
-                  <span className="text-2xl font-bold text-text-main mb-1">₹</span>
-                  <h3 className="text-4xl font-display font-bold text-text-main">{summary?.pendingAmount?.toLocaleString()}</h3>
-                </div>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-1 rounded-md">
-                  <ArrowDownRight className="w-3 h-3" /> To be paid
-                </span>
+                <p className="text-xs text-gray-500 font-medium mb-1">Total Paid (Selected)</p>
+                <h3 className="text-2xl font-bold text-gray-900">₹{totalPaid.toLocaleString('en-IN')}</h3>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
-                <CreditCard className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                <CreditCard className="w-5 h-5" />
               </div>
             </div>
           </div>
 
-          {/* Owners Card */}
-          <div className="bg-surface rounded-3xl p-6 border border-border shadow-soft relative overflow-hidden group">
-            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl group-hover:bg-indigo-500/20 transition-colors"></div>
-            <div className="flex justify-between items-start relative z-10">
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm relative overflow-hidden">
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-purple-400/10 blur-xl" />
+            <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-secondary-500 mb-1">Active Payees</p>
-                <h3 className="text-4xl font-display font-bold text-text-main mb-2 mt-2">{summary?.totalOwners}</h3>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md mt-1">
-                  Saree Owners
-                </span>
+                <p className="text-xs text-gray-500 font-medium mb-1">Total Owners</p>
+                <h3 className="text-3xl font-bold text-gray-900">{owners.length}</h3>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                <span className="font-bold text-xl">O</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 font-bold text-lg">
+                O
               </div>
             </div>
           </div>
         </div>
 
-        {/* Payments Data Table */}
+        {/* Filter & Table */}
         <Card className="!p-0 overflow-hidden">
-          <div className="px-6 py-5 border-b border-border bg-surface-hover/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-text-main font-display">Payment Records</h2>
-              <p className="text-sm text-secondary-500">All disbursements to owners</p>
+              <h2 className="font-bold text-gray-800">Payment Records</h2>
+              <p className="text-xs text-gray-500">Select an owner to view their payment history</p>
             </div>
-            <div className="flex gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-secondary-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search owner or reference..."
-                  className="block w-full pl-10 pr-3 py-2 border border-border rounded-xl leading-5 bg-white placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all text-sm"
-                />
-              </div>
-              <button className="flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-xl text-sm font-semibold text-secondary-700 hover:bg-surface-hover transition-colors shadow-sm">
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
+            <div className="w-full md:w-64">
+              <Select
+                value={selectedOwner}
+                onChange={(e) => handleOwnerChange(e.target.value)}
+                options={[
+                  { value: '', label: '— Select Owner —' },
+                  ...owners.map(o => ({ value: o.id.toString(), label: o.name })),
+                ]}
+              />
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-border">
-              <thead>
-                <tr className="bg-surface-hover/50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Date & Ref</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Owner Details</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Payment Mode</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-border/50">
-                {payments.map((payment) => (
-                  <tr key={payment.paymentId} className="hover:bg-surface-hover transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-text-main">
-                        {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
-                          day: 'numeric', month: 'short', year: 'numeric',
-                        })}
-                      </div>
-                      <div className="text-xs text-secondary-500 font-mono mt-0.5">
-                        {payment.referenceNo}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs">
-                          {payment.ownerName.charAt(0)}
-                        </div>
-                        <span className="text-sm font-semibold text-text-main">{payment.ownerName}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-secondary-600 bg-secondary-50 px-2.5 py-1 rounded-md border border-secondary-200">
-                        {payment.paymentMode}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="text-sm font-bold text-text-main">₹{payment.amount?.toLocaleString()}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <Badge variant={payment.status === 'COMPLETED' ? 'success' : 'warning'} className="px-2.5 py-1">
-                        {payment.status}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-secondary-400 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50">
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
-                    </td>
+            {loading ? (
+              <div className="text-center py-10 text-gray-500">Loading...</div>
+            ) : paginatedPayments.length === 0 ? (
+              <div className="text-center py-14">
+                <CreditCard className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">
+                  {selectedOwner ? 'No payment records found for this owner' : 'Select an owner to view payment history'}
+                </p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {['Payment ID', 'Owner', 'Amount Paid', 'Payment Mode', 'Payment Date', 'Remarks'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {/* ✅ OwnerPaymentHistoryDto: paymentId, ownerId, ownerName, amountPaid, paymentMode, paymentDate, remarks */}
+                  {paginatedPayments.map((p) => (
+                    <tr key={p.paymentId} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3 text-xs font-mono text-gray-500">#{p.paymentId}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                            {(p.ownerName || '?').charAt(0)}
+                          </div>
+                          <span className="font-medium text-gray-800 text-sm">{p.ownerName}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 font-bold text-emerald-600">
+                        ₹{(p.amountPaid || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-5 py-3">
+                        <Badge variant="info">{p.paymentMode}</Badge>
+                      </td>
+                      <td className="px-5 py-3 text-gray-600 text-sm">
+                        {p.paymentDate ? formatDate(p.paymentDate) : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-gray-500 text-sm">{p.remarks || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-          
-          <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-hover/30">
-            <span className="text-sm text-secondary-500">Showing 1 to {payments.length} entries</span>
-            <div className="flex gap-2">
-              <button className="px-3 py-1 border border-border rounded-lg text-sm font-medium text-secondary-500 bg-white hover:bg-surface-hover disabled:opacity-50" disabled>Previous</button>
-              <button className="px-3 py-1 border border-border rounded-lg text-sm font-medium text-secondary-500 bg-white hover:bg-surface-hover hover:text-text-main transition-colors">Next</button>
+
+          {totalPages > 1 && (
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <span className="text-xs text-gray-500">
+                Page {currentPage} of {totalPages} — {payments.length} total
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                  Previous
+                </Button>
+                <Button variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                  Next
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
       </div>
+
+      {/* Record Payment Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => { setShowModal(false); setError(''); setPayForm({ ownerId: '', amountPaid: '', paymentMode: 'CASH', paymentDate: today, remarks: '' }); }}
+        title="Record Owner Payment"
+        size="md"
+      >
+        <div className="space-y-4">
+          <Select
+            label="Owner *"
+            value={payForm.ownerId}
+            onChange={(e) => setPayForm(p => ({ ...p, ownerId: e.target.value }))}
+            options={[{ value: '', label: '— Select Owner —' }, ...owners.map(o => ({ value: o.id.toString(), label: o.name }))]}
+            required
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Amount Paid (₹) *"
+              type="number"
+              value={payForm.amountPaid}
+              onChange={(e) => setPayForm(p => ({ ...p, amountPaid: e.target.value }))}
+              placeholder="0.00"
+              required
+            />
+            <Input
+              label="Payment Date *"
+              type="date"
+              value={payForm.paymentDate}
+              onChange={(e) => setPayForm(p => ({ ...p, paymentDate: e.target.value }))}
+              required
+            />
+          </div>
+          <Select
+            label="Payment Mode *"
+            value={payForm.paymentMode}
+            onChange={(e) => setPayForm(p => ({ ...p, paymentMode: e.target.value }))}
+            options={[
+              { value: 'CASH', label: '💵 Cash' },
+              { value: 'ONLINE', label: '📱 Online' },
+              { value: 'CHEQUE', label: '🏦 Cheque' },
+            ]}
+          />
+          <Input
+            label="Remarks"
+            value={payForm.remarks}
+            onChange={(e) => setPayForm(p => ({ ...p, remarks: e.target.value }))}
+            placeholder="Optional notes"
+          />
+
+          {payForm.amountPaid && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+              <span className="text-emerald-700 text-sm font-medium">Recording Payment</span>
+              <span className="text-emerald-800 font-bold text-lg">₹{parseFloat(payForm.amountPaid || 0).toLocaleString('en-IN')}</span>
+            </div>
+          )}
+
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button className="flex-1" loading={submitting} onClick={handleRecordPayment}>Record Payment</Button>
+          </div>
+        </div>
+      </Modal>
     </MainLayout>
   );
 };

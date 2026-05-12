@@ -4,9 +4,7 @@ const API_BASE_URL = '/api';
 const getToken = () => localStorage.getItem('nool_token');
 
 const headers = (token = null) => {
-  const h = {
-    'Content-Type': 'application/json',
-  };
+  const h = { 'Content-Type': 'application/json' };
   if (token || getToken()) {
     h['Authorization'] = `Bearer ${token || getToken()}`;
   }
@@ -15,23 +13,21 @@ const headers = (token = null) => {
 
 const handleResponse = async (response) => {
   if (response.status === 401) {
-    // Auto logout on 401nool_token
     localStorage.removeItem('nool_token');
     localStorage.removeItem('nool_user');
     window.location.href = '/login';
     return;
   }
-
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
     const message = errorData?.message || `Request failed with status ${response.status}`;
     throw new Error(message);
   }
-
   const text = await response.text();
   return text ? JSON.parse(text) : null;
 };
-// Auth Services
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
 export const authService = {
   login: async (mobileNumber, password) => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -39,8 +35,7 @@ export const authService = {
       headers: headers(),
       body: JSON.stringify({ mobileNumber, password }),
     });
-
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
   logout: async () => {
@@ -48,7 +43,7 @@ export const authService = {
       method: 'POST',
       headers: headers(),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
   validate: async () => {
@@ -56,11 +51,11 @@ export const authService = {
       method: 'GET',
       headers: headers(),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 };
 
-// Employee Services
+// ─── Employee ────────────────────────────────────────────────────────────────
 export const employeeService = {
   create: async (data) => {
     const response = await fetch(`${API_BASE_URL}/employees`, {
@@ -68,7 +63,7 @@ export const employeeService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
   getById: async (id) => {
@@ -76,7 +71,7 @@ export const employeeService = {
       method: 'GET',
       headers: headers(),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
   getMe: async () => {
@@ -84,7 +79,7 @@ export const employeeService = {
       method: 'GET',
       headers: headers(),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
   update: async (data) => {
@@ -93,16 +88,25 @@ export const employeeService = {
       headers: headers(),
       body: JSON.stringify(data),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getList: async (pageNo = 0, pageSize = 10, searchKeyword = '') => {
+  updateStatus: async (employeeId, status) => {
+    const response = await fetch(`${API_BASE_URL}/employees/status`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify({ employeeId, status }),
+    });
+    return handleResponse(response);
+  },
+
+  getList: async (page = 0, size = 10, searchKeyword = '') => {
     const response = await fetch(`${API_BASE_URL}/employees/list`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ pageNo, pageSize, searchKeyword }),
+      body: JSON.stringify({ page, size, searchKeyword, sortBy: 'createdAt', sortingDirection: 'DESC' }),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
   delete: async (employeeId) => {
@@ -110,166 +114,215 @@ export const employeeService = {
       method: 'DELETE',
       headers: headers(),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 };
 
-// Attendance Services
+// ─── Attendance ──────────────────────────────────────────────────────────────
 export const attendanceService = {
+  // Backend: POST /attendance → { employeeId, attendanceDate, status }
   mark: async (data) => {
     const response = await fetch(`${API_BASE_URL}/attendance`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        employeeId: data.employeeId,
+        attendanceDate: data.attendanceDate,  // ✅ correct field name
+        status: data.status,
+      }),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
+
+  markAttendance: async (data) => attendanceService.mark(data),
 
   getById: async (id) => {
     const response = await fetch(`${API_BASE_URL}/attendance/${id}`, {
       method: 'GET',
       headers: headers(),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getByDate: async (date) => {
+  // Backend: POST /attendance/list → PaginationRequestDto
+  getList: async (page = 0, size = 50, searchKeyword = '') => {
     const response = await fetch(`${API_BASE_URL}/attendance/list`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ 
-        pageNo: 0,
-        pageSize: 100,
-        attendanceDate: date
+      body: JSON.stringify({
+        page,
+        size,
+        searchKeyword,
+        sortBy: 'attendanceDate',
+        sortingDirection: 'DESC',
       }),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getList: async (filters) => {
-    const response = await fetch(`${API_BASE_URL}/attendance/list`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(filters),
-    });
-    return await handleResponse(response);
-  },
-
-  getSummary: async (startDate, endDate) => {
-    const response = await fetch(`${API_BASE_URL}/attendance/summary`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
-    });
-    return await handleResponse(response);
-  },
-
-  getEmployeeSummary: async (employeeId, startDate, endDate) => {
+  // Backend: POST /attendance/employee/{employeeId}/summary → { fromDate, toDate }
+  getEmployeeSummary: async (employeeId, fromDate, toDate) => {
     const response = await fetch(
       `${API_BASE_URL}/attendance/employee/${employeeId}/summary`,
       {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
       }
     );
-    return await handleResponse(response);
+    return handleResponse(response);
+  },
+
+  // Backend: POST /attendance/summary → { fromDate, toDate }
+  getMySummary: async (fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/attendance/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
   },
 };
 
-// Salary Services
+// ─── Salary ──────────────────────────────────────────────────────────────────
 export const salaryService = {
+  // Backend: POST /salary-payments → SalaryPaymentRequestDto
+  // { employeeId, fromDate, toDate, amountPaid, paymentDate, paymentMode, remarks }
   create: async (data) => {
     const response = await fetch(`${API_BASE_URL}/salary-payments`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(data),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getHistory: async (employeeId, startDate, endDate) => {
+  // Backend: POST /salary-payments/employee/{employeeId}/history → PaginationRequestDto
+  getEmployeeHistory: async (employeeId, page = 0, size = 20) => {
     const response = await fetch(
       `${API_BASE_URL}/salary-payments/employee/${employeeId}/history`,
       {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ page, size, sortBy: 'paymentDate', sortingDirection: 'DESC' }),
       }
     );
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getSummary: async (startDate, endDate) => {
-    const response = await fetch(`${API_BASE_URL}/salary-payments/summary`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
-    });
-    return await handleResponse(response);
-  },
-
-  getEmployeeSummary: async (employeeId, startDate, endDate) => {
+  // Backend: POST /salary-payments/employee/{employeeId}/summary → { fromDate, toDate }
+  getEmployeeSummary: async (employeeId, fromDate, toDate) => {
     const response = await fetch(
       `${API_BASE_URL}/salary-payments/employee/${employeeId}/summary`,
       {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
       }
     );
-    return await handleResponse(response);
+    return handleResponse(response);
+  },
+
+  // Backend: POST /salary-payments/history → PaginationRequestDto (employee's own history)
+  getMyHistory: async (page = 0, size = 20) => {
+    const response = await fetch(`${API_BASE_URL}/salary-payments/history`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ page, size, sortBy: 'paymentDate', sortingDirection: 'DESC' }),
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /salary-payments/summary → { fromDate, toDate }
+  getMySummary: async (fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/salary-payments/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
   },
 };
 
-// Dashboard Services
+// ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboardService = {
+  // Backend: GET /admin/dashboard/summary
   getSummary: async () => {
     const response = await fetch(`${API_BASE_URL}/admin/dashboard/summary`, {
       method: 'GET',
       headers: headers(),
     });
-        return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getRevenueAnalytics: async (startDate, endDate) => {
+  // Backend: POST /admin/dashboard/revenue → { fromDate, toDate }
+  getRevenueAnalytics: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/admin/dashboard/revenue`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
     });
-        return await handleResponse(response);
+    return handleResponse(response);
   },
 
+  // Backend: POST /admin/dashboard/revenue/month → { month, year }
   getMonthlyRevenue: async (month, year) => {
     const response = await fetch(`${API_BASE_URL}/admin/dashboard/revenue/month`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ month, year }),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getWorkforceAnalytics: async (startDate, endDate) => {
+  // Backend: POST /admin/dashboard/workforce → { fromDate, toDate }
+  getWorkforceAnalytics: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/admin/dashboard/workforce`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 };
 
-// Saree Owner Services
+// ─── Leave & Productivity ────────────────────────────────────────────────────
+export const leaveProductivityService = {
+  // Backend: POST /admin/leave-productivity/employees → { fromDate, toDate }
+  getEmployeeLeaveProductivity: async (fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/admin/leave-productivity/employees`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /admin/leave-productivity/summary → { fromDate, toDate }
+  getLeaveProductivitySummary: async (fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/admin/leave-productivity/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),
+    });
+    return handleResponse(response);
+  },
+};
+
+// ─── Saree Owner ─────────────────────────────────────────────────────────────
 export const ownerService = {
+  // Backend: POST /owners → { ownerName, mobileNumber, password }
   create: async (data) => {
     const response = await fetch(`${API_BASE_URL}/owners`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ownerName: data.ownerName,
+        mobileNumber: data.mobileNumber,
+        password: data.password,
+      }),
     });
-        return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
   getById: async (id) => {
@@ -277,8 +330,7 @@ export const ownerService = {
       method: 'GET',
       headers: headers(),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
   getMe: async () => {
@@ -286,195 +338,207 @@ export const ownerService = {
       method: 'GET',
       headers: headers(),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
+  // Backend: PUT /owners → { ownerId, ownerName, mobileNumber }
   update: async (data) => {
     const response = await fetch(`${API_BASE_URL}/owners`, {
       method: 'PUT',
       headers: headers(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ownerId: data.ownerId,
+        ownerName: data.ownerName,
+        mobileNumber: data.mobileNumber,
+      }),
     });
-    return await handleResponse(response);
+    return handleResponse(response);
   },
 
-  getList: async (pageNo = 0, pageSize = 10, searchKeyword = '') => {
+  // Backend: PATCH /owners/status → { ownerId, ownerStatus }
+  updateStatus: async (ownerId, ownerStatus) => {
+    const response = await fetch(`${API_BASE_URL}/owners/status`, {
+      method: 'PATCH',
+      headers: headers(),
+      body: JSON.stringify({ ownerId, ownerStatus }),
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /owners/list → PaginationRequestDto
+  getList: async (page = 0, size = 10, searchKeyword = '') => {
     const response = await fetch(`${API_BASE_URL}/owners/list`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ pageNo, pageSize, searchKeyword }),
+      body: JSON.stringify({ page, size, searchKeyword, sortBy: 'createdAt', sortingDirection: 'DESC' }),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 };
 
-// Saree Inventory Services
+// ─── Saree Inventory (Owner Saree Transactions) ──────────────────────────────
 export const inventoryService = {
+  // Backend: POST /inventory/transaction → { ownerId, receivedDate, receivedQuantity, returnedDate, returnedQuantity, remarks }
   createTransaction: async (data) => {
     const response = await fetch(`${API_BASE_URL}/inventory/transaction`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(data),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
-  getTransactions: async (filters) => {
+  // Backend: POST /inventory/owner/{ownerId}/transactions → PaginationRequestDto
+  getOwnerTransactions: async (ownerId, page = 0, size = 20) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/owner/${ownerId}/transactions`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ page, size, sortBy: 'createdAt', sortingDirection: 'DESC' }),
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /inventory/transactions → PaginationRequestDto (my transactions for owner role)
+  getMyTransactions: async (page = 0, size = 20) => {
     const response = await fetch(`${API_BASE_URL}/inventory/transactions`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(filters),
+      body: JSON.stringify({ page, size, sortBy: 'createdAt', sortingDirection: 'DESC' }),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
-  getSummary: async (startDate, endDate) => {
+  // Backend: POST /inventory/owner/{ownerId}/summary → { fromDate, toDate }
+  getOwnerSummary: async (ownerId, fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/owner/${ownerId}/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /inventory/summary → { fromDate, toDate }
+  getOverallSummary: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/inventory/summary`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
-  getOwnerSummary: async (ownerId, startDate, endDate) => {
-    const response = await fetch(
-      `${API_BASE_URL}/inventory/owner/${ownerId}/summary`,
-      {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
-      }
-    );
-    return await handleResponse(response);
-
-  },
-
-  getMySummary: async (startDate, endDate) => {
+  // Backend: POST /inventory/my-summary → { fromDate, toDate }
+  getMySummary: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/inventory/my-summary`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 };
 
-// Owner Payment Services
+// ─── Owner Payment ────────────────────────────────────────────────────────────
 export const ownerPaymentService = {
+  // Backend: POST /owner-payments → { ownerId, amountPaid, paymentMode, paymentDate, remarks }
   create: async (data) => {
     const response = await fetch(`${API_BASE_URL}/owner-payments`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(data),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
-  getHistory: async (ownerId, startDate, endDate) => {
-    const response = await fetch(
-      `${API_BASE_URL}/owner-payments/owner/${ownerId}/history`,
-      {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
-      }
-    );
-    return await handleResponse(response);
-
+  // Backend: POST /owner-payments/owner/{ownerId}/history → PaginationRequestDto
+  getOwnerHistory: async (ownerId, page = 0, size = 20) => {
+    const response = await fetch(`${API_BASE_URL}/owner-payments/owner/${ownerId}/history`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ page, size, sortBy: 'paymentDate', sortingDirection: 'DESC' }),
+    });
+    return handleResponse(response);
   },
 
-  getSummary: async (startDate, endDate) => {
+  // Backend: POST /owner-payments/owner/{ownerId}/summary → { fromDate, toDate }
+  getOwnerSummary: async (ownerId, fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/owner-payments/owner/${ownerId}/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /owner-payments/history → PaginationRequestDto (my payments)
+  getMyHistory: async (page = 0, size = 20) => {
+    const response = await fetch(`${API_BASE_URL}/owner-payments/history`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ page, size, sortBy: 'paymentDate', sortingDirection: 'DESC' }),
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: POST /owner-payments/summary → { fromDate, toDate }
+  getMySummary: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/owner-payments/summary`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
     });
-    return await handleResponse(response);
-
-  },
-
-  getOwnerSummary: async (ownerId, startDate, endDate) => {
-    const response = await fetch(
-      `${API_BASE_URL}/owner-payments/owner/${ownerId}/summary`,
-      {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
-      }
-    );
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 };
 
-// Daily Work Services
+// ─── Daily Work ───────────────────────────────────────────────────────────────
 export const dailyWorkService = {
+  // Backend: POST /employee-daily-working → { employeeId, workDate, freshCount, rePolishCount }
   create: async (data) => {
     const response = await fetch(`${API_BASE_URL}/employee-daily-working`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        employeeId: data.employeeId,
+        workDate: data.workDate,
+        freshCount: data.freshCount,
+        rePolishCount: data.rePolishCount,
+      }),
     });
-    if (!response.ok) throw new Error('Failed to create daily work record');
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
-  getList: async (filters) => {
+  // Backend: POST /employee-daily-working/list → PaginationRequestDto
+  getList: async (page = 0, size = 20, searchKeyword = '') => {
     const response = await fetch(`${API_BASE_URL}/employee-daily-working/list`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(filters),
+      body: JSON.stringify({ page, size, searchKeyword, sortBy: 'workDate', sortingDirection: 'DESC' }),
     });
-    return await handleResponse(response);
-
+    return handleResponse(response);
   },
 
-  getWorkLogsList: async (filters) => {
-    const response = await fetch(`${API_BASE_URL}/employee-daily-working/list`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(filters),
-    });
-    return await handleResponse(response);
-  },
-
-  getSummary: async (startDate, endDate) => {
-    const response = await fetch(`${API_BASE_URL}/employee-daily-working/summary`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({ startDate, endDate }),
-    });
-    return await handleResponse(response);
-
-  },
-
-  getMyWorkSummary: async (dateRange) => {
-    const response = await fetch(`${API_BASE_URL}/employee-daily-working/summary`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(dateRange),
-    });
-    return await handleResponse(response);
-  },
-
-  getEmployeeSummary: async (employeeId, startDate, endDate) => {
+  // Backend: POST /employee-daily-working/employee/{employeeId}/summary → { fromDate, toDate }
+  getEmployeeSummary: async (employeeId, fromDate, toDate) => {
     const response = await fetch(
       `${API_BASE_URL}/employee-daily-working/employee/${employeeId}/summary`,
       {
         method: 'POST',
         headers: headers(),
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
       }
     );
-    return await handleResponse(response);
+    return handleResponse(response);
+  },
+
+  // Backend: POST /employee-daily-working/summary → { fromDate, toDate } (my summary)
+  getMyWorkSummary: async (fromDate, toDate) => {
+    const response = await fetch(`${API_BASE_URL}/employee-daily-working/summary`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
   },
 };
