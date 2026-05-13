@@ -12,6 +12,7 @@ import java.util.List;
 
 @Repository
 public interface SalaryPaymentRepository extends JpaRepository<SalaryPayment, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "employee")
     Page<SalaryPayment> findByEmployeeId(Long employeeId, Pageable pageable);
 
     List<SalaryPayment> findByPaymentDateBetween(LocalDate fromDate, LocalDate toDate);
@@ -52,4 +53,16 @@ public interface SalaryPaymentRepository extends JpaRepository<SalaryPayment, Lo
            """)
     LocalDate findLastPaymentDateByEmployee(Long employeeId);
 
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM SalaryPayment s WHERE s.employee.id = :employeeId")
+    int deleteAllByEmployeeId(Long employeeId);
+
+    // All-time per-employee paid sums.
+    @Query("""
+           SELECT s.employee.id, COALESCE(SUM(s.amountPaid), 0)
+           FROM SalaryPayment s
+           GROUP BY s.employee.id
+           """)
+    List<Object[]> sumPaidByAllEmployees();
 }

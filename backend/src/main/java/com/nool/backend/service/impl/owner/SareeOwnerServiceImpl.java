@@ -2,6 +2,7 @@ package com.nool.backend.service.impl.owner;
 
 import com.nool.backend.auth.security.CurrentUserUtil;
 import com.nool.backend.auth.entity.User;
+import com.nool.backend.auth.entity.UserProfile;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -35,18 +36,33 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
     @Override
     @Transactional
     public SareeOwnerResponseDto createOwner(CreateSareeOwnerRequestDto requestDto) {
+        String mobile = requestDto.getMobileNumber();
 
-        if (sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+        if (sareeOwnerRepository.existsByMobileNumber(mobile)) {
             throw new DuplicateResourceException("Owner with this mobile number already exists");
         }
-        if (userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
-            throw new DuplicateResourceException("A login account with this mobile number already exists");
-        }
 
+        // Clean up any orphan login account (no linked employee/owner) so a retry
+        // after a previously-failed create doesn't get blocked by a stale row.
+        userRepository.findByMobileNumber(mobile).ifPresent(existingUser -> {
+            UserProfile profile = userProfileRepository.findByUserId(existingUser.getId()).orElse(null);
+            boolean linkedToSomething = profile != null
+                    && (profile.getEmployeeId() != null || profile.getOwnerId() != null);
+            boolean isAdmin = existingUser.getRole() != null
+                    && existingUser.getRole().name().equals("ADMIN");
+            if (linkedToSomething || isAdmin) {
+                throw new DuplicateResourceException("This mobile number is already in use by another account");
+            }
+            if (profile != null) {
+                userProfileRepository.delete(profile);
+            }
+            userRepository.delete(existingUser);
+            userRepository.flush();
+        });
 
         SareeOwner sareeOwner = SareeOwner.builder()
                 .ownerName(requestDto.getOwnerName())
-                .mobileNumber(requestDto.getMobileNumber())
+                .mobileNumber(mobile)
                 .status(OwnerStatus.ACTIVE)
                 .build();
 
@@ -54,7 +70,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
 
         // Create associated user account with login credentials
         User user = adminUserService.createOwnerUser(
-            requestDto.getMobileNumber(),
+            mobile,
             requestDto.getPassword(),
             saved.getId()
         );
@@ -99,6 +115,14 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
 
     @Override
     public SareeOwnerResponseDto getOwnerById(Long ownerId) {
+        // A SAREE_OWNER can only read their own profile.
+        String role = CurrentUserUtil.getRole();
+        if (!"ADMIN".equals(role)) {
+            Long callerOwnerId = CurrentUserUtil.getOwnerId();
+            if (callerOwnerId == null || !callerOwnerId.equals(ownerId)) {
+                throw new org.springframework.security.access.AccessDeniedException("You can only view your own profile");
+            }
+        }
         SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
         return SareeOwnerResponseDto.builder()
                 .ownerId(sareeOwner.getId())
@@ -126,7 +150,10 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 paginationRequestDto.getSortBy()
         );
 
-        Page<SareeOwner> page = sareeOwnerRepository.findAll(pageRequest);
+        String keyword = paginationRequestDto.getSearchKeyword();
+        Page<SareeOwner> page = (keyword != null && !keyword.isBlank())
+                ? sareeOwnerRepository.searchOwners(keyword, pageRequest)
+                : sareeOwnerRepository.findAll(pageRequest);
 
         List<SareeOwnerListDto> content = page.getContent()
                 .stream()

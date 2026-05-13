@@ -62,6 +62,9 @@ public class SecurityConfig {
                         // ── Public ────────────────────────────────────────────────────────
                         .requestMatchers("/auth/**").permitAll()
 
+                        // ── Admin-only analytics & dashboard ──────────────────────────────
+                        .requestMatchers("/admin/**").hasAuthority("ADMIN")
+
                         // ── Employee management ───────────────────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/employees").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT,    "/employees").hasAuthority("ADMIN")
@@ -91,29 +94,34 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/employee/*/history").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/history").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/summary").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.GET,    "/salary-payments/employees-summary").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/**").hasAuthority("ADMIN")
 
                         // ── Owners ────────────────────────────────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/owners").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT,    "/owners").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH,  "/owners/status").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/owners/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/owners/list").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.GET,    "/owners/me").hasAnyAuthority("ADMIN", "SAREE_OWNER")
                         .requestMatchers(HttpMethod.GET,    "/owners/**").hasAnyAuthority("ADMIN", "SAREE_OWNER")
 
                         // ── Inventory ─────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/inventory/transaction").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/transaction/*/returns").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH,  "/inventory/transaction/*/return").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/owner/*/transactions").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST,   "/inventory/receipt").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST,   "/inventory/return").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST,   "/inventory/owner/*/ledger").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/inventory/owner/*/summary").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/inventory/summary").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/transactions").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        .requestMatchers(HttpMethod.GET,    "/inventory/owners").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/inventory/entry/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST,   "/inventory/my-ledger").hasAnyAuthority("ADMIN", "SAREE_OWNER")
                         .requestMatchers(HttpMethod.POST,   "/inventory/my-summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
 
                         // ── Owner Payments ────────────────────────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/owner-payments").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/owner-payments/owner/*/history").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/owner-payments/owner/*/summary").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET,    "/owner-payments/owners-summary").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/owner-payments/history").hasAnyAuthority("ADMIN", "SAREE_OWNER")
                         .requestMatchers(HttpMethod.POST,   "/owner-payments/summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
 

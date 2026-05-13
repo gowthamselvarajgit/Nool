@@ -51,6 +51,7 @@ public class OwnerPayment {
         this.updatedAt = now;
     }
 
+    @PreUpdate
     protected void onUpdate(){
         this.updatedAt = LocalDateTime.now();
     }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Button, Badge, Loading, ErrorMessage } from '../components/Common';
 import { employeeService, attendanceService } from '../services/api';
-import { formatDate } from '../utils/formatters';
+import { formatDate, friendlyStatus } from '../utils/formatters';
 import { CheckCircle, Clock, TrendingUp, Calendar, AlertCircle, ArrowUpRight, Award, Activity } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
@@ -90,27 +90,24 @@ const EmployeeDashboard = () => {
         role: 'Worker',
       });
 
-      // ✅ Fetch attendance summary for this month using correct API
-      let presentDays = 0, absentDays = 0, leaveDays = 0;
+      // ✅ AttendanceSummaryDto: { employeeId, employeeName, totalWorkingDays, absentDays, attendancePercentage }
+      let totalDays = 0, absentDays = 0, attendancePct = 0;
       try {
         const summaryRes = await attendanceService.getMySummary(fromDate, today);
-        presentDays = summaryRes?.presentDays ?? summaryRes?.totalPresent ?? 0;
-        absentDays = summaryRes?.absentDays ?? summaryRes?.totalAbsent ?? 0;
-        leaveDays = summaryRes?.leaveDays ?? summaryRes?.totalLeave ?? 0;
+        totalDays = summaryRes?.totalWorkingDays ?? 0;
+        absentDays = summaryRes?.absentDays ?? 0;
+        attendancePct = Math.round(summaryRes?.attendancePercentage ?? 0);
       } catch (_) { /* ignore — will show zeros */ }
 
-      const totalDays = presentDays + absentDays + leaveDays;
-      const attendancePct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+      const presentDays = Math.max(totalDays - absentDays, 0);
 
       setStats({
         presentDays,
         absentDays,
-        leaveDays,
         totalDays,
         attendance: attendancePct,
         chartData: [
           { name: 'Present', value: presentDays || 0, color: '#10b981' },
-          { name: 'Leave', value: leaveDays || 0, color: '#f59e0b' },
           { name: 'Absent', value: absentDays || 0, color: '#ef4444' },
         ],
       });
@@ -166,12 +163,6 @@ const EmployeeDashboard = () => {
             </h1>
             <p className="text-secondary-500 font-medium">Here's your work summary for this month.</p>
           </div>
-          <div className="flex gap-3">
-            <Button variant="secondary" className="bg-white">
-              <Calendar className="w-4 h-4 mr-2" />
-              View Schedule
-            </Button>
-          </div>
         </div>
 
         {/* Profile Highlight Card */}
@@ -195,7 +186,7 @@ const EmployeeDashboard = () => {
                 <div>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-100 text-xs font-semibold border border-emerald-500/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    {employeeData?.status}
+                    {friendlyStatus(employeeData?.status)}
                   </span>
                 </div>
               </div>
@@ -217,27 +208,20 @@ const EmployeeDashboard = () => {
         </Card>
 
         {/* Attendance Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard
             icon={CheckCircle}
             color="success"
             title="Days Present"
             value={stats.presentDays}
-            description="Out of 25 working days"
+            description={`Out of ${stats.totalDays} recorded days`}
           />
           <StatCard
             icon={AlertCircle}
             color="danger"
             title="Days Absent"
             value={stats.absentDays}
-            description="Requires manager approval"
-          />
-          <StatCard
-            icon={Clock}
-            color="warning"
-            title="Leave Days"
-            value={stats.leaveDays}
-            description="Approved time off"
+            description="Days marked as absent"
           />
           <StatCard
             icon={Activity}
@@ -297,7 +281,6 @@ const EmployeeDashboard = () => {
                 <h3 className="text-lg font-bold text-text-main font-display">Recent Activity</h3>
                 <p className="text-sm text-secondary-500">Your latest attendance records</p>
               </div>
-              <Button variant="ghost" size="sm">View All</Button>
             </div>
             
             <div className="p-2 overflow-y-auto max-h-[360px] scrollbar-hide">
@@ -339,7 +322,7 @@ const EmployeeDashboard = () => {
                         }
                         className="px-3 py-1 text-xs"
                       >
-                        {record.status}
+                        {friendlyStatus(record.status)}
                       </Badge>
                     </div>
                   ))}

@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Card, Loading, ErrorMessage, Badge } from '../components/Common';
+import { Card, Loading, ErrorMessage } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { inventoryService } from '../services/api';
-import { RefreshCw, ArrowUpRight, ArrowDownRight, Search, Filter } from 'lucide-react';
+import { exportToExcel } from '../utils/excelExporter';
+import { formatDate } from '../utils/formatters';
+import { RefreshCw, ArrowDownCircle, ArrowUpCircle, Package, Search, Download } from 'lucide-react';
 
 export const TransactionsPage = () => {
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState([]);
+  const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const now = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -20,20 +25,16 @@ export const TransactionsPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-
-        // ✅ Real API calls — no localStorage fallback needed (uses JWT token)
-        const [txRes, summaryRes] = await Promise.all([
-          inventoryService.getMyTransactions(0, 50).catch(() => ({ content: [] })),
+        const [ledgerRes, summaryRes] = await Promise.all([
+          inventoryService.getMyLedger(0, 100).catch(() => ({ content: [] })),
           inventoryService.getMySummary(firstDay, lastDay).catch(() => null),
         ]);
 
-        setTransactions(txRes?.content || []);
-
-        // ✅ Map OwnerInventorySummaryDto fields
+        setEntries(ledgerRes?.content || []);
         setSummary({
-          totalGiven: summaryRes?.totalSareesReceived ?? 0,
+          totalGiven: summaryRes?.totalSareesGiven ?? 0,
           totalReturned: summaryRes?.totalSareesReturned ?? 0,
-          pendingCount: summaryRes?.sareesInHand ?? 0,
+          inHand: summaryRes?.sareesInHand ?? 0,
         });
       } catch (err) {
         setError(err.message || 'Failed to load transactions');
@@ -42,10 +43,23 @@ export const TransactionsPage = () => {
       }
     };
     fetchData();
-  }, [user]);
+  }, [user]); // eslint-disable-line
+
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter(e => {
+      const fields = [e.entryId, e.remarks, e.entryDate, e.entryType];
+      return fields.some(f => String(f ?? '').toLowerCase().includes(q));
+    });
+  }, [entries, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const startIdx = (page - 1) * pageSize;
+  const visible = filtered.slice(startIdx, startIdx + pageSize);
 
   if (loading) return <MainLayout><Loading text="Loading your transactions..." /></MainLayout>;
-  
+
   if (error) {
     return (
       <MainLayout>
@@ -64,28 +78,44 @@ export const TransactionsPage = () => {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-sm font-semibold mb-3">
               <RefreshCw className="w-4 h-4" />
-              Transaction History
+              Ledger
             </div>
             <h1 className="text-3xl md:text-4xl font-display font-bold text-text-main tracking-tight mb-2">
               Stock Movements
             </h1>
-            <p className="text-secondary-500 font-medium">Detailed log of all sarees given and returned</p>
+            <p className="text-secondary-500 font-medium">Every saree received and returned, in order</p>
           </div>
-          
-          <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
+
+          <div className="flex gap-3 w-full md:w-auto items-center flex-wrap">
+            <div className="relative flex-1 md:w-72">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-secondary-400" />
               </div>
               <input
                 type="text"
-                placeholder="Search worker..."
-                className="block w-full pl-10 pr-3 py-2.5 border border-border rounded-xl leading-5 bg-white placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all text-sm"
+                placeholder="Search by date, type or remark..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                className="block w-full pl-10 pr-3 py-2.5 border border-border rounded-xl leading-5 bg-white placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all text-base"
               />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-border rounded-xl text-sm font-semibold text-secondary-700 hover:bg-surface-hover transition-colors shadow-sm">
-              <Filter className="w-4 h-4" />
-              Filter
+            <button
+              type="button"
+              disabled={!entries.length}
+              onClick={() => exportToExcel({
+                rows: entries.map(e => ({
+                  'Date': e.entryDate ? formatDate(e.entryDate) : '',
+                  'Type': e.entryType === 'RECEIPT' ? 'Received' : 'Returned',
+                  'Quantity': e.quantity ?? 0,
+                  'Remarks': e.remarks || '',
+                })),
+                fileName: 'Nool_My_Transactions',
+                sheetName: 'Ledger',
+                columnWidths: [14, 12, 12, 28],
+              })}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-border rounded-xl text-sm font-semibold text-secondary-700 hover:bg-surface-hover transition-colors shadow-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" /> Export Excel
             </button>
           </div>
         </div>
@@ -94,29 +124,29 @@ export const TransactionsPage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-2xl border border-border shadow-sm flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <ArrowUpRight className="w-5 h-5" />
+              <ArrowDownCircle className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-secondary-500 font-medium">Sarees Given</p>
-              <p className="text-xl font-bold text-text-main">{summary?.totalGiven}</p>
+              <p className="text-xl font-bold text-text-main">{summary?.totalGiven ?? 0}</p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-2xl border border-border shadow-sm flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <ArrowDownRight className="w-5 h-5" />
+              <ArrowUpCircle className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-secondary-500 font-medium">Sarees Returned</p>
-              <p className="text-xl font-bold text-text-main">{summary?.totalReturned}</p>
+              <p className="text-xl font-bold text-text-main">{summary?.totalReturned ?? 0}</p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-2xl border border-border shadow-sm flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-              <RefreshCw className="w-5 h-5" />
+              <Package className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-secondary-500 font-medium">Pending Stock</p>
-              <p className="text-xl font-bold text-text-main">{summary?.pendingCount}</p>
+              <p className="text-xs text-secondary-500 font-medium">In Hand</p>
+              <p className="text-xl font-bold text-text-main">{summary?.inHand ?? 0}</p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-2xl border border-border shadow-sm flex items-center gap-4">
@@ -125,67 +155,79 @@ export const TransactionsPage = () => {
             </div>
             <div>
               <p className="text-xs text-secondary-500 font-medium">Total Entries</p>
-              <p className="text-xl font-bold text-text-main">{transactions.length}</p>
+              <p className="text-xl font-bold text-text-main">{entries.length}</p>
             </div>
           </div>
         </div>
 
-        {/* Data Table */}
+        {/* Ledger Table */}
         <Card className="!p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
               <thead>
                 <tr className="bg-surface-hover/50">
-                  {/* ✅ SareeTransactionResponseDto fields */}
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">ID</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Received Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Received Qty</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Returned Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Returned Qty</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Quantity</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Remarks</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-border/50">
-                {transactions.map((tx) => (
-                  <tr key={tx.transactionId} className="hover:bg-surface-hover transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-mono text-secondary-500 bg-secondary-50 px-2 py-1 rounded">#{tx.transactionId}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
-                      {tx.receivedDate ? new Date(tx.receivedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <ArrowUpRight className="w-4 h-4 text-indigo-500" />
-                        <span className="text-sm font-bold text-indigo-700">{tx.receivedQuantity ?? '—'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
-                      {tx.returnedDate ? new Date(tx.returnedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {tx.returnedQuantity != null ? (
-                        <div className="flex items-center gap-2">
-                          <ArrowDownRight className="w-4 h-4 text-emerald-500" />
-                          <span className="text-sm font-bold text-emerald-700">{tx.returnedQuantity}</span>
-                        </div>
-                      ) : <span className="text-secondary-400 text-sm">—</span>}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-secondary-500">
-                      {tx.remarks || '—'}
+                {visible.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-12 text-center text-secondary-500">
+                      No entries found.
                     </td>
                   </tr>
-                ))}
+                )}
+                {visible.map((e) => {
+                  const isReceipt = e.entryType === 'RECEIPT';
+                  return (
+                    <tr key={e.entryId} className="hover:bg-surface-hover transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
+                        {e.entryDate ? new Date(e.entryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          isReceipt
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {isReceipt ? <ArrowDownCircle className="w-3.5 h-3.5" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
+                          {isReceipt ? 'Received' : 'Returned'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-base font-bold ${isReceipt ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                          {isReceipt ? '+' : '−'}{e.quantity ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-secondary-500">
+                        {e.remarks || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          
+
           {/* Pagination Footer */}
           <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-surface-hover/30">
-            <span className="text-sm text-secondary-500">Showing 1 to {transactions.length} of {transactions.length} entries</span>
+            <span className="text-sm text-secondary-500">
+              Showing {filtered.length === 0 ? 0 : startIdx + 1} to {Math.min(startIdx + pageSize, filtered.length)} of {filtered.length} entries
+            </span>
             <div className="flex gap-2">
-              <button className="px-3 py-1 border border-border rounded-lg text-sm font-medium text-secondary-500 bg-white hover:bg-surface-hover disabled:opacity-50" disabled>Previous</button>
-              <button className="px-3 py-1 border border-border rounded-lg text-sm font-medium text-secondary-500 bg-white hover:bg-surface-hover disabled:opacity-50" disabled>Next</button>
+              <button
+                className="px-3 py-1.5 border border-border rounded-lg text-sm font-medium text-secondary-700 bg-white hover:bg-surface-hover disabled:opacity-50"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >Previous</button>
+              <button
+                className="px-3 py-1.5 border border-border rounded-lg text-sm font-medium text-secondary-700 bg-white hover:bg-surface-hover disabled:opacity-50"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >Next</button>
             </div>
           </div>
         </Card>

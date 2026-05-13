@@ -2,7 +2,7 @@ package com.nool.backend.auth.service.impl;
 
 import com.nool.backend.auth.entity.User;
 import com.nool.backend.auth.entity.UserProfile;
-import com.nool.backend.auth.repository.AuthUserRepository;
+import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.enums.Role;
 import com.nool.backend.exception.DuplicateResourceException;
@@ -15,14 +15,14 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class AdminUserServiceImpl implements AdminUserService {
-    private final AuthUserRepository authUserRepository;
+    private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public User createEmployeeUser(String mobileNumber, String rawPassword, Long employeeId) {
-        if (authUserRepository.findByMobileNumber(mobileNumber).isPresent()) {
+        if (userRepository.findByMobileNumber(mobileNumber).isPresent()) {
             throw new DuplicateResourceException("A login account with this mobile number already exists");
         }
 
@@ -32,7 +32,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .role(Role.WORKER)
                 .active(true)
                 .build();
-        User savedUser = authUserRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         UserProfile profile = UserProfile.builder()
                 .user(savedUser)
@@ -45,7 +45,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     @Transactional
     public User createOwnerUser(String mobileNumber, String rawPassword, Long ownerId) {
-        if (authUserRepository.findByMobileNumber(mobileNumber).isPresent()) {
+        if (userRepository.findByMobileNumber(mobileNumber).isPresent()) {
             throw new DuplicateResourceException("A login account with this mobile number already exists");
         }
 
@@ -55,7 +55,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .role(Role.SAREE_OWNER)
                 .active(true)
                 .build();
-        User savedUser = authUserRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         UserProfile userProfile = UserProfile.builder()
                 .user(savedUser)

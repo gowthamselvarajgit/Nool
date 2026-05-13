@@ -3,8 +3,9 @@ import { MainLayout } from '../components/Layout';
 import { Button, Card, Input, Modal, Badge, Select, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { Table } from '../components/Table';
 import { employeeService } from '../services/api';
-import { formatDate, getEmployeeStatusColor, getInitials } from '../utils/formatters';
-import { Edit2, Trash2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { formatDate, getEmployeeStatusColor, getInitials, friendlyStatus } from '../utils/formatters';
+import { exportToExcel } from '../utils/excelExporter';
+import { Edit2, Eye, ToggleLeft, ToggleRight, Download } from 'lucide-react';
 
 const EmployeeForm = ({ initialData, onSubmit, isLoading }) => {
   const [formData, setFormData] = useState(
@@ -95,23 +96,23 @@ const EmployeeForm = ({ initialData, onSubmit, isLoading }) => {
 
 export const EmployeesPage = () => {
   const [employees, setEmployees] = useState([]);
-  const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (pageOneBased = currentPage, kw = searchKeyword) => {
     try {
       setLoading(true);
       setError('');
-      const response = await employeeService.getList(0, 100);
+      const response = await employeeService.getList(pageOneBased - 1, itemsPerPage, kw);
       const list = response?.content || [];
       const mapped = list.map((e) => ({
         id: e.employeeId,
@@ -121,7 +122,9 @@ export const EmployeesPage = () => {
         status: e.status,
         mobileNumber: e.mobileNumber,
       }));
-      setEmployees(mapped || []);
+      setEmployees(mapped);
+      setTotalPages(response?.totalPages || 1);
+      setTotalItems(response?.totalElements ?? mapped.length);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -130,19 +133,19 @@ export const EmployeesPage = () => {
   };
 
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    fetchEmployees(currentPage, searchKeyword);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
+  // Debounce search → reset to first page and refetch.
   useEffect(() => {
-    const keyword = searchKeyword.toLowerCase();
-    const filtered = employees.filter((emp) => {
-      return (
-        (emp.name || '').toLowerCase().includes(keyword) ||
-        (emp.mobileNumber || '').includes(keyword)
-      );
-    });
-    setFilteredEmployees(filtered);
-  }, [searchKeyword, employees]);
+    const t = setTimeout(() => {
+      setCurrentPage(1);
+      fetchEmployees(1, searchKeyword);
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKeyword]);
 
   const handleCreateOrUpdate = async (formData) => {
     try {
@@ -154,8 +157,11 @@ export const EmployeesPage = () => {
           employeeName: formData.name,
           polishingRate: Number(formData.polishingRate),
           mobileNumber: formData.mobileNumber,
-          status: formData.status,
         });
+        // Status is updated via a separate endpoint
+        if (formData.status && formData.status !== selectedEmployee.status) {
+          await employeeService.updateStatus(selectedEmployee.id, formData.status);
+        }
       } else {
         // Create expects: employeeName, joiningDate, polishingRate, mobileNumber, password
         await employeeService.create({
@@ -176,16 +182,27 @@ export const EmployeesPage = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedEmployee) return;
+  const handleExport = async () => {
     try {
-      setIsSubmitting(true);
-      await employeeService.delete(selectedEmployee.id);
-      setShowDeleteModal(false);
-      setSelectedEmployee(null);
-      fetchEmployees();
-    } catch (err) { setError(err.message); }
-    finally { setIsSubmitting(false); }
+      // Fetch the full set (large page size) for export, regardless of current pagination.
+      const res = await employeeService.getList(0, 2000, searchKeyword);
+      const all = (res?.content || []).map((e) => ({
+        'Employee ID': e.employeeId,
+        'Name': e.employeeName,
+        'Mobile': e.mobileNumber,
+        'Joining Date': e.joiningDate ? formatDate(e.joiningDate) : '',
+        'Polishing Rate (₹)': e.polishingRate ?? 0,
+        'Status': friendlyStatus(e.status),
+      }));
+      exportToExcel({
+        rows: all,
+        fileName: 'Nool_Employees',
+        sheetName: 'Employees',
+        columnWidths: [12, 22, 14, 14, 18, 14],
+      });
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   // Toggle employee ACTIVE <-> LEFT
@@ -218,12 +235,7 @@ export const EmployeesPage = () => {
 
   if (loading) return <MainLayout><Loading text="Loading employees..." /></MainLayout>;
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-  const paginatedData = filteredEmployees.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Server-side pagination: `employees` already holds the current page.
 
   // Table columns configuration
   const columns = [
@@ -257,7 +269,7 @@ export const EmployeesPage = () => {
     {
       key: 'status',
       label: 'Status',
-      render: (value) => <Badge variant={getEmployeeStatusColor(value)}>{value}</Badge>,
+      render: (value) => <Badge variant={getEmployeeStatusColor(value)}>{friendlyStatus(value)}</Badge>,
     },
     {
       key: 'actions',
@@ -273,14 +285,11 @@ export const EmployeesPage = () => {
           <button
             onClick={() => handleToggleStatus(row)}
             className={`p-1.5 rounded-lg transition-colors ${row.status === 'ACTIVE' ? 'hover:bg-red-50' : 'hover:bg-green-50'}`}
-            title={row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+            title={row.status === 'ACTIVE' ? 'Mark as Left' : 'Mark as Active'}
           >
             {row.status === 'ACTIVE'
               ? <ToggleRight className="w-5 h-5 text-green-600" />
               : <ToggleLeft className="w-5 h-5 text-gray-400" />}
-          </button>
-          <button onClick={() => { setSelectedEmployee(row); setShowDeleteModal(true); }} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-            <Trash2 className="w-4 h-4 text-red-600" />
           </button>
         </div>
       ),
@@ -307,44 +316,35 @@ export const EmployeesPage = () => {
             onChange={(e) => setSearchKeyword(e.target.value)}
             className="flex-1"
           />
-          <Button onClick={() => { setSelectedEmployee(null); setShowModal(true); }}>
-            ➕ Add Employee
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-1" /> Export Excel
+            </Button>
+            <Button onClick={() => { setSelectedEmployee(null); setShowModal(true); }}>
+              ➕ Add Employee
+            </Button>
+          </div>
         </Card>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <p className="text-gray-600 text-sm">Total Employees</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{employees.length}</p>
-          </Card>
-          <Card>
-            <p className="text-gray-600 text-sm">Active</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">
-              {employees.filter((e) => e.status === 'ACTIVE').length}
-            </p>
-          </Card>
-          <Card>
-            <p className="text-gray-600 text-sm">Inactive</p>
-            <p className="text-3xl font-bold text-yellow-600 mt-1">
-              {employees.filter((e) => e.status === 'LEFT').length}
-            </p>
-          </Card>
-        </div>
+        {/* Stats — totals across all pages */}
+        <Card>
+          <p className="text-gray-600 text-sm">Total Employees</p>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{totalItems}</p>
+        </Card>
 
         {/* Employee Table */}
-        {filteredEmployees.length === 0 ? (
+        {employees.length === 0 ? (
           <EmptyState message="No employees found" icon="👤" />
         ) : (
           <Card className="overflow-hidden">
             <Table
               columns={columns}
-              data={paginatedData}
+              data={employees}
               pagination={{
                 currentPage,
                 totalPages,
                 itemsPerPage,
-                totalItems: filteredEmployees.length,
+                totalItems,
               }}
               onPaginationChange={(page) => setCurrentPage(page)}
             />
@@ -382,7 +382,7 @@ export const EmployeesPage = () => {
               <div>
                 <h3 className="text-xl font-bold text-gray-900">{selectedEmployee.name}</h3>
                 <Badge variant={getEmployeeStatusColor(selectedEmployee.status)}>
-                  {selectedEmployee.status}
+                  {friendlyStatus(selectedEmployee.status)}
                 </Badge>
               </div>
             </div>
@@ -406,41 +406,6 @@ export const EmployeesPage = () => {
         )}
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteModal}
-        onClose={() => { setShowDeleteModal(false); setSelectedEmployee(null); }}
-        title="Delete Employee"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800 font-medium">
-              ⚠️ Are you sure you want to delete <strong>{selectedEmployee?.name}</strong>?
-            </p>
-            <p className="text-red-700 text-sm mt-2">
-              This action cannot be undone. All employee records will be permanently deleted.
-            </p>
-          </div>
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => { setShowDeleteModal(false); setSelectedEmployee(null); }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              className="flex-1"
-              loading={isSubmitting}
-              onClick={handleDelete}
-            >
-              Delete
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </MainLayout>
   );
 };

@@ -25,7 +25,6 @@ import EmployeeProfile from './pages/EmployeeProfile';
 import DailyWorkPage from './pages/DailyWorkPage';
 import PerformancePage from './pages/PerformancePage';
 import PaymentsManagementPage from './pages/PaymentsManagementPage';
-import InventoryReportPage from './pages/InventoryReportPage';
 
 function App() {
   return (
@@ -112,11 +111,7 @@ function App() {
           />
           <Route
             path="/admin/inventory-report"
-            element={
-              <PrivateRoute requiredRole="ADMIN">
-                <InventoryReportPage />
-              </PrivateRoute>
-            }
+            element={<Navigate to="/admin/inventory" replace />}
           />
           <Route
             path="/admin/analytics"

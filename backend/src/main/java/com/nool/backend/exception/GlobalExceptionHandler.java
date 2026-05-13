@@ -69,11 +69,17 @@ public class GlobalExceptionHandler {
 
     //FALLBACK 500
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleGenric(Exception exception, HttpServletRequest request){
+    public ResponseEntity<ApiErrorResponse> handleGenric(Exception exception, HttpServletRequest request) throws Exception {
+        // Let Spring Security handle its own access-denied/authentication errors
+        if (exception instanceof org.springframework.security.access.AccessDeniedException
+                || exception instanceof org.springframework.security.core.AuthenticationException) {
+            throw exception;
+        }
         ApiErrorResponse errorResponse = ApiErrorResponse.builder()
                 .timeStamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Internal Server Error")
+                .message(exception.getMessage() != null ? exception.getMessage() : "An unexpected error occurred")
                 .path(request.getRequestURI())
                 .build();
 
@@ -110,31 +116,61 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception, HttpServletRequest request){
 
         String path = request.getRequestURI();
-        String message;
+        String rootCause = extractRootCauseMessage(exception);
+        String lowerCause = rootCause == null ? "" : rootCause.toLowerCase();
 
-        if (path.contains("/attendance")) {
-            message = "Duplicate attendance. Attendance already marked for this employee on this date.";
-        } else if (path.contains("/inventory") || path.contains("/transaction")) {
-            message = "Duplicate or invalid transaction data. A transaction with the same details may already exist.";
-        } else if (path.contains("/salary")) {
-            message = "Duplicate salary record. A payment for this period may already exist.";
-        } else if (path.contains("/owner")) {
-            message = "Duplicate entry. An owner with this mobile number may already exist.";
-        } else if (path.contains("/employee")) {
-            message = "Duplicate entry. An employee with this mobile number may already exist.";
+        String message;
+        HttpStatus status = HttpStatus.CONFLICT;
+
+        // ── Inspect the actual database error first, not just the URL ──────────
+        if (lowerCause.contains("foreign key") || lowerCause.contains("a foreign key constraint fails")) {
+            status = HttpStatus.CONFLICT;
+            if (path.contains("/employees")) {
+                message = "Cannot delete this employee — they have attendance, salary, or daily-work history. Mark them as 'Left Job' instead.";
+            } else if (path.contains("/owners")) {
+                message = "Cannot delete this owner — they have transaction or payment history. Mark them as 'Not Working' instead.";
+            } else {
+                message = "Cannot complete the action: related records exist. Underlying error: " + rootCause;
+            }
+        } else if (lowerCause.contains("duplicate entry") || lowerCause.contains("unique constraint")) {
+            if (lowerCause.contains("mobile") || lowerCause.contains("mobile_number")) {
+                message = "This mobile number is already registered. Please use a different one.";
+            } else if (lowerCause.contains("attendance_date") || path.contains("/attendance")) {
+                message = "Attendance is already marked for this employee on this date.";
+            } else if (lowerCause.contains("work_date") || path.contains("/employee-daily-working")) {
+                message = "A daily work entry already exists for this employee on this date.";
+            } else if (path.contains("/salary")) {
+                message = "A salary payment already exists for this period.";
+            } else {
+                message = "Duplicate entry detected. Underlying error: " + rootCause;
+            }
+        } else if (lowerCause.contains("cannot be null") || lowerCause.contains("not-null property")) {
+            status = HttpStatus.BAD_REQUEST;
+            message = "A required field is missing. Underlying error: " + rootCause;
         } else {
-            message = "Data conflict: duplicate or invalid entry detected.";
+            message = "Data conflict. Underlying error: " + rootCause;
         }
 
         ApiErrorResponse errorResponse = ApiErrorResponse.builder()
                 .timeStamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error("Conflict")
+                .status(status.value())
+                .error(status.getReasonPhrase())
                 .message(message)
                 .path(path)
                 .build();
 
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    private String extractRootCauseMessage(Throwable t) {
+        Throwable cur = t;
+        Throwable last = t;
+        int depth = 0;
+        while (cur != null && depth++ < 10) {
+            last = cur;
+            cur = cur.getCause();
+        }
+        return last.getMessage();
     }
 
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)

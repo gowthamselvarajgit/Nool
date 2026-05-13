@@ -112,7 +112,9 @@ export const Table = ({
                 ))}
                 {actions && (
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    {/* On touch devices (sm and below) actions are always visible;
+                        on desktop they fade in on row hover. */}
+                    <div className="flex gap-2 justify-end opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity duration-200">
                       {actions(row).map((action, idx) => (
                         <Button
                           key={idx}

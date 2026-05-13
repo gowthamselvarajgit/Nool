@@ -5,7 +5,6 @@ import com.nool.backend.dto.dashboard.admin.AdminEmployeeLeaveProductivityDto;
 import com.nool.backend.dto.dashboard.admin.AdminLeaveProductivitySummary;
 import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.entity.employee.Employee;
-import com.nool.backend.entity.employee.EmployeeDailyWork;
 import com.nool.backend.enums.AttendanceStatus;
 import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
@@ -15,7 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,74 +31,79 @@ public class AdminLeaveProductivityServiceImpl implements AdminLeaveProductivity
     @Override
     public List<AdminEmployeeLeaveProductivityDto> getEmployeeLeaveProductivity(DateRangeDto dateRangeDto) {
 
+        LocalDate fromDate = dateRangeDto.getFromDate();
+        LocalDate toDate = dateRangeDto.getToDate();
+
+        // 1 query — all employees.
         List<Employee> employees = employeeRepository.findAll();
 
-        return employees.stream()
-                .map(employee -> {
-                    Long employeeId = employee.getId();
-                    long presentDays = attendanceRepository.countByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.PRESENT);
-                    List<Attendance> absences = attendanceRepository.findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate(), AttendanceStatus.ABSENT);
-                    long absentDays = absences.size();
-                    List<LocalDate> absentDates = absences.stream().map(Attendance::getAttendanceDate).toList();
-                    List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
-                    long totalWorkDays = works.stream()
-                            .map(EmployeeDailyWork::getWorkDate)
-                            .distinct()
-                            .count();
-                    long totalFreshWork = works.stream()
-                            .mapToLong(EmployeeDailyWork::getFreshCount)
-                            .sum();
-                    long totalRePolishWork = works.stream()
-                            .mapToLong(EmployeeDailyWork::getRePolishCount)
-                            .sum();
-                    double productivityScore = totalWorkDays == 0 ? 0 : (double) totalFreshWork / totalWorkDays;
+        // 1 query — attendance counts grouped by employee + status.
+        Map<Long, Map<AttendanceStatus, Long>> attendanceByEmployee = new HashMap<>();
+        for (Object[] row : attendanceRepository.aggregateByEmployeeAndStatus(fromDate, toDate)) {
+            Long employeeId = (Long) row[0];
+            AttendanceStatus status = (AttendanceStatus) row[1];
+            Long count = (Long) row[2];
+            attendanceByEmployee
+                    .computeIfAbsent(employeeId, k -> new HashMap<>())
+                    .put(status, count);
+        }
 
-                    return AdminEmployeeLeaveProductivityDto.builder()
-                            .employeeId(employeeId)
-                            .employeeName(employee.getName())
-                            .presentDays(presentDays)
-                            .absentDates(absentDates)
-                            .totalWorkDays(totalWorkDays)
-                            .totalFreshWork(totalFreshWork)
-                            .totalRePolish(totalRePolishWork)
-                            .productivityScore(productivityScore)
-                            .build();
-                }).toList();
+        // 1 query — daily-work aggregates grouped by employee.
+        Map<Long, long[]> workByEmployee = new HashMap<>();
+        for (Object[] row : employeeDailyWorkRepository.aggregateByEmployee(fromDate, toDate)) {
+            Long employeeId = (Long) row[0];
+            long freshCount = ((Number) row[1]).longValue();
+            long rePolishCount = ((Number) row[2]).longValue();
+            long workDays = ((Number) row[3]).longValue();
+            workByEmployee.put(employeeId, new long[]{freshCount, rePolishCount, workDays});
+        }
+
+        // 1 query — all absence rows in range, grouped client-side per employee.
+        Map<Long, List<LocalDate>> absentDatesByEmployee = attendanceRepository
+                .findByDateRangeAndStatus(fromDate, toDate, AttendanceStatus.ABSENT)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        a -> a.getEmployee().getId(),
+                        Collectors.mapping(Attendance::getAttendanceDate, Collectors.toList())
+                ));
+
+        List<AdminEmployeeLeaveProductivityDto> result = new ArrayList<>(employees.size());
+        for (Employee employee : employees) {
+            Long employeeId = employee.getId();
+            Map<AttendanceStatus, Long> attendanceCounts = attendanceByEmployee.getOrDefault(employeeId, Map.of());
+            long[] work = workByEmployee.getOrDefault(employeeId, new long[]{0, 0, 0});
+            long totalFreshWork = work[0];
+            long totalRePolishWork = work[1];
+            long totalWorkDays = work[2];
+            long presentDays = attendanceCounts.getOrDefault(AttendanceStatus.PRESENT, 0L);
+            List<LocalDate> absentDates = absentDatesByEmployee.getOrDefault(employeeId, List.of());
+
+            double productivityScore = totalWorkDays == 0 ? 0 : (double) totalFreshWork / totalWorkDays;
+
+            result.add(AdminEmployeeLeaveProductivityDto.builder()
+                    .employeeId(employeeId)
+                    .employeeName(employee.getName())
+                    .presentDays(presentDays)
+                    .absentDates(absentDates)
+                    .totalWorkDays(totalWorkDays)
+                    .totalFreshWork(totalFreshWork)
+                    .totalRePolish(totalRePolishWork)
+                    .productivityScore(productivityScore)
+                    .build());
+        }
+        return result;
     }
 
     @Override
     public AdminLeaveProductivitySummary getLeaveProductivitySummary(DateRangeDto dateRangeDto) {
+        LocalDate fromDate = dateRangeDto.getFromDate();
+        LocalDate toDate = dateRangeDto.getToDate();
+
         long totalEmployees = employeeRepository.count();
-        long totalPresentDays = attendanceRepository
-                .findAll()
-                .stream()
-                .filter(a -> !a.getAttendanceDate().isBefore(dateRangeDto.getFromDate()) &&
-                        !a.getAttendanceDate().isAfter(dateRangeDto.getToDate()) &&
-                        a.getAttendanceStatus() == AttendanceStatus.PRESENT)
-                .count();
-        long totalAbsentDays = attendanceRepository
-                .findAll()
-                .stream()
-                .filter(attendance -> !attendance.getAttendanceDate().isBefore(dateRangeDto.getFromDate()) &&
-                        !attendance.getAttendanceDate().isAfter(dateRangeDto.getToDate())&&
-                        attendance.getAttendanceStatus() == AttendanceStatus.ABSENT)
-                .count();
-
-        long totalFreshWork = employeeDailyWorkRepository
-                .findAll()
-                .stream()
-                .filter(employeeDailyWork -> !employeeDailyWork.getWorkDate().isBefore(dateRangeDto.getFromDate()) &&
-                        !employeeDailyWork.getWorkDate().isAfter(dateRangeDto.getToDate()))
-                .mapToLong(EmployeeDailyWork::getFreshCount)
-                .sum();
-
-        long totalRePolish = employeeDailyWorkRepository
-                .findAll()
-                .stream()
-                .filter(employeeDailyWork -> !employeeDailyWork.getWorkDate().isBefore(dateRangeDto.getFromDate()) &&
-                        !employeeDailyWork.getWorkDate().isAfter(dateRangeDto.getToDate()))
-                .mapToLong(EmployeeDailyWork::getRePolishCount)
-                .sum();
+        long totalPresentDays = attendanceRepository.countByDateRangeAndStatus(fromDate, toDate, AttendanceStatus.PRESENT);
+        long totalAbsentDays = attendanceRepository.countByDateRangeAndStatus(fromDate, toDate, AttendanceStatus.ABSENT);
+        long totalFreshWork = nz(employeeDailyWorkRepository.sumFreshWorkByDateRange(fromDate, toDate));
+        long totalRePolish = nz(employeeDailyWorkRepository.sumRePolishWorkByDateRange(fromDate, toDate));
 
         return AdminLeaveProductivitySummary.builder()
                 .totalEmployees(totalEmployees)
@@ -105,4 +113,6 @@ public class AdminLeaveProductivityServiceImpl implements AdminLeaveProductivity
                 .totalRePolishWork(totalRePolish)
                 .build();
     }
+
+    private static long nz(Long v) { return v == null ? 0L : v; }
 }

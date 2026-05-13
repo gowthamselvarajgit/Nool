@@ -13,6 +13,7 @@ import java.util.List;
 @Repository
 public interface OwnerPaymentRepository extends JpaRepository<OwnerPayment, Long> {
     List<OwnerPayment> findByOwnerId(Long ownerId);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "owner")
     Page<OwnerPayment> findByOwnerId(Long ownerId, Pageable pageable);
     List<OwnerPayment> findByPaymentDateBetween(LocalDate fromDate, LocalDate toDate);
     List<OwnerPayment> findByOwnerIdAndPaymentDateBetween(Long ownerId,LocalDate fromDate, LocalDate toDate);
@@ -27,4 +28,11 @@ public interface OwnerPaymentRepository extends JpaRepository<OwnerPayment, Long
            """)
     Double sumTotalAmountPaidByOwnerAndDateRange(Long ownerId, LocalDate fromDate, LocalDate toDate);
 
+    // All-time per-owner paid sums.
+    @Query("""
+           SELECT p.owner.id, COALESCE(SUM(p.amountPaid), 0)
+           FROM OwnerPayment p
+           GROUP BY p.owner.id
+           """)
+    List<Object[]> sumPaidByAllOwners();
 }

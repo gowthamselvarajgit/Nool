@@ -1,5 +1,6 @@
 package com.nool.backend.entity.owner;
 
+import com.nool.backend.enums.LedgerEntryType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -7,28 +8,32 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "saree_returns")
+@Table(name = "saree_ledger")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SareeReturn {
+public class SareeLedgerEntry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "return_id")
+    @Column(name = "entry_id")
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "transaction_id", nullable = false)
-    private SareeTransaction transaction;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", nullable = false)
+    private SareeOwner sareeOwner;
 
-    @Column(name = "returned_date", nullable = false)
-    private LocalDate returnedDate;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entry_type", nullable = false, length = 16)
+    private LedgerEntryType entryType;
 
-    @Column(name = "returned_quantity", nullable = false)
-    private Integer returnedQuantity;
+    @Column(name = "entry_date", nullable = false)
+    private LocalDate entryDate;
+
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
 
     @Column(name = "remarks")
     private String remarks;

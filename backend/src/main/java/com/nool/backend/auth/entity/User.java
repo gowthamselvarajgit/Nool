@@ -31,6 +31,7 @@ public class User {
     private Role role;
 
     @Column(name = "active_status", nullable = false)
+    @lombok.Builder.Default
     private boolean active = true;
 
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)

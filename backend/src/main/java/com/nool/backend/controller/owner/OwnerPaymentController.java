@@ -51,4 +51,9 @@ public class OwnerPaymentController {
         return ownerPaymentService.getMyPaymentSummary(dateRangeDto);
     }
 
+    // GET /owner-payments/owners-summary — admin view, all-time per-owner summary
+    @GetMapping("/owners-summary")
+    public java.util.List<OwnerPaymentSummaryDto> getAllOwnersPaymentSummary() {
+        return ownerPaymentService.getAllOwnersPaymentSummary();
+    }
 }

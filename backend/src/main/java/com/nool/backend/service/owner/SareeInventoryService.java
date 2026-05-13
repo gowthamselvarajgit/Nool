@@ -3,29 +3,30 @@ package com.nool.backend.service.owner;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
+import com.nool.backend.dto.inventory.LedgerEntryRequestDto;
+import com.nool.backend.dto.inventory.LedgerEntryResponseDto;
 import com.nool.backend.dto.inventory.OwnerInventorySummaryDto;
 import com.nool.backend.dto.inventory.SareeInventorySummaryDto;
-import com.nool.backend.dto.inventory.SareeTransactionRequestDto;
-import com.nool.backend.dto.inventory.SareeTransactionResponseDto;
-import com.nool.backend.dto.inventory.SareeTransactionReturnDto;
+
+import java.util.List;
 
 public interface SareeInventoryService {
 
-    SareeTransactionResponseDto recordSareeTransaction(SareeTransactionRequestDto requestDto);
+    LedgerEntryResponseDto addReceipt(LedgerEntryRequestDto requestDto);
 
-    // Adds a partial return row — can be called multiple times until fully returned
-    SareeTransactionResponseDto addPartialReturn(Long transactionId, SareeTransactionReturnDto dto);
+    LedgerEntryResponseDto addReturn(LedgerEntryRequestDto requestDto);
 
-    // Legacy PATCH compat — delegates to addPartialReturn
-    SareeTransactionResponseDto recordReturn(Long transactionId, SareeTransactionReturnDto dto);
-
-    PaginationResponseDto<SareeTransactionResponseDto> getSareeTransactionList(Long ownerId, PaginationRequestDto paginationRequestDto);
+    PaginationResponseDto<LedgerEntryResponseDto> getOwnerLedger(Long ownerId, PaginationRequestDto paginationRequestDto);
 
     OwnerInventorySummaryDto getOwnerInventorySummary(Long ownerId, DateRangeDto dateRangeDto);
 
     SareeInventorySummaryDto getOverallInventorySummary(DateRangeDto dateRangeDto);
 
-    PaginationResponseDto<SareeTransactionResponseDto> getMySareeTransactionList(PaginationRequestDto paginationRequestDto);
+    PaginationResponseDto<LedgerEntryResponseDto> getMyLedger(PaginationRequestDto paginationRequestDto);
 
     OwnerInventorySummaryDto getMyInventorySummary(DateRangeDto dateRangeDto);
+
+    List<OwnerInventorySummaryDto> getAllOwnersInventory();
+
+    void deleteLedgerEntry(Long entryId);
 }

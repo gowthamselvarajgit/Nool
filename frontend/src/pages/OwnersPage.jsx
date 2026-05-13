@@ -5,12 +5,12 @@ import {
 } from '../components/Common';
 import { Table } from '../components/Table';
 import { ownerService } from '../services/api';
-import { getInitials } from '../utils/formatters';
-import { Edit2, Eye, ToggleLeft, ToggleRight, Plus, RefreshCw } from 'lucide-react';
+import { getInitials, friendlyStatus } from '../utils/formatters';
+import { exportToExcel } from '../utils/excelExporter';
+import { Edit2, Eye, ToggleLeft, ToggleRight, Plus, RefreshCw, Download } from 'lucide-react';
 
 const OwnersPage = () => {
   const [owners, setOwners] = useState([]);
-  const [filteredOwners, setFilteredOwners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -19,12 +19,14 @@ const OwnersPage = () => {
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
 
-  async function fetchOwners() {
+  async function fetchOwners(pageOneBased = currentPage, kw = searchKeyword) {
     try {
       setLoading(true); setError('');
-      const response = await ownerService.getList(0, 200);
+      const response = await ownerService.getList(pageOneBased - 1, itemsPerPage, kw);
       const list = response?.content || [];
       const mapped = list.map((owner) => ({
         id: owner.ownerId,
@@ -33,22 +35,25 @@ const OwnersPage = () => {
         status: owner.ownerStatus,
       }));
       setOwners(mapped);
+      setTotalPages(response?.totalPages || 1);
+      setTotalItems(response?.totalElements ?? mapped.length);
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
   }
 
-  useEffect(() => { fetchOwners(); }, []);
+  useEffect(() => {
+    fetchOwners(currentPage, searchKeyword);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
   useEffect(() => {
-    const kw = searchKeyword.toLowerCase();
-    setFilteredOwners(
-      owners.filter(o =>
-        (o.ownerName || '').toLowerCase().includes(kw) ||
-        (o.mobileNumber || '').includes(kw)
-      )
-    );
-    setCurrentPage(1);
-  }, [searchKeyword, owners]);
+    const t = setTimeout(() => {
+      setCurrentPage(1);
+      fetchOwners(1, searchKeyword);
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKeyword]);
 
   const handleCreate = async (formData) => {
     try {
@@ -76,6 +81,26 @@ const OwnersPage = () => {
     finally { setIsSubmitting(false); }
   };
 
+  const handleExport = async () => {
+    try {
+      const res = await ownerService.getList(0, 2000, searchKeyword);
+      const all = (res?.content || []).map((o) => ({
+        'Owner ID': o.ownerId,
+        'Owner Name': o.ownerName,
+        'Mobile': o.mobileNumber,
+        'Status': friendlyStatus(o.ownerStatus),
+      }));
+      exportToExcel({
+        rows: all,
+        fileName: 'Nool_Owners',
+        sheetName: 'Owners',
+        columnWidths: [10, 22, 14, 14],
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   // ── Toggle Active/Inactive ────────────────────────────────────────────────
   const handleToggleStatus = async (owner) => {
     try {
@@ -89,8 +114,9 @@ const OwnersPage = () => {
     }
   };
 
+  // Per-page snapshot — fine for small shops. `total` uses server count.
   const stats = {
-    total: owners.length,
+    total: totalItems,
     active: owners.filter(o => o.status === 'ACTIVE').length,
     inactive: owners.filter(o => o.status === 'INACTIVE').length,
   };
@@ -155,8 +181,7 @@ const OwnersPage = () => {
     },
   ];
 
-  const totalPages = Math.ceil(filteredOwners.length / itemsPerPage);
-  const paginatedData = filteredOwners.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // Server-side pagination — `owners` already holds the current page.
 
   if (loading) return <MainLayout><Loading text="Loading owners..." /></MainLayout>;
 
@@ -168,8 +193,11 @@ const OwnersPage = () => {
             <h1 className="text-4xl font-bold text-gray-900">🧵 Saree Owner Management</h1>
             <p className="text-gray-500 mt-1">Add, edit, and manage saree owner accounts</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={fetchOwners}><RefreshCw className="w-4 h-4" /></Button>
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-1" /> Export Excel
+            </Button>
             <Button onClick={() => { setSelectedOwner(null); setError(''); setShowModal(true); }}>
               <Plus className="w-4 h-4 mr-1" /> Add Owner
             </Button>
@@ -203,14 +231,14 @@ const OwnersPage = () => {
           />
         </Card>
 
-        {filteredOwners.length === 0 ? (
+        {owners.length === 0 ? (
           <EmptyState message="No owners found" icon="🧵" />
         ) : (
           <Card className="overflow-hidden">
             <Table
               columns={columns}
-              data={paginatedData}
-              pagination={{ currentPage, totalPages, itemsPerPage, totalItems: filteredOwners.length }}
+              data={owners}
+              pagination={{ currentPage, totalPages, itemsPerPage, totalItems }}
               onPaginationChange={(page) => setCurrentPage(page)}
             />
           </Card>

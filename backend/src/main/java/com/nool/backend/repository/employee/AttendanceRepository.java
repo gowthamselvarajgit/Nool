@@ -27,6 +27,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             LocalDate toDate
     );
 
+    boolean existsByEmployeeIdAndAttendanceDate(Long employeeId, LocalDate attendanceDate);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "employee")
     Page<Attendance> findByEmployeeId(Long employeeId, Pageable pageable);
 
     @Query("""
@@ -53,4 +56,35 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             LocalDate toDate,
             AttendanceStatus attendanceStatus
     );
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Attendance a WHERE a.employee.id = :employeeId")
+    int deleteAllByEmployeeId(Long employeeId);
+
+    // Aggregate counts per employee+status for a date range — used by leave-productivity.
+    @Query("""
+           SELECT a.employee.id, a.attendanceStatus, COUNT(a)
+           FROM Attendance a
+           WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+           GROUP BY a.employee.id, a.attendanceStatus
+           """)
+    List<Object[]> aggregateByEmployeeAndStatus(LocalDate fromDate, LocalDate toDate);
+
+    // Single-row count by status for a date range (no employee grouping)
+    @Query("""
+           SELECT COUNT(a)
+           FROM Attendance a
+           WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+             AND a.attendanceStatus = :status
+           """)
+    long countByDateRangeAndStatus(LocalDate fromDate, LocalDate toDate, AttendanceStatus status);
+
+    // All rows of a particular status in range, for grouping absent-dates per employee
+    @Query("""
+           SELECT a FROM Attendance a
+           WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+             AND a.attendanceStatus = :status
+           """)
+    List<Attendance> findByDateRangeAndStatus(LocalDate fromDate, LocalDate toDate, AttendanceStatus status);
 }

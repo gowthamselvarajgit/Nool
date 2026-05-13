@@ -8,9 +8,11 @@ export const Button = ({
   size = 'md',
   disabled = false,
   isLoading = false,
+  loading = false,
   onClick,
   ...props
 }) => {
+  const busy = isLoading || loading;
   const baseStyles =
     'font-medium rounded-xl transition-all duration-300 flex items-center justify-center gap-2 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:active:scale-100';
 
@@ -32,11 +34,11 @@ export const Button = ({
   return (
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-      disabled={disabled || isLoading}
+      disabled={disabled || busy}
       onClick={onClick}
       {...props}
     >
-      {isLoading ? (
+      {busy ? (
         <>
           <Spinner size="sm" />
           <span>Processing...</span>
@@ -96,8 +98,10 @@ export const Select = ({
   error,
   className = '',
   required = false,
+  placeholder,
   ...props
 }) => {
+  const hasEmpty = options.some((o) => o.value === '' || o.value === null || o.value === undefined);
   return (
     <div className="w-full">
       {label && (
@@ -119,7 +123,7 @@ export const Select = ({
         }}
         {...props}
       >
-        <option value="">Select an option</option>
+        {!hasEmpty && <option value="">{placeholder || 'Select an option'}</option>}
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -153,7 +157,7 @@ export const Badge = ({ children, variant = 'default', className = '' }) => {
 export const Spinner = ({ size = 'md', className = '' }) => {
   const sizes = {
     sm: 'w-4 h-4 border-2',
-    md: 'w-8 h-8 border-3',
+    md: 'w-8 h-8 border-2',
     lg: 'w-12 h-12 border-4',
   };
 

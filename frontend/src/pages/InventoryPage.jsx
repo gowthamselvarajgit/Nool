@@ -27,7 +27,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export const InventoryPage = () => {
   const { user } = useAuth();
   const [summary, setSummary] = useState(null);
-  const [transactions, setTransactions] = useState([]);
+  const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -41,20 +41,18 @@ export const InventoryPage = () => {
       try {
         setLoading(true);
 
-        // ✅ Real API — no ownerId needed (JWT-based, SAREE_OWNER role uses /my-summary and /transactions)
-        const [summaryRes, txRes] = await Promise.all([
+        const [summaryRes, ledgerRes] = await Promise.all([
           inventoryService.getMySummary(firstDay, lastDay).catch(() => null),
-          inventoryService.getMyTransactions(0, 20).catch(() => ({ content: [] })),
+          inventoryService.getMyLedger(0, 50).catch(() => ({ content: [] })),
         ]);
 
-        // ✅ OwnerInventorySummaryDto: totalSareesReceived, totalSareesReturned, sareesInHand
         setSummary({
-          totalGiven: summaryRes?.totalSareesReceived ?? 0,
+          totalGiven: summaryRes?.totalSareesGiven ?? 0,
           totalReturned: summaryRes?.totalSareesReturned ?? 0,
           pendingCount: summaryRes?.sareesInHand ?? 0,
         });
 
-        setTransactions(txRes?.content || []);
+        setEntries(ledgerRes?.content || []);
       } catch (err) {
         setError(err.message || 'Failed to load inventory data');
       } finally {
@@ -62,7 +60,7 @@ export const InventoryPage = () => {
       }
     };
     fetchData();
-  }, [user]);
+  }, [user]); // eslint-disable-line
 
   if (loading) return <MainLayout><Loading text="Loading your inventory..." /></MainLayout>;
   
@@ -78,16 +76,16 @@ export const InventoryPage = () => {
 
   const returnRate = summary?.totalGiven ? Math.round((summary.totalReturned / summary.totalGiven) * 100) : 0;
 
-  // Build chart from actual transactions grouped by week
+  // Build chart from ledger entries grouped by week
   const chartData = (() => {
     const weeks = { 'Week 1': { given: 0, returned: 0 }, 'Week 2': { given: 0, returned: 0 }, 'Week 3': { given: 0, returned: 0 }, 'Week 4': { given: 0, returned: 0 } };
-    transactions.forEach(tx => {
-      const date = tx.receivedDate ? new Date(tx.receivedDate) : null;
+    entries.forEach(e => {
+      const date = e.entryDate ? new Date(e.entryDate) : null;
       if (!date) return;
       const day = date.getDate();
       const wk = day <= 7 ? 'Week 1' : day <= 14 ? 'Week 2' : day <= 21 ? 'Week 3' : 'Week 4';
-      weeks[wk].given += tx.receivedQuantity || 0;
-      weeks[wk].returned += tx.returnedQuantity || 0;
+      if (e.entryType === 'RECEIPT') weeks[wk].given += e.quantity || 0;
+      else if (e.entryType === 'RETURN') weeks[wk].returned += e.quantity || 0;
     });
     return Object.entries(weeks).map(([name, v]) => ({ name, ...v }));
   })();
@@ -231,10 +229,9 @@ export const InventoryPage = () => {
               <h2 className="text-lg font-bold text-text-main font-display">Recent Movements</h2>
               <p className="text-sm text-secondary-500">Latest inventory activities</p>
             </div>
-            <button className="text-sm font-semibold text-primary-600 hover:text-primary-700">View Full History</button>
           </div>
 
-          {transactions.length === 0 ? (
+          {entries.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 mx-auto bg-secondary-50 rounded-full flex items-center justify-center mb-4">
                 <Package className="w-8 h-8 text-secondary-300" />
@@ -243,40 +240,37 @@ export const InventoryPage = () => {
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {/* ✅ SareeTransactionResponseDto: transactionId, receivedDate, receivedQuantity, returnedDate, returnedQuantity, remarks */}
-              {transactions.map((tx) => (
-                <div key={tx.transactionId} className="flex items-center justify-between px-6 py-4 hover:bg-surface-hover transition-colors group">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${
-                      tx.receivedQuantity ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                    }`}>
-                      {tx.receivedQuantity ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+              {entries.map((e) => {
+                const isReceipt = e.entryType === 'RECEIPT';
+                return (
+                  <div key={e.entryId} className="flex items-center justify-between px-6 py-4 hover:bg-surface-hover transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${
+                        isReceipt ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                      }`}>
+                        {isReceipt ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+                      </div>
+                      <div>
+                        <p className="font-bold text-text-main group-hover:text-primary-600 transition-colors">
+                          {isReceipt ? 'Sarees Received' : 'Sarees Returned'}
+                        </p>
+                        <p className="text-sm text-secondary-500 font-medium flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" />
+                          {e.entryDate
+                            ? new Date(e.entryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : '—'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-text-main group-hover:text-primary-600 transition-colors">
-                        TXN #{tx.transactionId}
+                    <div className="text-right">
+                      <p className={`font-bold ${isReceipt ? 'text-indigo-600' : 'text-emerald-600'}`}>
+                        {isReceipt ? '+' : '−'}{e.quantity} <span className="text-sm font-medium text-secondary-500">{isReceipt ? 'given' : 'returned'}</span>
                       </p>
-                      <p className="text-sm text-secondary-500 font-medium flex items-center gap-1.5">
-                        <Calendar className="w-3 h-3" />
-                        {tx.receivedDate
-                          ? new Date(tx.receivedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                          : tx.returnedDate
-                          ? new Date(tx.returnedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                          : '—'}
-                      </p>
+                      {e.remarks && <p className="text-xs text-secondary-400 mt-0.5">{e.remarks}</p>}
                     </div>
                   </div>
-                  <div className="text-right">
-                    {tx.receivedQuantity != null && (
-                      <p className="font-bold text-indigo-600">{tx.receivedQuantity} <span className="text-sm font-medium text-secondary-500">given</span></p>
-                    )}
-                    {tx.returnedQuantity != null && (
-                      <p className="font-bold text-emerald-600">{tx.returnedQuantity} <span className="text-sm font-medium text-secondary-500">returned</span></p>
-                    )}
-                    {tx.remarks && <p className="text-xs text-secondary-400 mt-0.5">{tx.remarks}</p>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

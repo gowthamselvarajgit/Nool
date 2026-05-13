@@ -256,6 +256,15 @@ export const salaryService = {
     });
     return handleResponse(response);
   },
+
+  // Backend: GET /salary-payments/employees-summary → list of {employeeId, employeeName, totalEarnings, totalSalaryPaid, pendingSalary}
+  getAllEmployeesSummary: async () => {
+    const response = await fetch(`${API_BASE_URL}/salary-payments/employees-summary`, {
+      method: 'GET',
+      headers: headers(),
+    });
+    return handleResponse(response);
+  },
 };
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -390,11 +399,11 @@ export const ownerService = {
   },
 };
 
-// ─── Saree Inventory (Owner Saree Transactions) ──────────────────────────────
+// ─── Saree Inventory (Ledger model: independent RECEIPT / RETURN entries) ────
 export const inventoryService = {
-  // Backend: POST /inventory/transaction → { ownerId, receivedDate, receivedQuantity, returnedDate, returnedQuantity, remarks }
-  createTransaction: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/transaction`, {
+  // POST /inventory/receipt → { ownerId, entryDate, quantity, remarks }
+  addReceipt: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/receipt`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(data),
@@ -402,72 +411,80 @@ export const inventoryService = {
     return handleResponse(response);
   },
 
-  // Backend: POST /inventory/owner/{ownerId}/transactions → PaginationRequestDto
-  getOwnerTransactions: async (ownerId, page = 0, size = 20) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/owner/${ownerId}/transactions`, {
+  // POST /inventory/return → { ownerId, entryDate, quantity, remarks }
+  addReturn: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/return`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ page, size, sortBy: 'createdAt', sortingDirection: 'DESC' }),
+      body: JSON.stringify(data),
     });
     return handleResponse(response);
   },
 
-  // Backend: POST /inventory/transactions → PaginationRequestDto (my transactions for owner role)
-  getMyTransactions: async (page = 0, size = 20) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/transactions`, {
+  // POST /inventory/owner/{ownerId}/ledger → PaginationRequestDto
+  getOwnerLedger: async (ownerId, page = 0, size = 50) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/owner/${ownerId}/ledger`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ page, size, sortBy: 'createdAt', sortingDirection: 'DESC' }),
+      body: JSON.stringify({ page, size, sortBy: 'entryDate', sortingDirection: 'DESC' }),
     });
     return handleResponse(response);
   },
 
-  // Backend: POST /inventory/owner/{ownerId}/summary → { fromDate, toDate }
+  // POST /inventory/my-ledger → PaginationRequestDto
+  getMyLedger: async (page = 0, size = 50) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/my-ledger`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ page, size, sortBy: 'entryDate', sortingDirection: 'DESC' }),
+    });
+    return handleResponse(response);
+  },
+
+  // POST /inventory/owner/{ownerId}/summary → { fromDate, toDate }
   getOwnerSummary: async (ownerId, fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/inventory/owner/${ownerId}/summary`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+      body: JSON.stringify({ fromDate, toDate }),
     });
     return handleResponse(response);
   },
 
-  // Backend: POST /inventory/summary → { fromDate, toDate }
+  // POST /inventory/summary → { fromDate, toDate }
   getOverallSummary: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/inventory/summary`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+      body: JSON.stringify({ fromDate, toDate }),
     });
     return handleResponse(response);
   },
 
-  // Backend: POST /inventory/my-summary → { fromDate, toDate }
+  // POST /inventory/my-summary → { fromDate, toDate }
   getMySummary: async (fromDate, toDate) => {
     const response = await fetch(`${API_BASE_URL}/inventory/my-summary`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+      body: JSON.stringify({ fromDate, toDate }),
     });
     return handleResponse(response);
   },
 
-  // Backend: POST /inventory/transaction/{id}/returns → partial return (can be called multiple times)
-  addPartialReturn: async (transactionId, data) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/transaction/${transactionId}/returns`, {
-      method: 'POST',
+  // GET /inventory/owners → list of OwnerInventorySummaryDto across all owners
+  getAllOwnersInventory: async () => {
+    const response = await fetch(`${API_BASE_URL}/inventory/owners`, {
+      method: 'GET',
       headers: headers(),
-      body: JSON.stringify(data),
     });
     return handleResponse(response);
   },
 
-  // Legacy PATCH (kept for backward compat)
-  recordReturn: async (transactionId, data) => {
-    const response = await fetch(`${API_BASE_URL}/inventory/transaction/${transactionId}/return`, {
-      method: 'PATCH',
+  // DELETE /inventory/entry/{id} → delete a ledger entry (admin only)
+  deleteEntry: async (entryId) => {
+    const response = await fetch(`${API_BASE_URL}/inventory/entry/${entryId}`, {
+      method: 'DELETE',
       headers: headers(),
-      body: JSON.stringify(data),
     });
     return handleResponse(response);
   },
@@ -521,6 +538,15 @@ export const ownerPaymentService = {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ fromDate, toDate }),  // ✅ correct field names
+    });
+    return handleResponse(response);
+  },
+
+  // Backend: GET /owner-payments/owners-summary → list of {ownerId, ownerName, totalAmountPayable, totalAmountPaid, pendingAmount}
+  getAllOwnersSummary: async () => {
+    const response = await fetch(`${API_BASE_URL}/owner-payments/owners-summary`, {
+      method: 'GET',
+      headers: headers(),
     });
     return handleResponse(response);
   },

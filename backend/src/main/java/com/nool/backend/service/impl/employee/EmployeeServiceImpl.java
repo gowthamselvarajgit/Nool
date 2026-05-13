@@ -13,7 +13,10 @@ import com.nool.backend.exception.DuplicateResourceException;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.repository.auth.UserProfileRepository;
+import com.nool.backend.repository.employee.AttendanceRepository;
+import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
+import com.nool.backend.repository.employee.SalaryPaymentRepository;
 import com.nool.backend.service.employee.EmployeeService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -32,20 +35,43 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final AdminUserService adminUserService;
+    private final AttendanceRepository attendanceRepository;
+    private final SalaryPaymentRepository salaryPaymentRepository;
+    private final EmployeeDailyWorkRepository dailyWorkRepository;
 
     @Override
     @Transactional
     public EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto) {
-        if (employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
+        String mobile = requestDto.getMobileNumber();
+
+        if (employeeRepository.existsByMobileNumber(mobile)) {
             throw new DuplicateResourceException("Employee with this mobile number already exists");
         }
-        if (userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
-            throw new DuplicateResourceException("A login account with this mobile number already exists");
-        }
+
+        // If a login User exists for this mobile, decide whether it's a legitimate
+        // conflict (admin, owner, or another linked employee) or a stale orphan
+        // from a previously-failed create — orphans get cleaned up so the retry can
+        // succeed.
+        userRepository.findByMobileNumber(mobile).ifPresent(existingUser -> {
+            UserProfile profile = userProfileRepository.findByUserId(existingUser.getId()).orElse(null);
+            boolean linkedToSomething = profile != null
+                    && (profile.getEmployeeId() != null || profile.getOwnerId() != null);
+            boolean isAdmin = existingUser.getRole() != null
+                    && existingUser.getRole().name().equals("ADMIN");
+            if (linkedToSomething || isAdmin) {
+                throw new DuplicateResourceException("This mobile number is already in use by another account");
+            }
+            // Orphan user — drop it so we can re-register cleanly.
+            if (profile != null) {
+                userProfileRepository.delete(profile);
+            }
+            userRepository.delete(existingUser);
+            userRepository.flush();
+        });
 
         Employee employee = Employee.builder()
                 .name(requestDto.getEmployeeName())
-                .mobileNumber(requestDto.getMobileNumber())
+                .mobileNumber(mobile)
                 .joiningDate(requestDto.getJoiningDate())
                 .polishRate(requestDto.getPolishingRate())
                 .status(EmployeeStatus.ACTIVE).build();
@@ -54,7 +80,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         // Create associated user account with login credentials
         User user = adminUserService.createEmployeeUser(
-            requestDto.getMobileNumber(),
+            mobile,
             requestDto.getPassword(),
             saved.getId()
         );
@@ -112,6 +138,14 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public EmployeeResponseDto getEmployeeById(Long employeeId) {
+        // A WORKER can only read their own profile, never another employee's.
+        String role = CurrentUserUtil.getRole();
+        if (!"ADMIN".equals(role)) {
+            Long callerEmployeeId = CurrentUserUtil.getEmployeeId();
+            if (callerEmployeeId == null || !callerEmployeeId.equals(employeeId)) {
+                throw new org.springframework.security.access.AccessDeniedException("You can only view your own profile");
+            }
+        }
         Employee employee = employeeRepository.findById(employeeId).orElseThrow(()->new ResourceNotFoundException("Employee not found"));
         return EmployeeResponseDto.builder()
                 .employeeId(employee.getId())
@@ -180,7 +214,14 @@ public class EmployeeServiceImpl implements EmployeeService {
     public void deleteEmployee(Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
-        // Delete linked user account if exists
+
+        // 1. Cascade-delete all child records that reference employee_id via FK.
+        //    MySQL won't let us drop the parent row otherwise.
+        dailyWorkRepository.deleteAllByEmployeeId(employeeId);
+        salaryPaymentRepository.deleteAllByEmployeeId(employeeId);
+        attendanceRepository.deleteAllByEmployeeId(employeeId);
+
+        // 2. Unlink the user from the employee, then delete the profile + user.
         UserProfile profile = userProfileRepository.findByEmployeeId(employeeId).orElse(null);
         User user = employee.getUser();
         if (user == null && profile != null) {
@@ -189,11 +230,17 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (user != null) {
             employee.setUser(null);
             employeeRepository.save(employee);
-            if (profile != null) {
-                userProfileRepository.delete(profile);
-            }
+            employeeRepository.flush();
+        }
+        if (profile != null) {
+            userProfileRepository.delete(profile);
+            userProfileRepository.flush();
+        }
+        if (user != null) {
             userRepository.delete(user);
         }
+
+        // 3. Finally drop the employee row.
         employeeRepository.delete(employee);
     }
 }

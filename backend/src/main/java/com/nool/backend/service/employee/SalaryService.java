@@ -20,4 +20,5 @@ public interface SalaryService {
 
     SalarySummaryDto getMySalarySummary(DateRangeDto dateRangeDto);
 
+    java.util.List<SalarySummaryDto> getAllEmployeesSalarySummary();
 }

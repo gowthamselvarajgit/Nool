@@ -3,53 +3,45 @@ package com.nool.backend.controller.owner;
 import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
+import com.nool.backend.dto.inventory.LedgerEntryRequestDto;
+import com.nool.backend.dto.inventory.LedgerEntryResponseDto;
 import com.nool.backend.dto.inventory.OwnerInventorySummaryDto;
 import com.nool.backend.dto.inventory.SareeInventorySummaryDto;
-import com.nool.backend.dto.inventory.SareeTransactionRequestDto;
-import com.nool.backend.dto.inventory.SareeTransactionResponseDto;
-import com.nool.backend.dto.inventory.SareeTransactionReturnDto;
 import com.nool.backend.service.owner.SareeInventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/inventory")
 @RequiredArgsConstructor
 public class SareeInventoryController {
+
     private final SareeInventoryService sareeInventoryService;
 
-    // ── New Receipt ───────────────────────────────────────────────────────────
-    @PostMapping("/transaction")
-    public SareeTransactionResponseDto recordSareeTransaction(
-            @Valid @RequestBody SareeTransactionRequestDto requestDto) {
-        return sareeInventoryService.recordSareeTransaction(requestDto);
+    // ── Add Receipt (admin) ──────────────────────────────────────────────────
+    @PostMapping("/receipt")
+    public LedgerEntryResponseDto addReceipt(@Valid @RequestBody LedgerEntryRequestDto requestDto) {
+        return sareeInventoryService.addReceipt(requestDto);
     }
 
-    // ── Partial Return (POST — creates a new saree_returns row) ──────────────
-    @PostMapping("/transaction/{id}/returns")
-    public SareeTransactionResponseDto addPartialReturn(
-            @PathVariable Long id,
-            @Valid @RequestBody SareeTransactionReturnDto dto) {
-        return sareeInventoryService.addPartialReturn(id, dto);
+    // ── Add Return (admin) ───────────────────────────────────────────────────
+    @PostMapping("/return")
+    public LedgerEntryResponseDto addReturn(@Valid @RequestBody LedgerEntryRequestDto requestDto) {
+        return sareeInventoryService.addReturn(requestDto);
     }
 
-    // ── Legacy PATCH return (kept for backward compat) ────────────────────────
-    @PatchMapping("/transaction/{id}/return")
-    public SareeTransactionResponseDto recordReturn(
-            @PathVariable Long id,
-            @Valid @RequestBody SareeTransactionReturnDto dto) {
-        return sareeInventoryService.recordReturn(id, dto);
-    }
-
-    // ── Admin list by owner ───────────────────────────────────────────────────
-    @PostMapping("/owner/{ownerId}/transactions")
-    public PaginationResponseDto<SareeTransactionResponseDto> getOwnerTransactions(
+    // ── Owner ledger (admin) ─────────────────────────────────────────────────
+    @PostMapping("/owner/{ownerId}/ledger")
+    public PaginationResponseDto<LedgerEntryResponseDto> getOwnerLedger(
             @PathVariable Long ownerId,
             @RequestBody PaginationRequestDto paginationRequestDto) {
-        return sareeInventoryService.getSareeTransactionList(ownerId, paginationRequestDto);
+        return sareeInventoryService.getOwnerLedger(ownerId, paginationRequestDto);
     }
 
+    // ── Owner summary (admin) ────────────────────────────────────────────────
     @PostMapping("/owner/{ownerId}/summary")
     public OwnerInventorySummaryDto getOwnerInventorySummary(
             @PathVariable Long ownerId,
@@ -57,17 +49,30 @@ public class SareeInventoryController {
         return sareeInventoryService.getOwnerInventorySummary(ownerId, dateRangeDto);
     }
 
+    // ── Overall summary (admin) ──────────────────────────────────────────────
     @PostMapping("/summary")
     public SareeInventorySummaryDto getOverallInventorySummary(
             @Valid @RequestBody DateRangeDto dateRangeDto) {
         return sareeInventoryService.getOverallInventorySummary(dateRangeDto);
     }
 
-    // ── Owner self-service ────────────────────────────────────────────────────
-    @PostMapping("/transactions")
-    public PaginationResponseDto<SareeTransactionResponseDto> getMyTransactions(
+    // ── All owners inventory list (admin) ────────────────────────────────────
+    @GetMapping("/owners")
+    public List<OwnerInventorySummaryDto> getAllOwnersInventory() {
+        return sareeInventoryService.getAllOwnersInventory();
+    }
+
+    // ── Delete ledger entry (admin) ──────────────────────────────────────────
+    @DeleteMapping("/entry/{id}")
+    public void deleteLedgerEntry(@PathVariable Long id) {
+        sareeInventoryService.deleteLedgerEntry(id);
+    }
+
+    // ── Owner self-service ───────────────────────────────────────────────────
+    @PostMapping("/my-ledger")
+    public PaginationResponseDto<LedgerEntryResponseDto> getMyLedger(
             @RequestBody PaginationRequestDto paginationRequestDto) {
-        return sareeInventoryService.getMySareeTransactionList(paginationRequestDto);
+        return sareeInventoryService.getMyLedger(paginationRequestDto);
     }
 
     @PostMapping("/my-summary")

@@ -75,6 +75,8 @@ public class SalaryServiceImpl implements SalaryService {
             Long employeeId,
             PaginationRequestDto paginationRequestDto) {
 
+        assertSelfOrAdmin(employeeId);
+
         PageRequest pageRequest = PageRequest.of(
                 paginationRequestDto.getPage(),
                 paginationRequestDto.getSize(),
@@ -115,6 +117,8 @@ public class SalaryServiceImpl implements SalaryService {
        ========================= */
     @Override
     public SalarySummaryDto getSalarySummary(Long employeeId, DateRangeDto dateRangeDto) {
+
+        assertSelfOrAdmin(employeeId);
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
@@ -171,5 +175,57 @@ public class SalaryServiceImpl implements SalaryService {
         }
 
         return getSalarySummary(employeeId, dateRangeDto);
+    }
+
+    /* =========================
+       ✅ ALL-EMPLOYEES SALARY SUMMARY (admin)
+       ========================= */
+    @Override
+    public List<SalarySummaryDto> getAllEmployeesSalarySummary() {
+        // 1) all employees
+        List<Employee> employees = employeeRepository.findAll();
+
+        // 2) all-time fresh totals per employee
+        java.util.Map<Long, Long> freshByEmployee = new java.util.HashMap<>();
+        for (Object[] row : employeeDailyWorkRepository.aggregateByAllEmployees()) {
+            Long empId = (Long) row[0];
+            Long fresh = ((Number) row[1]).longValue();
+            freshByEmployee.put(empId, fresh);
+        }
+
+        // 3) all-time paid sums per employee
+        java.util.Map<Long, Double> paidByEmployee = new java.util.HashMap<>();
+        for (Object[] row : salaryPaymentRepository.sumPaidByAllEmployees()) {
+            Long empId = (Long) row[0];
+            Double paid = ((Number) row[1]).doubleValue();
+            paidByEmployee.put(empId, paid);
+        }
+
+        // 4) build per-employee summaries
+        List<SalarySummaryDto> result = new java.util.ArrayList<>(employees.size());
+        for (Employee emp : employees) {
+            long fresh = freshByEmployee.getOrDefault(emp.getId(), 0L);
+            double earnings = fresh * emp.getPolishRate();
+            double paid = paidByEmployee.getOrDefault(emp.getId(), 0.0);
+            double pending = Math.max(earnings - paid, 0);
+            result.add(SalarySummaryDto.builder()
+                    .employeeId(emp.getId())
+                    .employeeName(emp.getName())
+                    .totalEarnings(earnings)
+                    .totalSalaryPaid(paid)
+                    .pendingSalary(pending)
+                    .build());
+        }
+        return result;
+    }
+
+    private void assertSelfOrAdmin(Long employeeId) {
+        String role = CurrentUserUtil.getRole();
+        if ("ADMIN".equals(role)) return;
+        Long caller = CurrentUserUtil.getEmployeeId();
+        if (caller == null || !caller.equals(employeeId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "You can only view your own salary records");
+        }
     }
 }

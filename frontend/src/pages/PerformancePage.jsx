@@ -65,7 +65,7 @@ export const PerformancePage = () => {
           qualityScore: totalFresh > 0
             ? Math.round((totalFresh / (currentTotal || 1)) * 100)
             : 0,
-          monthlyEarnings: summaryRes?.totalEarning ?? summaryRes?.totalEarnings ?? 0,
+          monthlyEarnings: summaryRes?.totalRevenue ?? summaryRes?.totalEarning ?? summaryRes?.totalEarnings ?? 0,
           history: history.length > 0 ? history : [{ month: 'No Data', value: 0 }],
         });
       } catch (err) {

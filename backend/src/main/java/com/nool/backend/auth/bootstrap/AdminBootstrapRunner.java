@@ -1,7 +1,7 @@
 package com.nool.backend.auth.bootstrap;
 
 import com.nool.backend.auth.entity.User;
-import com.nool.backend.auth.repository.AuthUserRepository;
+import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.enums.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class AdminBootstrapRunner implements CommandLineRunner{
-    private final AuthUserRepository authUserRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${admin.mobile}")
@@ -23,7 +23,7 @@ public class AdminBootstrapRunner implements CommandLineRunner{
 
     @Override
     public void run(String... args){
-        boolean adminExists = authUserRepository.existsByRole(Role.ADMIN);
+        boolean adminExists = userRepository.existsByRole(Role.ADMIN);
         if (adminExists){
             return;
         }
@@ -34,7 +34,7 @@ public class AdminBootstrapRunner implements CommandLineRunner{
         admin.setRole(Role.ADMIN);
         admin.setActive(true);
 
-        authUserRepository.save(admin);
+        userRepository.save(admin);
 
         System.out.println("✅ DEFAULT ADMIN ACCOUNT CREATED SUCCESSFULLY");
 

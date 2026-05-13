@@ -10,7 +10,7 @@ import com.nool.backend.auth.dto.AuthLoginRequestDto;
 import com.nool.backend.auth.dto.AuthLoginResponseDto;
 import com.nool.backend.auth.entity.User;
 import com.nool.backend.auth.entity.UserProfile;
-import com.nool.backend.auth.repository.AuthUserRepository;
+import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.auth.security.JwtUtil;
 import com.nool.backend.auth.service.AuthService;
 import com.nool.backend.exception.BadRequestException;
@@ -21,14 +21,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private final AuthUserRepository authUserRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
     @Override
     public AuthLoginResponseDto login(AuthLoginRequestDto requestDto) {
 
-        User user = authUserRepository
+        User user = userRepository
                 .findByMobileNumber(requestDto.getMobileNumber())
                 .orElseThrow(() -> new BadRequestException("Invalid mobile number or password"));
 

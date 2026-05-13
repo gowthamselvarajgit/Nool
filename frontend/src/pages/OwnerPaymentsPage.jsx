@@ -3,7 +3,9 @@ import { MainLayout } from '../components/Layout';
 import { Card, Loading, ErrorMessage, Badge } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { ownerPaymentService } from '../services/api';
-import { CreditCard, Banknote, Clock, CheckCircle2, ChevronRight, Download, History, Calendar } from 'lucide-react';
+import { exportToExcel } from '../utils/excelExporter';
+import { formatDate } from '../utils/formatters';
+import { CreditCard, Banknote, Clock, CheckCircle2, ChevronRight, History, Calendar, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Custom Tooltip for Recharts
@@ -105,10 +107,25 @@ export const OwnerPaymentsPage = () => {
               <Calendar className="w-4 h-4" /> {monthName}
             </p>
           </div>
-          
-          <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-white text-text-main border border-border rounded-xl text-sm font-semibold hover:bg-surface-hover transition-colors shadow-sm w-full md:w-auto">
-            <Download className="w-4 h-4" />
-            Download Statement
+
+          <button
+            type="button"
+            disabled={!payments.length}
+            onClick={() => exportToExcel({
+              rows: payments.map(p => ({
+                'Payment ID': p.paymentId,
+                'Date': p.paymentDate ? formatDate(p.paymentDate) : '',
+                'Amount (₹)': p.amountPaid ?? 0,
+                'Mode': p.paymentMode || '',
+                'Remarks': p.remarks || '',
+              })),
+              fileName: 'Nool_My_Payments',
+              sheetName: 'Payments',
+              columnWidths: [12, 14, 14, 12, 24],
+            })}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white text-text-main border border-border rounded-xl text-sm font-semibold hover:bg-surface-hover transition-colors shadow-sm disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" /> Export Excel
           </button>
         </div>
 
@@ -257,11 +274,6 @@ export const OwnerPaymentsPage = () => {
               </div>
             )}
             
-            <div className="p-4 border-t border-border">
-              <button className="w-full py-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
-                View All Payments
-              </button>
-            </div>
           </Card>
         </div>
       </div>

@@ -23,15 +23,36 @@ export const formatCurrency = (value) => {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
-  }).format(value);
+  }).format(value || 0);
 };
 
 export const getInitials = (name) => {
+  if (!name || typeof name !== 'string') return '?';
   return name
-    .split(' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
     .map((n) => n[0])
     .join('')
-    .toUpperCase();
+    .toUpperCase() || '?';
+};
+
+// Plain-language status labels for senior users
+export const friendlyStatus = (status) => {
+  const map = {
+    ACTIVE: 'Active',
+    INACTIVE: 'Not Working',
+    LEFT: 'Left Job',
+    ON_LEAVE: 'On Leave',
+    SUSPENDED: 'Paused',
+    PRESENT: 'Present',
+    ABSENT: 'Absent',
+    LEAVE: 'On Leave',
+    HALF_DAY: 'Half Day',
+    HOLIDAY: 'Holiday',
+    WEEKEND: 'Weekend',
+  };
+  return map[status] || status || '—';
 };
 
 export const getAttendanceColor = (status) => {

@@ -3,9 +3,10 @@ import { MainLayout } from '../components/Layout';
 import { Card, Button, Badge } from '../components/Common';
 import {
   Users, TrendingUp, DollarSign, Activity, AlertCircle, ArrowUpRight,
-  Briefcase, ChevronRight, CheckCircle, XCircle, Wifi, Database, Monitor, RefreshCw
+  Briefcase, ChevronRight, CheckCircle, XCircle, Wifi, Database, Monitor, RefreshCw, Download
 } from 'lucide-react';
 import { dashboardService, leaveProductivityService } from '../services/api';
+import { exportToExcel } from '../utils/excelExporter';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTip,
@@ -126,6 +127,7 @@ export const AdminDashboard = () => {
         totalEmployees: data.totalEmployees || 0,
         activeEmployees: data.activeEmployees || 0,
         inactiveEmployees: data.inactiveEmployees || 0,
+        totalOwners: data.totalOwners || 0,
         todayFreshWork: data.todayFreshWork || 0,
         todayRepolishWork: data.todayRepolishWork || 0,
         monthFreshWork: data.monthFreshWork || 0,
@@ -216,25 +218,49 @@ export const AdminDashboard = () => {
           </div>
         ) : (
           <>
-            {/* KPI Row 1 — Workforce & Work */}
-            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <StatCard title="Total Employees" value={summary?.totalEmployees} icon={Users}
-                sub={`${summary?.activeEmployees} active`} color="primary" />
-              <StatCard title="Today Fresh Sarees" value={summary?.todayFreshWork} icon={Briefcase}
-                sub={`Month: ${summary?.monthFreshWork}`} color="success" />
-              <StatCard title="Today Revenue" value={`₹${fmt(summary?.todayRevenue)}`} icon={DollarSign}
-                sub={`Month: ₹${fmt(summary?.monthRevenue)}`} color="info" />
-              <StatCard title="Sarees In Hand" value={summary?.sareesInHand} icon={Activity}
-                sub={`${summary?.totalSareesReceived} received total`} color="warning" />
+            {/* ── Section 1: Workforce ─────────────────────────────────── */}
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-500" /> Workforce
+              </h2>
+              <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <StatCard title="Total Employees" value={summary?.totalEmployees} icon={Users}
+                  sub={`${summary?.activeEmployees} working now`} color="primary" />
+                <StatCard title="Active Today" value={workforce?.employeesPresentToday ?? '—'} icon={CheckCircle}
+                  sub={`${workforce?.employeesAbsentToday ?? 0} absent`} color="success" />
+                <StatCard title="Inactive Employees" value={summary?.inactiveEmployees} icon={XCircle} color="danger" />
+                <StatCard title="Saree Owners" value={summary?.totalOwners ?? 0} icon={Briefcase} color="info" />
+              </div>
             </div>
 
-            {/* KPI Row 2 — Salary */}
-            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <StatCard title="Total Revenue (All)" value={`₹${fmt(summary?.totalRevenue)}`} icon={TrendingUp} color="success" />
-              <StatCard title="Salary Paid" value={`₹${fmt(summary?.totalSalaryPaid)}`} icon={DollarSign} color="info" />
-              <StatCard title="Pending Salary" value={`₹${fmt(summary?.pendingSalary)}`} icon={AlertCircle} color="danger" />
-              <StatCard title="Re-Polish Today" value={summary?.todayRepolishWork} icon={Activity}
-                sub={`Month: ${summary?.monthRepolishWork}`} color="warning" />
+            {/* ── Section 2: Today's Work ─────────────────────────────── */}
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-500" /> Today's Work
+              </h2>
+              <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <StatCard title="Fresh Sarees Today" value={summary?.todayFreshWork} icon={Briefcase}
+                  sub={`Month: ${fmt(summary?.monthFreshWork)}`} color="success" />
+                <StatCard title="Re-Polish Today" value={summary?.todayRepolishWork} icon={Activity}
+                  sub={`Month: ${fmt(summary?.monthRepolishWork)}`} color="warning" />
+                <StatCard title="Today's Revenue" value={`₹${fmt(summary?.todayRevenue)}`} icon={DollarSign}
+                  sub={`Month: ₹${fmt(summary?.monthRevenue)}`} color="info" />
+                <StatCard title="All-time Revenue" value={`₹${fmt(summary?.totalRevenue)}`} icon={TrendingUp} color="primary" />
+              </div>
+            </div>
+
+            {/* ── Section 3: Inventory & Salary ───────────────────────── */}
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <Database className="w-5 h-5 text-amber-500" /> Inventory & Salary
+              </h2>
+              <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <StatCard title="Sarees In Hand" value={summary?.sareesInHand} icon={Activity}
+                  sub={`Received: ${fmt(summary?.totalSareesReceived)}`} color="warning" />
+                <StatCard title="Sarees Returned" value={summary?.totalSareesReturned} icon={CheckCircle} color="success" />
+                <StatCard title="Salary Paid" value={`₹${fmt(summary?.totalSalaryPaid)}`} icon={DollarSign} color="info" />
+                <StatCard title="Pending Salary" value={`₹${fmt(summary?.pendingSalary)}`} icon={AlertCircle} color="danger" />
+              </div>
             </div>
 
             {/* Charts Row */}
@@ -391,9 +417,31 @@ export const AdminDashboard = () => {
             {/* Leave & Productivity Table */}
             {leaveData.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-100">
-                  <h3 className="font-bold text-gray-800">Employee Leave & Productivity (This Month)</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Attendance, work counts and productivity scores</p>
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-gray-800">Employee Leave & Productivity (This Month)</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Attendance, work counts and productivity scores</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 text-sm"
+                    onClick={() => exportToExcel({
+                      rows: leaveData.map(r => ({
+                        'Employee': r.employeeName,
+                        'Present Days': r.presentDays ?? 0,
+                        'Absent Days': r.absentDates?.length ?? 0,
+                        'Work Days': r.totalWorkDays ?? 0,
+                        'Fresh Sarees': r.totalFreshWork ?? 0,
+                        'Re-Polish': r.totalRePolish ?? 0,
+                        'Productivity (%)': Number((r.productivityScore ?? 0).toFixed(2)),
+                      })),
+                      fileName: 'Nool_Leave_Productivity',
+                      sheetName: 'Leave & Productivity',
+                      columnWidths: [22, 14, 14, 12, 14, 12, 18],
+                    })}
+                  >
+                    <Download className="w-4 h-4" /> Export Excel
+                  </Button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

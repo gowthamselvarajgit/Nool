@@ -3,6 +3,7 @@ import { MainLayout } from '../components/Layout';
 import { Card, Badge, Loading, ErrorMessage } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { ownerService } from '../services/api';
+import { friendlyStatus } from '../utils/formatters';
 import { User, Phone, Calendar, Briefcase, Mail, Shield, Building } from 'lucide-react';
 
 export const OwnerProfile = () => {
@@ -67,15 +68,15 @@ export const OwnerProfile = () => {
                 <h2 className="text-3xl font-display font-bold tracking-tight mb-1">{profile?.ownerName}</h2>
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-3">
                   <span className="px-3 py-1 bg-white/10 rounded-full text-sm font-medium border border-white/10 flex items-center gap-1.5">
-                    <User className="w-4 h-4" /> ID: #{profile?.sareeOwnerId}
+                    <User className="w-4 h-4" /> ID: #{profile?.ownerId}
                   </span>
                   <span className={`px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1.5 ${
-                    profile?.status === 'ACTIVE'
+                    profile?.ownerStatus === 'ACTIVE'
                       ? 'bg-emerald-500/20 text-emerald-100 border border-emerald-500/30'
                       : 'bg-rose-500/20 text-rose-100 border border-rose-500/30'
                   }`}>
-                    <span className={`w-2 h-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-rose-400'} animate-pulse`}></span>
-                    {profile?.status}
+                    <span className={`w-2 h-2 rounded-full ${profile?.ownerStatus === 'ACTIVE' ? 'bg-emerald-400' : 'bg-rose-400'} animate-pulse`}></span>
+                    {friendlyStatus(profile?.ownerStatus)}
                   </span>
                 </div>
               </div>
@@ -129,8 +130,8 @@ export const OwnerProfile = () => {
                   <Building className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Owner Status</p>
-                  <p className="text-lg font-medium text-text-main">{profile?.ownerStatus ?? 'N/A'}</p>
+                  <p className="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-1">Account Status</p>
+                  <p className="text-lg font-medium text-text-main">{friendlyStatus(profile?.ownerStatus)}</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">

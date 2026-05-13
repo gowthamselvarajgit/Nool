@@ -2,21 +2,22 @@ package com.nool.backend.dto.inventory;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
 import java.time.LocalDate;
 
 @Data
-public class SareeTransactionRequestDto {
+public class LedgerEntryRequestDto {
+
     @NotNull(message = "Owner id is required")
     private Long ownerId;
 
-    private LocalDate receivedDate;
-    private Integer receivedQuantity;
+    @NotNull(message = "Date is required")
+    private LocalDate entryDate;
 
-    private LocalDate returnedDate;
-    private Integer returnedQuantity;
+    @NotNull(message = "Quantity is required")
+    @Positive(message = "Quantity must be greater than zero")
+    private Integer quantity;
 
     private String remarks;
 }

@@ -9,6 +9,7 @@ public class AdminDashboardSummaryDto {
     private Long totalEmployees;
     private Long activeEmployees;
     private Long inactiveEmployees;
+    private Long totalOwners;
 
     private Long todayFreshWork;
     private Long todayRepolishWork;

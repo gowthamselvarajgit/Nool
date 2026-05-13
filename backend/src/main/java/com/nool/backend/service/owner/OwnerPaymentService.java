@@ -21,4 +21,5 @@ public interface OwnerPaymentService {
     OwnerPaymentSummaryDto
     getMyPaymentSummary(DateRangeDto dateRangeDto);
 
+    java.util.List<OwnerPaymentSummaryDto> getAllOwnersPaymentSummary();
 }

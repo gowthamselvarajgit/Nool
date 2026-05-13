@@ -13,8 +13,9 @@ import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.repository.employee.SalaryPaymentRepository;
-import com.nool.backend.repository.owner.SareeReturnRepository;
-import com.nool.backend.repository.owner.SareeTransactionRepository;
+import com.nool.backend.enums.LedgerEntryType;
+import com.nool.backend.repository.owner.SareeLedgerRepository;
+import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.service.dashboard.AdminDashboardService;
 import com.nool.backend.dto.common.MonthYearRequestDto;
 
@@ -32,9 +33,9 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeDailyWorkRepository employeeDailyWorkRepository;
     private final SalaryPaymentRepository salaryPaymentRepository;
-    private final SareeTransactionRepository sareeTransactionRepository;
-    private final SareeReturnRepository sareeReturnRepository;
+    private final SareeLedgerRepository sareeLedgerRepository;
     private final AttendanceRepository attendanceRepository;
+    private final SareeOwnerRepository sareeOwnerRepository;
 
     @Override
     public AdminDashboardSummaryDto getDashboardSummary() {
@@ -45,21 +46,26 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         long totalEmployees = employeeRepository.count();
         long activeEmployees = employeeRepository.countByStatus(EmployeeStatus.ACTIVE);
         long inactiveEmployees = employeeRepository.countByStatus(EmployeeStatus.LEFT);
+        long totalOwners = sareeOwnerRepository.count();
 
-        long todayFreshCount = employeeDailyWorkRepository.sumFreshWorkByDate(today);
-        long todayRepolishCount = employeeDailyWorkRepository.sumRePolishWorkByDate(today);
+        long todayFreshCount = nz(employeeDailyWorkRepository.sumFreshWorkByDate(today));
+        long todayRepolishCount = nz(employeeDailyWorkRepository.sumRePolishWorkByDate(today));
 
-        Long monthFreshWork = employeeDailyWorkRepository.sumFreshWorkByDateRange(startOfMonth, today);
-        Long monthRepolishWork = employeeDailyWorkRepository.sumRePolishWorkByDateRange(startOfMonth, today);
+        Long monthFreshWork = nz(employeeDailyWorkRepository.sumFreshWorkByDateRange(startOfMonth, today));
+        Long monthRepolishWork = nz(employeeDailyWorkRepository.sumRePolishWorkByDateRange(startOfMonth, today));
 
         double todayRevenue = calculateTotalSalaryEarned(today, today);
         double monthRevenue = calculateTotalSalaryEarned(startOfMonth, today);
         double totalRevenue = monthRevenue;
 
 
-        Long totalReceived = sareeTransactionRepository.sumTotalReceived(startOfMonth, today);
-        Long totalReturned = sareeReturnRepository.sumReturnedByDateRange(startOfMonth, today);
-        long sareesInHand = totalReceived - totalReturned;
+        Long totalReceived = nz(sareeLedgerRepository.sumQuantityByTypeAndDateRange(
+                LedgerEntryType.RECEIPT, startOfMonth, today));
+        Long totalReturned = nz(sareeLedgerRepository.sumQuantityByTypeAndDateRange(
+                LedgerEntryType.RETURN, startOfMonth, today));
+        long allTimeReceived = nz(sareeLedgerRepository.sumQuantityByType(LedgerEntryType.RECEIPT));
+        long allTimeReturned = nz(sareeLedgerRepository.sumQuantityByType(LedgerEntryType.RETURN));
+        long sareesInHand = Math.max(allTimeReceived - allTimeReturned, 0);
 
         double totalSalaryEarned = calculateTotalSalaryEarned(startOfMonth, today);
         Double totalSalaryPaidBoxed = salaryPaymentRepository.sumTotalSalaryPaidByDateRange(startOfMonth, today);
@@ -70,6 +76,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .totalEmployees(totalEmployees)
                 .activeEmployees(activeEmployees)
                 .inactiveEmployees(inactiveEmployees)
+                .totalOwners(totalOwners)
                 .todayFreshWork(todayFreshCount)
                 .todayRepolishWork(todayRepolishCount)
                 .monthFreshWork(monthFreshWork)
@@ -158,6 +165,10 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .totalFreshWorkThisMonth(totalFreshMonth)
                 .totalRePolishWorkThisMonth(totalRePolishMonth)
                 .build();
+    }
+
+    private static long nz(Long v) {
+        return v == null ? 0L : v;
     }
 
     private double calculateTotalSalaryEarned(

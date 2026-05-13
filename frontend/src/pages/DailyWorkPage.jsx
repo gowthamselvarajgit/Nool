@@ -3,7 +3,9 @@ import { MainLayout } from '../components/Layout';
 import { Card, Loading, ErrorMessage, Badge } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { dailyWorkService } from '../services/api';
-import { ClipboardList, PlusCircle, CheckCircle2, TrendingUp, Calendar, Zap } from 'lucide-react';
+import { exportToExcel } from '../utils/excelExporter';
+import { formatDate } from '../utils/formatters';
+import { ClipboardList, CheckCircle2, TrendingUp, Calendar, Zap, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -120,11 +122,22 @@ export const DailyWorkPage = () => {
           
           <button
             type="button"
-            disabled
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 text-gray-500 rounded-xl text-sm font-bold cursor-not-allowed w-full md:w-auto"
+            disabled={!workLogs.length}
+            onClick={() => exportToExcel({
+              rows: workLogs.map(log => ({
+                'Date': log.workDate ? formatDate(log.workDate) : (log.date ? formatDate(log.date) : ''),
+                'Fresh Sarees': log.freshCount ?? 0,
+                'Re-Polish': log.rePolishCount ?? 0,
+                'Earnings (₹)': Math.round(log.todayEarning ?? log.earnings ?? 0),
+              })),
+              fileName: 'Nool_My_Daily_Work',
+              sheetName: 'Daily Work',
+              columnWidths: [14, 14, 12, 14],
+            })}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-text-main border border-border rounded-xl text-sm font-bold hover:bg-surface-hover transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
           >
-            <PlusCircle className="w-5 h-5" />
-            Admin Adds Daily Work
+            <Download className="w-5 h-5" />
+            Export Excel
           </button>
         </div>
 

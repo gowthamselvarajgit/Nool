@@ -11,6 +11,7 @@ import com.nool.backend.dto.common.PaginationResponseDto;
 import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.enums.AttendanceStatus;
+import com.nool.backend.exception.DuplicateResourceException;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
@@ -43,6 +44,10 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     public AttendanceResponseDto markAttendance(AttendanceRequestDto requestDto) {
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+        if (attendanceRepository.existsByEmployeeIdAndAttendanceDate(employee.getId(), requestDto.getAttendanceDate())) {
+            throw new DuplicateResourceException(
+                    "Attendance is already marked for " + employee.getName() + " on " + requestDto.getAttendanceDate());
+        }
         Attendance attendance = Attendance.builder()
                 .employee(employee)
                 .attendanceDate(requestDto.getAttendanceDate())
@@ -132,6 +137,14 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public AttendanceSummaryDto getAttendanceSummaryByEmployee(Long employeeId, DateRangeDto dateRangeDto) {
+        String role = CurrentUserUtil.getRole();
+        if (!"ADMIN".equals(role)) {
+            Long caller = CurrentUserUtil.getEmployeeId();
+            if (caller == null || !caller.equals(employeeId)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "You can only view your own attendance");
+            }
+        }
         Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         List<Attendance> attendances = attendanceRepository.findByEmployeeIdAndAttendanceDateBetween(employeeId, dateRangeDto.getFromDate(),dateRangeDto.getToDate());

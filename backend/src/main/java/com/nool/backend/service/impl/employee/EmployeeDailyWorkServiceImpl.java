@@ -126,6 +126,14 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
 
     @Override
     public EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto) {
+        String role = CurrentUserUtil.getRole();
+        if (!"ADMIN".equals(role)) {
+            Long caller = CurrentUserUtil.getEmployeeId();
+            if (caller == null || !caller.equals(employeeId)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "You can only view your own work records");
+            }
+        }
         Employee employee = employeeRepository.findById(employeeId).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
 
         List<EmployeeDailyWork> works = employeeDailyWorkRepository.findByEmployeeIdAndWorkDateBetween(employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());

@@ -2,25 +2,12 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Badge, Loading, ErrorMessage } from '../components/Common';
 import { ownerService, inventoryService, ownerPaymentService } from '../services/api';
-import { formatDate } from '../utils/formatters';
-import { DollarSign, TrendingUp, CreditCard, AlertCircle, Package, ArrowUpRight, ArrowDownRight, User } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-surface/90 backdrop-blur-md p-3 rounded-xl shadow-elevated border border-border">
-        <p className="text-secondary-500 text-xs mb-1 font-medium">{label}</p>
-        <p className="text-sm font-bold text-indigo-600">₹{payload[0]?.value?.toLocaleString()}</p>
-      </div>
-    );
-  }
-  return null;
-};
+import { formatDate, friendlyStatus } from '../utils/formatters';
+import { CreditCard, AlertCircle, Package, ArrowUpRight, ArrowDownRight, User } from 'lucide-react';
 
 const OwnerDashboard = () => {
   const [ownerData, setOwnerData] = useState(null);
-  const [transactions, setTransactions] = useState([]);
+  const [entries, setEntries] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,27 +25,27 @@ const OwnerDashboard = () => {
         id: profile.ownerId,
         name: profile.ownerName,
         mobile: profile.mobileNumber,
-        status: profile.ownerStatus,
+        status: profile.ownerStatus || 'ACTIVE',
       });
 
       // ✅ Fetch my saree transactions using correct API
       const today = new Date().toISOString().split('T')[0];
       const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
-      const [txRes, summaryRes, paymentRes] = await Promise.all([
-        inventoryService.getMyTransactions(0, 50).catch(() => ({ content: [] })),
+      const [ledgerRes, summaryRes, paymentRes] = await Promise.all([
+        inventoryService.getMyLedger(0, 100).catch(() => ({ content: [] })),
         inventoryService.getMySummary(fromDate, today).catch(() => null),
         ownerPaymentService.getMyHistory(0, 50).catch(() => ({ content: [] })),
       ]);
 
-      const transList = txRes?.content || [];
+      const entryList = ledgerRes?.content || [];
       const payments = paymentRes?.content || [];
       const totalPaid = payments.reduce((s, p) => s + (p.amountPaid || 0), 0);
 
-      setTransactions(transList);
+      setEntries(entryList);
       setStats({
-        totalTransactions: transList.length,
-        totalReceived: summaryRes?.totalSareesReceived ?? 0,
+        totalTransactions: entryList.length,
+        totalReceived: summaryRes?.totalSareesGiven ?? 0,
         totalReturned: summaryRes?.totalSareesReturned ?? 0,
         sareesInHand: summaryRes?.sareesInHand ?? 0,
         totalPayments: payments.length,
@@ -80,8 +67,8 @@ const OwnerDashboard = () => {
   const returnedPct = stats.totalReceived > 0
     ? Math.round((stats.totalReturned / stats.totalReceived) * 100)
     : 0;
-  const totalPages = Math.ceil(transactions.length / itemsPerPage);
-  const paginatedData = transactions.slice(
+  const totalPages = Math.ceil(entries.length / itemsPerPage);
+  const paginatedData = entries.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -118,7 +105,7 @@ const OwnerDashboard = () => {
               </div>
               <div>
                 <p className="text-indigo-200 text-xs font-semibold uppercase tracking-wider mb-1">Status</p>
-                <p className="text-white font-bold">{ownerData?.status || 'ACTIVE'}</p>
+                <p className="text-white font-bold">{friendlyStatus(ownerData?.status)}</p>
               </div>
             </div>
           </div>
@@ -127,7 +114,7 @@ const OwnerDashboard = () => {
         {/* Top Stats — real inventory data */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
-            { label: 'Sarees Received', value: stats.totalReceived ?? 0, icon: Package, bg: 'bg-indigo-50', fg: 'text-indigo-600', border: 'border-indigo-100' },
+            { label: 'Sarees Given', value: stats.totalReceived ?? 0, icon: Package, bg: 'bg-indigo-50', fg: 'text-indigo-600', border: 'border-indigo-100' },
             { label: 'Sarees Returned', value: stats.totalReturned ?? 0, icon: ArrowUpRight, bg: 'bg-emerald-50', fg: 'text-emerald-600', border: 'border-emerald-100' },
             { label: 'Sarees In Hand', value: stats.sareesInHand ?? 0, icon: AlertCircle, bg: 'bg-amber-50', fg: 'text-amber-600', border: 'border-amber-100' },
             { label: 'Total Payments', value: stats.totalPayments ?? 0, icon: CreditCard, bg: 'bg-purple-50', fg: 'text-purple-600', border: 'border-purple-100' },
@@ -153,7 +140,7 @@ const OwnerDashboard = () => {
             <h3 className="text-lg font-bold text-text-main font-display">Saree Inventory (This Month)</h3>
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center">
-                <p className="text-xs font-semibold text-indigo-600 mb-1">Received</p>
+                <p className="text-xs font-semibold text-indigo-600 mb-1">Given</p>
                 <p className="text-3xl font-bold text-indigo-700">{stats.totalReceived ?? 0}</p>
               </div>
               <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
@@ -189,33 +176,35 @@ const OwnerDashboard = () => {
 
         {/* Transaction Summary Strip */}
         <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'Total Transactions', value: stats.totalTransactions, color: 'indigo' },
-            { label: 'Total Received', value: stats.totalReceived, color: 'emerald' },
-            { label: 'In Hand', value: stats.sareesInHand, color: 'amber' },
-          ].map((s, i) => (
-            <div key={i} className={`bg-${s.color}-50 border border-${s.color}-100 rounded-2xl p-5 text-center`}>
-              <p className={`text-sm font-medium text-${s.color}-600 mb-2`}>{s.label}</p>
-              <p className={`text-3xl font-display font-bold text-${s.color}-700`}>{s.value ?? 0}</p>
-            </div>
-          ))}
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 text-center">
+            <p className="text-sm font-medium text-indigo-600 mb-2">Total Transactions</p>
+            <p className="text-3xl font-display font-bold text-indigo-700">{stats.totalTransactions ?? 0}</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-center">
+            <p className="text-sm font-medium text-emerald-600 mb-2">Sarees Given</p>
+            <p className="text-3xl font-display font-bold text-emerald-700">{stats.totalReceived ?? 0}</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 text-center">
+            <p className="text-sm font-medium text-amber-600 mb-2">In Hand</p>
+            <p className="text-3xl font-display font-bold text-amber-700">{stats.sareesInHand ?? 0}</p>
+          </div>
         </div>
 
-        {/* Recent Transactions */}
+        {/* Recent Ledger Entries */}
         <Card className="!p-0 overflow-hidden">
           <div className="px-6 py-5 border-b border-border bg-surface-hover/30 flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-bold text-text-main font-display">Recent Transactions</h2>
-              <p className="text-sm text-secondary-500">Your latest saree movements</p>
+              <h2 className="text-lg font-bold text-text-main font-display">Recent Activity</h2>
+              <p className="text-sm text-secondary-500">Sarees given and returned</p>
             </div>
           </div>
 
-          {transactions.length === 0 ? (
+          {entries.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 mx-auto bg-secondary-50 rounded-full flex items-center justify-center mb-4">
                 <Package className="w-8 h-8 text-secondary-300" />
               </div>
-              <p className="text-secondary-500 font-medium">No saree transactions yet</p>
+              <p className="text-secondary-500 font-medium">No saree activity yet</p>
             </div>
           ) : (
             <>
@@ -223,38 +212,41 @@ const OwnerDashboard = () => {
                 <table className="min-w-full divide-y divide-border">
                   <thead>
                     <tr className="bg-surface-hover/50">
-                      {/* ✅ SareeTransactionResponseDto: transactionId, receivedDate, receivedQuantity, returnedDate, returnedQuantity, remarks */}
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">ID</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Received Date</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Received Qty</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Returned Date</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Returned Qty</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Quantity</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">Remarks</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-border/50">
-                    {paginatedData.map((tx) => (
-                      <tr key={tx.transactionId} className="hover:bg-surface-hover transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-mono text-secondary-500 bg-secondary-50 px-2 py-1 rounded">#{tx.transactionId}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
-                          {tx.receivedDate ? formatDate(tx.receivedDate) : '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">
-                          {tx.receivedQuantity ?? '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
-                          {tx.returnedDate ? formatDate(tx.returnedDate) : '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">
-                          {tx.returnedQuantity ?? '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                          {tx.remarks || '—'}
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedData.map((e) => {
+                      const isReceipt = e.entryType === 'RECEIPT';
+                      return (
+                        <tr key={e.entryId} className="hover:bg-surface-hover transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-600">
+                            {e.entryDate ? formatDate(e.entryDate) : '—'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              isReceipt
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {isReceipt ? <ArrowDownRight className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
+                              {isReceipt ? 'Received' : 'Returned'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`text-base font-bold ${isReceipt ? 'text-indigo-700' : 'text-emerald-700'}`}>
+                              {isReceipt ? '+' : '−'}{e.quantity ?? 0}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
+                            {e.remarks || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

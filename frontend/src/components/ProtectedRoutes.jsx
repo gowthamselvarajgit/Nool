@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Loading } from '../components/Common';
 
@@ -53,12 +53,12 @@ export const UnauthorizedPage = () => {
         <p className="text-gray-600 mb-6">
           You don't have permission to access this page.
         </p>
-        <a
-          href="/"
+        <Link
+          to="/login"
           className="inline-block bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
         >
-          Go to Home
-        </a>
+          Go to Login
+        </Link>
       </div>
     </div>
   );

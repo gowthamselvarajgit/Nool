@@ -3,8 +3,9 @@ import { MainLayout } from '../components/Layout';
 import { Button, Modal, Loading, ErrorMessage } from '../components/Common';
 import { attendanceService, employeeService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { formatDate } from '../utils/formatters';
-import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Plus, User, ChevronRight } from 'lucide-react';
+import { formatDate, friendlyStatus } from '../utils/formatters';
+import { exportToExcel } from '../utils/excelExporter';
+import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Plus, User, ChevronRight, Download } from 'lucide-react';
 
 const AttendancePage = () => {
   const { user } = useAuth();
@@ -142,6 +143,21 @@ const AttendancePage = () => {
               className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
             />
             <Button variant="outline" onClick={fetchAll}><RefreshCw className="w-4 h-4" /></Button>
+            <Button
+              variant="outline"
+              onClick={() => exportToExcel({
+                rows: monthRecords.map(r => ({
+                  'Employee': r.employeeName || '',
+                  'Date': r.attendanceDate ? formatDate(r.attendanceDate) : '',
+                  'Status': friendlyStatus(r.status),
+                })),
+                fileName: `Nool_Attendance_${selectedMonth}`,
+                sheetName: 'Attendance',
+                columnWidths: [22, 14, 14],
+              })}
+            >
+              <Download className="w-4 h-4 mr-1" /> Export
+            </Button>
             {!isWorker && (
               <Button onClick={() => { setMarkError(''); setShowMarkModal(true); }}>
                 <Plus className="w-4 h-4 mr-1" /> Mark Attendance
@@ -154,17 +170,22 @@ const AttendancePage = () => {
 
         {/* Month summary strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Employees', value: employees.length, color: 'indigo', bg: 'bg-indigo-50' },
-            { label: 'Present Days', value: totalPresent, color: 'emerald', bg: 'bg-emerald-50' },
-            { label: 'Absent Days', value: totalAbsent, color: 'rose', bg: 'bg-rose-50' },
-            { label: 'Records This Month', value: monthRecords.length, color: 'gray', bg: 'bg-gray-50' },
-          ].map((s, i) => (
-            <div key={i} className={`${s.bg} rounded-2xl p-4 border border-${s.color}-100`}>
-              <p className={`text-2xl font-bold text-${s.color}-700`}>{s.value}</p>
-              <p className={`text-sm text-${s.color}-600`}>{s.label}</p>
-            </div>
-          ))}
+          <div className="bg-indigo-50 rounded-2xl p-4 border border-indigo-100">
+            <p className="text-2xl font-bold text-indigo-700">{employees.length}</p>
+            <p className="text-sm text-indigo-600">Total Employees</p>
+          </div>
+          <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+            <p className="text-2xl font-bold text-emerald-700">{totalPresent}</p>
+            <p className="text-sm text-emerald-600">Present Days</p>
+          </div>
+          <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100">
+            <p className="text-2xl font-bold text-rose-700">{totalAbsent}</p>
+            <p className="text-sm text-rose-600">Absent Days</p>
+          </div>
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+            <p className="text-2xl font-bold text-gray-700">{monthRecords.length}</p>
+            <p className="text-sm text-gray-600">Records This Month</p>
+          </div>
         </div>
 
         {/* Employee Cards Grid */}
@@ -246,17 +267,29 @@ const AttendancePage = () => {
           <div className="space-y-4">
             {/* Summary */}
             <div className="grid grid-cols-4 gap-3 text-center">
-              {[
-                { label: 'Present', value: detailEmployee.present, color: 'emerald' },
-                { label: 'Absent', value: detailEmployee.absent, color: 'rose' },
-                { label: 'Leave', value: detailEmployee.leave, color: 'amber' },
-                { label: 'Rate', value: detailEmployee.rate !== null ? `${detailEmployee.rate}%` : '—', color: detailEmployee.rate >= 80 ? 'emerald' : detailEmployee.rate >= 50 ? 'amber' : 'rose' },
-              ].map((s, i) => (
-                <div key={i} className={`bg-${s.color}-50 rounded-xl p-3`}>
-                  <p className={`text-xl font-bold text-${s.color}-700`}>{s.value}</p>
-                  <p className={`text-xs text-${s.color}-500`}>{s.label}</p>
-                </div>
-              ))}
+              <div className="bg-emerald-50 rounded-xl p-3">
+                <p className="text-xl font-bold text-emerald-700">{detailEmployee.present}</p>
+                <p className="text-xs text-emerald-500">Present</p>
+              </div>
+              <div className="bg-rose-50 rounded-xl p-3">
+                <p className="text-xl font-bold text-rose-700">{detailEmployee.absent}</p>
+                <p className="text-xs text-rose-500">Absent</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-3">
+                <p className="text-xl font-bold text-amber-700">{detailEmployee.leave}</p>
+                <p className="text-xs text-amber-500">Leave</p>
+              </div>
+              {(() => {
+                const r = detailEmployee.rate;
+                const bg = r === null ? 'bg-gray-50' : r >= 80 ? 'bg-emerald-50' : r >= 50 ? 'bg-amber-50' : 'bg-rose-50';
+                const fg = r === null ? 'text-gray-600' : r >= 80 ? 'text-emerald-700' : r >= 50 ? 'text-amber-700' : 'text-rose-700';
+                return (
+                  <div className={`rounded-xl p-3 ${bg}`}>
+                    <p className={`text-xl font-bold ${fg}`}>{r !== null ? `${r}%` : '—'}</p>
+                    <p className="text-xs text-gray-500">Rate</p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Records list */}

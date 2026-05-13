@@ -52,5 +52,9 @@ public class SalaryPaymentController {
         return salaryService.getMySalaryPaymentHistory(paginationRequestDto);
     }
 
-
+    // GET /salary-payments/employees-summary — admin view, all-time per-employee summary
+    @GetMapping("/employees-summary")
+    public java.util.List<SalarySummaryDto> getAllEmployeesSalarySummary() {
+        return salaryService.getAllEmployeesSalarySummary();
+    }
 }

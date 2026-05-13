@@ -16,6 +16,7 @@ public interface EmployeeDailyWorkRepository
 
     List<EmployeeDailyWork> findByEmployeeId(Long employeeId);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "employee")
     Page<EmployeeDailyWork> findByEmployeeId(Long employeeId, Pageable pageable);
 
     List<EmployeeDailyWork> findByWorkDate(LocalDate workDate);
@@ -61,4 +62,31 @@ public interface EmployeeDailyWorkRepository
             LocalDate fromDate,
             LocalDate toDate
     );
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM EmployeeDailyWork w WHERE w.employee.id = :employeeId")
+    int deleteAllByEmployeeId(Long employeeId);
+
+    // Per-employee aggregate for a date range (fresh, repolish, distinct workdays).
+    @Query("""
+           SELECT w.employee.id,
+                  COALESCE(SUM(w.freshCount), 0),
+                  COALESCE(SUM(w.rePolishCount), 0),
+                  COUNT(DISTINCT w.workDate)
+           FROM EmployeeDailyWork w
+           WHERE w.workDate BETWEEN :fromDate AND :toDate
+           GROUP BY w.employee.id
+           """)
+    List<Object[]> aggregateByEmployee(LocalDate fromDate, LocalDate toDate);
+
+    // All-time per-employee fresh + repolish totals.
+    @Query("""
+           SELECT w.employee.id,
+                  COALESCE(SUM(w.freshCount), 0),
+                  COALESCE(SUM(w.rePolishCount), 0)
+           FROM EmployeeDailyWork w
+           GROUP BY w.employee.id
+           """)
+    List<Object[]> aggregateByAllEmployees();
 }
