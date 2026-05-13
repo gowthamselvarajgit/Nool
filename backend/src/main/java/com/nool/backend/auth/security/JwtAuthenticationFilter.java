@@ -39,12 +39,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (!jwtUtil.isTokenExpired(token)) {
 
                 Claims claims = jwtUtil.extractAllClaims(token);
-                Long userId = claims.get("userId", Long.class);
                 String role = claims.get("role", String.class);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                userId,   // ✅ principal (identity)
+                                claims,
                                 null,
                                 List.of(new SimpleGrantedAuthority(role))
                         );

@@ -73,8 +73,8 @@ const AnalyticsPage = () => {
       setEmployeeStats({
         total: employees.length,
         active: employees.filter(e => e.status === 'ACTIVE').length,
-        inactive: employees.filter(e => e.status === 'INACTIVE').length,
-        onLeave: employees.filter(e => e.status === 'ON_LEAVE').length,
+        inactive: employees.filter(e => e.status === 'LEFT').length,
+        onLeave: 0,
       });
 
       // ── Owner stats ────────────────────────────────────────────────────────

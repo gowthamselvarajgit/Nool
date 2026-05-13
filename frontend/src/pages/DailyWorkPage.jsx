@@ -43,7 +43,7 @@ export const DailyWorkPage = () => {
         // ✅ Correct method: getList(page, size) instead of non-existent getWorkLogsList
         const [summaryRes, logsRes] = await Promise.all([
           dailyWorkService.getMyWorkSummary(fromDate, toDate).catch(() => null),
-          dailyWorkService.getList(0, 30).catch(() => ({ content: [] })),
+          dailyWorkService.getMyList(0, 30).catch(() => ({ content: [] })),
         ]);
 
         // ✅ Map summary — field names from EmployeeDailyWorkSummaryDto
@@ -118,9 +118,13 @@ export const DailyWorkPage = () => {
             </p>
           </div>
           
-          <button className="flex items-center justify-center gap-2 px-6 py-3 bg-text-main text-white rounded-xl text-sm font-bold hover:bg-black transition-all duration-300 shadow-xl shadow-black/10 hover:-translate-y-0.5 w-full md:w-auto">
+          <button
+            type="button"
+            disabled
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 text-gray-500 rounded-xl text-sm font-bold cursor-not-allowed w-full md:w-auto"
+          >
             <PlusCircle className="w-5 h-5" />
-            Log Today's Work
+            Admin Adds Daily Work
           </button>
         </div>
 

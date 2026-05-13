@@ -117,7 +117,7 @@ const EmployeeDashboard = () => {
 
       // ✅ Fetch recent attendance records (latest 10)
       try {
-        const attRes = await attendanceService.getList(0, 10);
+        const attRes = await attendanceService.getMyList(0, 10);
         setRecentAttendance(attRes?.content || []);
       } catch (_) {
         setRecentAttendance([]);

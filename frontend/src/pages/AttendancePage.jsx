@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Button, Modal, Loading, ErrorMessage } from '../components/Common';
 import { attendanceService, employeeService } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../utils/formatters';
 import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Plus, User, ChevronRight } from 'lucide-react';
 
 const AttendancePage = () => {
+  const { user } = useAuth();
+  const isWorker = user?.role === 'WORKER';
   const [employees, setEmployees] = useState([]);
   const [allRecords, setAllRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,12 +32,27 @@ const AttendancePage = () => {
   async function fetchAll() {
     try {
       setLoading(true); setError('');
-      const [empRes, attRes] = await Promise.all([
-        employeeService.getList(0, 200),
-        attendanceService.getList(0, 1000),
-      ]);
-      setEmployees(empRes?.content || []);
-      setAllRecords(attRes?.content || []);
+      if (isWorker) {
+        const [profileRes, attRes] = await Promise.all([
+          employeeService.getMe(),
+          attendanceService.getMyList(0, 1000),
+        ]);
+        setEmployees([{
+          employeeId: profileRes.employeeId,
+          employeeName: profileRes.employeeName,
+          mobileNumber: profileRes.mobileNumber,
+          status: profileRes.status,
+          polishingRate: profileRes.polishingRate,
+        }]);
+        setAllRecords(attRes?.content || []);
+      } else {
+        const [empRes, attRes] = await Promise.all([
+          employeeService.getList(0, 200),
+          attendanceService.getList(0, 1000),
+        ]);
+        setEmployees(empRes?.content || []);
+        setAllRecords(attRes?.content || []);
+      }
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
   }
@@ -112,7 +130,9 @@ const AttendancePage = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold text-gray-900">📍 Attendance</h1>
-            <p className="text-gray-500 mt-1">Click any employee card to view their attendance history</p>
+            <p className="text-gray-500 mt-1">
+              {isWorker ? 'View your attendance history' : 'Click any employee card to view their attendance history'}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -122,9 +142,11 @@ const AttendancePage = () => {
               className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
             />
             <Button variant="outline" onClick={fetchAll}><RefreshCw className="w-4 h-4" /></Button>
-            <Button onClick={() => { setMarkError(''); setShowMarkModal(true); }}>
-              <Plus className="w-4 h-4 mr-1" /> Mark Attendance
-            </Button>
+            {!isWorker && (
+              <Button onClick={() => { setMarkError(''); setShowMarkModal(true); }}>
+                <Plus className="w-4 h-4 mr-1" /> Mark Attendance
+              </Button>
+            )}
           </div>
         </div>
 

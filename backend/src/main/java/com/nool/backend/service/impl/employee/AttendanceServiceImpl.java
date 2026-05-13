@@ -30,6 +30,16 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
+
+    private AttendanceListResponseDto mapToListDto(Attendance attendance) {
+        return AttendanceListResponseDto.builder()
+                .attendanceId(attendance.getId())
+                .employeeId(attendance.getEmployee().getId())
+                .employeeName(attendance.getEmployee().getName())
+                .attendanceDate(attendance.getAttendanceDate())
+                .status(attendance.getAttendanceStatus())
+                .build();
+    }
     @Override
     public AttendanceResponseDto markAttendance(AttendanceRequestDto requestDto) {
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
@@ -76,15 +86,40 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         List<AttendanceListResponseDto> content = page
                 .getContent()
-                .stream().
-                map(attendance -> AttendanceListResponseDto
-                        .builder()
-                        .attendanceId(attendance.getId())
-                        .employeeId(attendance.getEmployee().getId())
-                        .employeeName(attendance.getEmployee().getName())
-                        .attendanceDate(attendance.getAttendanceDate())
-                        .status(attendance.getAttendanceStatus())
-                        .build()).collect(Collectors.toList());
+                .stream()
+                .map(this::mapToListDto)
+                .collect(Collectors.toList());
+        return PaginationResponseDto.<AttendanceListResponseDto>builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
+    @Override
+    public PaginationResponseDto<AttendanceListResponseDto> getMyAttendanceList(PaginationRequestDto paginationRequestDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access denied");
+        }
+
+        PageRequest pageRequest = PageRequest.of(
+                paginationRequestDto.getPage(),
+                paginationRequestDto.getSize(),
+                Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+                paginationRequestDto.getSortBy()
+        );
+
+        Page<Attendance> page = attendanceRepository.findByEmployeeId(employeeId, pageRequest);
+
+        List<AttendanceListResponseDto> content = page.getContent()
+                .stream()
+                .map(this::mapToListDto)
+                .collect(Collectors.toList());
+
         return PaginationResponseDto.<AttendanceListResponseDto>builder()
                 .content(content)
                 .page(page.getNumber())

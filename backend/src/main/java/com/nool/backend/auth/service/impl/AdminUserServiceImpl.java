@@ -5,6 +5,7 @@ import com.nool.backend.auth.entity.UserProfile;
 import com.nool.backend.auth.repository.AuthUserRepository;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.enums.Role;
+import com.nool.backend.exception.DuplicateResourceException;
 import com.nool.backend.repository.auth.UserProfileRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -20,37 +21,47 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     @Transactional
-    public void createEmployeeUser(String mobileNumber, String rawPassword, Long employeeId) {
+    public User createEmployeeUser(String mobileNumber, String rawPassword, Long employeeId) {
+        if (authUserRepository.findByMobileNumber(mobileNumber).isPresent()) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
+        }
+
         User user = User.builder()
                 .mobileNumber(mobileNumber)
                 .password(passwordEncoder.encode(rawPassword))
                 .role(Role.WORKER)
                 .active(true)
                 .build();
-        authUserRepository.save(user);
+        User savedUser = authUserRepository.save(user);
 
         UserProfile profile = UserProfile.builder()
-                .user(user)
+                .user(savedUser)
                 .employeeId(employeeId)
                 .build();
         userProfileRepository.save(profile);
+        return savedUser;
     }
 
     @Override
     @Transactional
-    public void createOwnerUser(String mobileNumber, String rawPassword, Long ownerId) {
+    public User createOwnerUser(String mobileNumber, String rawPassword, Long ownerId) {
+        if (authUserRepository.findByMobileNumber(mobileNumber).isPresent()) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
+        }
+
         User user = User.builder()
                 .mobileNumber(mobileNumber)
                 .password(passwordEncoder.encode(rawPassword))
                 .role(Role.SAREE_OWNER)
                 .active(true)
                 .build();
-        authUserRepository.save(user);
+        User savedUser = authUserRepository.save(user);
 
         UserProfile userProfile = UserProfile.builder()
-                .user(user)
+                .user(savedUser)
                 .ownerId(ownerId)
                 .build();
         userProfileRepository.save(userProfile);
+        return savedUser;
     }
 }

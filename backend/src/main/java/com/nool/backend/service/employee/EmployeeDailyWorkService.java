@@ -12,6 +12,7 @@ public interface EmployeeDailyWorkService {
     EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto);
 
     PaginationResponseDto<EmployeeDailyWorkListDto> getDailyWorkList(PaginationRequestDto paginationRequestDto);
+    PaginationResponseDto<EmployeeDailyWorkListDto> getMyDailyWorkList(PaginationRequestDto paginationRequestDto);
 
     EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto);
 

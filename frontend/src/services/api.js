@@ -160,6 +160,20 @@ export const attendanceService = {
     return handleResponse(response);
   },
 
+  getMyList: async (page = 0, size = 50) => {
+    const response = await fetch(`${API_BASE_URL}/attendance/my-list`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        page,
+        size,
+        sortBy: 'attendanceDate',
+        sortingDirection: 'DESC',
+      }),
+    });
+    return handleResponse(response);
+  },
+
   // Backend: POST /attendance/employee/{employeeId}/summary → { fromDate, toDate }
   getEmployeeSummary: async (employeeId, fromDate, toDate) => {
     const response = await fetch(
@@ -535,6 +549,15 @@ export const dailyWorkService = {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ page, size, searchKeyword, sortBy: 'workDate', sortingDirection: 'DESC' }),
+    });
+    return handleResponse(response);
+  },
+
+  getMyList: async (page = 0, size = 20) => {
+    const response = await fetch(`${API_BASE_URL}/employee-daily-working/my-list`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ page, size, sortBy: 'workDate', sortingDirection: 'DESC' }),
     });
     return handleResponse(response);
   },

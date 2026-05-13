@@ -7,6 +7,7 @@ import com.nool.backend.dto.dashboard.owner.OwnerInventoryAnalyticsDto;
 import com.nool.backend.entity.owner.SareeOwner;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.OwnerPaymentRepository;
+import com.nool.backend.repository.owner.SareeReturnRepository;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
 import com.nool.backend.repository.owner.SareeTransactionRepository;
 import com.nool.backend.service.dashboard.OwnerDashboardService;
@@ -23,6 +24,7 @@ public class OwnerDashboardServiceImpl implements OwnerDashboardService {
     private final SareeOwnerRepository sareeOwnerRepository;
     private final SareeTransactionRepository sareeTransactionRepository;
     private final OwnerPaymentRepository ownerPaymentRepository;
+    private final SareeReturnRepository sareeReturnRepository;
 
 
     @Override
@@ -30,13 +32,18 @@ public class OwnerDashboardServiceImpl implements OwnerDashboardService {
         SareeOwner sareeOwner = sareeOwnerRepository.findById(ownerId).orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         Long totalSareesGiven = sareeTransactionRepository.sumReceivedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
-        Long totalSareesReturned = sareeTransactionRepository.sumReturnedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+        Long totalSareesReturned = sareeReturnRepository.sumReturnedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
         long sareesInHand = totalSareesGiven - totalSareesReturned;
 
         double totalAmountPayable = totalSareesReturned * RATE_PER_SAREE;
-        Double totalAmountPaid = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
-        double pendingAmount = totalAmountPayable - totalAmountPaid;
+        Double totalAmountPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwnerAndDateRange(
+                ownerId,
+                dateRangeDto.getFromDate(),
+                dateRangeDto.getToDate()
+        );
+        double totalAmountPaid = totalAmountPaidBoxed == null ? 0.0 : totalAmountPaidBoxed;
+        double pendingAmount = Math.max(totalAmountPayable - totalAmountPaid, 0);
 
         return OwnerDashboardSummaryDto.builder()
                 .ownerId(ownerId)
@@ -53,7 +60,7 @@ public class OwnerDashboardServiceImpl implements OwnerDashboardService {
     @Override
     public OwnerInventoryAnalyticsDto getInventoryAnalytics(Long ownerId, DateRangeDto dateRangeDto) {
         Long sareesGiven = sareeTransactionRepository.sumReceivedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
-        Long sareesReturned = sareeTransactionRepository.sumReturnedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+        Long sareesReturned = sareeReturnRepository.sumReturnedByOwnerAndDateRange(ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
         long sareesInHand = sareesGiven - sareesReturned;
         return OwnerInventoryAnalyticsDto.builder()
                 .date(LocalDate.now())

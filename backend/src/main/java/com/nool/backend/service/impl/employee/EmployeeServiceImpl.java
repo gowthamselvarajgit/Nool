@@ -1,6 +1,8 @@
 package com.nool.backend.service.impl.employee;
 
 import com.nool.backend.auth.security.CurrentUserUtil;
+import com.nool.backend.auth.entity.User;
+import com.nool.backend.auth.entity.UserProfile;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -10,6 +12,7 @@ import com.nool.backend.enums.EmployeeStatus;
 import com.nool.backend.exception.DuplicateResourceException;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.auth.UserRepository;
+import com.nool.backend.repository.auth.UserProfileRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.service.employee.EmployeeService;
 import jakarta.transaction.Transactional;
@@ -27,6 +30,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
+    private final UserProfileRepository userProfileRepository;
     private final AdminUserService adminUserService;
 
     @Override
@@ -34,6 +38,9 @@ public class EmployeeServiceImpl implements EmployeeService {
     public EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto) {
         if (employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
             throw new DuplicateResourceException("Employee with this mobile number already exists");
+        }
+        if (userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
         }
 
         Employee employee = Employee.builder()
@@ -46,11 +53,13 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee saved = employeeRepository.save(employee);
 
         // Create associated user account with login credentials
-        adminUserService.createEmployeeUser(
+        User user = adminUserService.createEmployeeUser(
             requestDto.getMobileNumber(),
             requestDto.getPassword(),
             saved.getId()
         );
+        saved.setUser(user);
+        saved = employeeRepository.save(saved);
 
         return EmployeeResponseDto.builder()
                 .employeeId(saved.getId())
@@ -72,9 +81,24 @@ public class EmployeeServiceImpl implements EmployeeService {
         employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
             throw new DuplicateResourceException("Mobile number already in use");
         }
+        if (!employee.getMobileNumber().equals(requestDto.getMobileNumber()) &&
+                userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
+        }
         employee.setName(requestDto.getEmployeeName());
         employee.setPolishRate(requestDto.getPolishingRate());
         employee.setMobileNumber(requestDto.getMobileNumber());
+        User user = employee.getUser();
+        if (user == null) {
+            user = userProfileRepository.findByEmployeeId(employee.getId())
+                    .map(profile -> profile.getUser())
+                    .orElse(null);
+        }
+        if (user != null) {
+            user.setMobileNumber(requestDto.getMobileNumber());
+            userRepository.save(user);
+            employee.setUser(user);
+        }
         employeeRepository.save(employee);
     }
 
@@ -157,8 +181,18 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
         // Delete linked user account if exists
-        if (employee.getUser() != null) {
-            userRepository.delete(employee.getUser());
+        UserProfile profile = userProfileRepository.findByEmployeeId(employeeId).orElse(null);
+        User user = employee.getUser();
+        if (user == null && profile != null) {
+            user = profile.getUser();
+        }
+        if (user != null) {
+            employee.setUser(null);
+            employeeRepository.save(employee);
+            if (profile != null) {
+                userProfileRepository.delete(profile);
+            }
+            userRepository.delete(user);
         }
         employeeRepository.delete(employee);
     }

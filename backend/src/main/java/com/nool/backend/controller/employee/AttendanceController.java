@@ -36,6 +36,11 @@ public class AttendanceController {
         return attendanceService.getAttendanceList(paginationRequestDto);
     }
 
+    @PostMapping("/my-list")
+    public PaginationResponseDto<AttendanceListResponseDto> getMyAttendanceList(@RequestBody PaginationRequestDto paginationRequestDto){
+        return attendanceService.getMyAttendanceList(paginationRequestDto);
+    }
+
     //✅ ATTENDANCE SUMMARY API – PASSED
     @PostMapping("/employee/{employeeId}/summary")
     public AttendanceSummaryDto getAttendanceSummary(@PathVariable Long employeeId, @Valid @RequestBody DateRangeDto dateRangeDto){

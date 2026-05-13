@@ -29,6 +29,18 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
     private final EmployeeDailyWorkRepository employeeDailyWorkRepository;
     private final EmployeeRepository employeeRepository;
 
+    private EmployeeDailyWorkListDto mapToListDto(EmployeeDailyWork employeeDailyWork) {
+        return EmployeeDailyWorkListDto.builder()
+                .workId(employeeDailyWork.getId())
+                .employeeId(employeeDailyWork.getEmployee().getId())
+                .employeeName(employeeDailyWork.getEmployee().getName())
+                .workDate(employeeDailyWork.getWorkDate())
+                .freshCount(employeeDailyWork.getFreshCount())
+                .rePolishCount(employeeDailyWork.getRePolishCount())
+                .todayEarning(employeeDailyWork.getFreshCount() * employeeDailyWork.getEmployee().getPolishRate())
+                .build();
+    }
+
 
     @Override
     public EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {
@@ -70,15 +82,38 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
         List<EmployeeDailyWorkListDto> content = page
                 .getContent()
                 .stream()
-                .map(employeeDailyWork -> EmployeeDailyWorkListDto.builder()
-                        .workId(employeeDailyWork.getId())
-                        .employeeId(employeeDailyWork.getEmployee().getId())
-                        .employeeName(employeeDailyWork.getEmployee().getName())
-                        .workDate(employeeDailyWork.getWorkDate())
-                        .freshCount(employeeDailyWork.getFreshCount())
-                        .rePolishCount(employeeDailyWork.getRePolishCount())
-                        .todayEarning(employeeDailyWork.getFreshCount() * employeeDailyWork.getEmployee().getPolishRate())
-                        .build()).collect(Collectors.toList());
+                .map(this::mapToListDto)
+                .collect(Collectors.toList());
+        return PaginationResponseDto.<EmployeeDailyWorkListDto>builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
+    @Override
+    public PaginationResponseDto<EmployeeDailyWorkListDto> getMyDailyWorkList(PaginationRequestDto paginationRequestDto) {
+        Long employeeId = CurrentUserUtil.getEmployeeId();
+        if (employeeId == null){
+            throw new RuntimeException("Access denied");
+        }
+
+        PageRequest pageRequest = PageRequest.of(
+                paginationRequestDto.getPage(),
+                paginationRequestDto.getSize(),
+                Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+                paginationRequestDto.getSortBy()
+        );
+
+        Page<EmployeeDailyWork> page = employeeDailyWorkRepository.findByEmployeeId(employeeId, pageRequest);
+        List<EmployeeDailyWorkListDto> content = page.getContent()
+                .stream()
+                .map(this::mapToListDto)
+                .collect(Collectors.toList());
+
         return PaginationResponseDto.<EmployeeDailyWorkListDto>builder()
                 .content(content)
                 .page(page.getNumber())

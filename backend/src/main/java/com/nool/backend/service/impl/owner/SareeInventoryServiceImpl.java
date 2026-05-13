@@ -48,6 +48,9 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
 
         int received = tx.getReceivedQuantity() != null ? tx.getReceivedQuantity() : 0;
         int inHand = received - (int) totalReturned;
+        SareeReturn lastReturn = partialReturns.isEmpty()
+                ? null
+                : partialReturns.get(partialReturns.size() - 1);
 
         List<SareeReturnResponseDto> returnDtos = partialReturns.stream()
                 .map(r -> SareeReturnResponseDto.builder()
@@ -68,6 +71,8 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
                 .sareesInHand(inHand)
                 .fullyReturned(inHand <= 0 && received > 0)
                 .returns(returnDtos)
+                .returnedDate(lastReturn != null ? lastReturn.getReturnedDate() : tx.getReturnedDate())
+                .returnedQuantity(lastReturn != null ? lastReturn.getReturnedQuantity() : tx.getReturnedQuantity())
                 .remarks(tx.getRemarks())
                 .build();
     }
@@ -170,18 +175,16 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
                 sareeTransactionRepository.findBySareeOwnerIdAndReceivedDateBetween(
                         ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
-        List<SareeTransaction> returnedTx =
-                sareeTransactionRepository.findBySareeOwnerIdAndReturnedDateBetween(
-                        ownerId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
-
         long totalReceived = received.stream()
                 .mapToLong(t -> t.getReceivedQuantity() == null ? 0 : t.getReceivedQuantity())
                 .sum();
 
-        // For summary, use the partial returns table for accurate totals
-        long totalReturned = received.stream()
-                .mapToLong(t -> sareeReturnRepository.sumReturnedByTransactionId(t.getId()))
-                .sum();
+        Long totalReturnedBoxed = sareeReturnRepository.sumReturnedByOwnerAndDateRange(
+                ownerId,
+                dateRangeDto.getFromDate(),
+                dateRangeDto.getToDate()
+        );
+        long totalReturned = totalReturnedBoxed == null ? 0L : totalReturnedBoxed;
 
         return OwnerInventorySummaryDto.builder()
                 .ownerId(ownerId)
@@ -199,7 +202,7 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
                         dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
         Long totalReturned =
-                sareeTransactionRepository.sumTotalReturned(
+                sareeReturnRepository.sumReturnedByDateRange(
                         dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
         // Supplement totalReturned with partial returns that might not be on the tx itself

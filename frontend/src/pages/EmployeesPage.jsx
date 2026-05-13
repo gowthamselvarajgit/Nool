@@ -80,8 +80,7 @@ const EmployeeForm = ({ initialData, onSubmit, isLoading }) => {
         onChange={handleChange}
         options={[
           { value: 'ACTIVE', label: 'Active' },
-          { value: 'INACTIVE', label: 'Inactive' },
-          { value: 'ON_LEAVE', label: 'On Leave' },
+          { value: 'LEFT', label: 'Inactive' },
         ]}
       />
 
@@ -189,11 +188,11 @@ export const EmployeesPage = () => {
     finally { setIsSubmitting(false); }
   };
 
-  // Toggle employee ACTIVE <-> INACTIVE
+  // Toggle employee ACTIVE <-> LEFT
   const handleToggleStatus = async (employee) => {
     try {
       setError('');
-      const newStatus = employee.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      const newStatus = employee.status === 'ACTIVE' ? 'LEFT' : 'ACTIVE';
       await employeeService.updateStatus(employee.id, newStatus);
       fetchEmployees();
     } catch (err) { setError(`Status update failed: ${err.message}`); }
@@ -326,9 +325,9 @@ export const EmployeesPage = () => {
             </p>
           </Card>
           <Card>
-            <p className="text-gray-600 text-sm">On Leave</p>
+            <p className="text-gray-600 text-sm">Inactive</p>
             <p className="text-3xl font-bold text-yellow-600 mt-1">
-              {employees.filter((e) => e.status === 'ON_LEAVE').length}
+              {employees.filter((e) => e.status === 'LEFT').length}
             </p>
           </Card>
         </div>

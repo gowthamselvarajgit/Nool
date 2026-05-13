@@ -40,7 +40,7 @@ export const PerformancePage = () => {
 
         const [summaryRes, logsRes] = await Promise.all([
           dailyWorkService.getMyWorkSummary(fromDate, toDate).catch(() => null),
-          dailyWorkService.getList(0, 50).catch(() => ({ content: [] })),
+          dailyWorkService.getMyList(0, 50).catch(() => ({ content: [] })),
         ]);
 
         const totalFresh = summaryRes?.totalFreshCount ?? summaryRes?.totalFreshSareesPolished ?? 0;

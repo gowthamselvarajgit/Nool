@@ -134,7 +134,11 @@ public class SalaryServiceImpl implements SalaryService {
 
         // ✅ Null-safe paid amount
         Double totalPaidBoxed =
-                salaryPaymentRepository.sumTotalSalaryPaidByEmployee(employeeId);
+                salaryPaymentRepository.sumTotalSalaryPaidByEmployeeAndDateRange(
+                        employeeId,
+                        dateRangeDto.getFromDate(),
+                        dateRangeDto.getToDate()
+                );
         double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
 
         // ✅ Pending salary must NEVER be negative

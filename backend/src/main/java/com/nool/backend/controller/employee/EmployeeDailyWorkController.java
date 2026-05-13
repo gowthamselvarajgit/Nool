@@ -32,6 +32,11 @@ public class EmployeeDailyWorkController {
         return employeeDailyWorkService.getDailyWorkList(paginationRequestDto);
     }
 
+    @PostMapping("/my-list")
+    public PaginationResponseDto<EmployeeDailyWorkListDto> getMyDailyWorkList(@RequestBody PaginationRequestDto paginationRequestDto){
+        return employeeDailyWorkService.getMyDailyWorkList(paginationRequestDto);
+    }
+
     //✅ EMPLOYEE DAILY WORK SUMMARY API – PASSED
     @PostMapping("/employee/{employeeId}/summary")
     public EmployeeWorkSummaryDto getEmployeeWorkSummary(@PathVariable Long employeeId, @Valid @RequestBody DateRangeDto dateRangeDto){

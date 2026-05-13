@@ -50,6 +50,7 @@ export const getEmployeeStatusColor = (status) => {
   const colors = {
     ACTIVE: 'success',
     INACTIVE: 'default',
+    LEFT: 'default',
     ON_LEAVE: 'warning',
   };
   return colors[status] || 'default';

@@ -19,4 +19,12 @@ public interface OwnerPaymentRepository extends JpaRepository<OwnerPayment, Long
     @Query("SELECT COALESCE(SUM(p.amountPaid), 0) FROM OwnerPayment p WHERE p.owner.id = :ownerId")
     Double sumTotalAmountPaidByOwner(Long ownerId);
 
+    @Query("""
+           SELECT COALESCE(SUM(p.amountPaid), 0)
+           FROM OwnerPayment p
+           WHERE p.owner.id = :ownerId
+             AND p.paymentDate BETWEEN :fromDate AND :toDate
+           """)
+    Double sumTotalAmountPaidByOwnerAndDateRange(Long ownerId, LocalDate fromDate, LocalDate toDate);
+
 }

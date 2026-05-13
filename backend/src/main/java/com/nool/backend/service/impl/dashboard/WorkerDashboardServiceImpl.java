@@ -17,7 +17,6 @@ import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.repository.employee.SalaryPaymentRepository;
 import com.nool.backend.service.dashboard.WorkerDashboardService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -71,8 +70,13 @@ public class WorkerDashboardServiceImpl implements WorkerDashboardService {
 
         double thisMonthEarnings = thisMonthFreshWork * employee.getPolishRate();
 
-        Double totalSalaryPaid = salaryPaymentRepository.sumTotalSalaryPaidByEmployee(employeeId);
-        double pendingSalary = totalEarnings - totalSalaryPaid;
+        Double totalSalaryPaidBoxed = salaryPaymentRepository.sumTotalSalaryPaidByEmployeeAndDateRange(
+                employeeId,
+                dateRangeDto.getFromDate(),
+                dateRangeDto.getToDate()
+        );
+        double totalSalaryPaid = totalSalaryPaidBoxed == null ? 0.0 : totalSalaryPaidBoxed;
+        double pendingSalary = Math.max(totalEarnings - totalSalaryPaid, 0);
 
         LocalDate lastPaymentDate = salaryPaymentRepository.findLastPaymentDateByEmployee(employeeId);
 

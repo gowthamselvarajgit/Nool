@@ -2,6 +2,8 @@ package com.nool.backend.repository.employee;
 
 import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.enums.AttendanceStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -24,6 +26,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             LocalDate fromDate,
             LocalDate toDate
     );
+
+    Page<Attendance> findByEmployeeId(Long employeeId, Pageable pageable);
 
     @Query("""
            SELECT COUNT(a)

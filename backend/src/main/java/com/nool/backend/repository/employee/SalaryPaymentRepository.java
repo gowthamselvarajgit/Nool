@@ -29,6 +29,21 @@ public interface SalaryPaymentRepository extends JpaRepository<SalaryPayment, Lo
            """)
     Double sumTotalSalaryPaidByEmployee(Long employeeId);
 
+    @Query("""
+           SELECT COALESCE(SUM(s.amountPaid), 0)
+           FROM SalaryPayment s
+           WHERE s.paymentDate BETWEEN :fromDate AND :toDate
+           """)
+    Double sumTotalSalaryPaidByDateRange(LocalDate fromDate, LocalDate toDate);
+
+    @Query("""
+           SELECT COALESCE(SUM(s.amountPaid), 0)
+           FROM SalaryPayment s
+           WHERE s.employee.id = :employeeId
+             AND s.paymentDate BETWEEN :fromDate AND :toDate
+           """)
+    Double sumTotalSalaryPaidByEmployeeAndDateRange(Long employeeId, LocalDate fromDate, LocalDate toDate);
+
 
     @Query("""
            SELECT MAX(s.paymentDate)

@@ -12,8 +12,8 @@ import com.nool.backend.entity.owner.OwnerPayment;
 import com.nool.backend.entity.owner.SareeOwner;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.OwnerPaymentRepository;
+import com.nool.backend.repository.owner.SareeReturnRepository;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
-import com.nool.backend.repository.owner.SareeTransactionRepository;
 import com.nool.backend.service.owner.OwnerPaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,7 +32,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
 
     private final OwnerPaymentRepository ownerPaymentRepository;
     private final SareeOwnerRepository sareeOwnerRepository;
-    private final SareeTransactionRepository sareeTransactionRepository;
+    private final SareeReturnRepository sareeReturnRepository;
 
     /* =========================
        ✅ RECORD OWNER PAYMENT
@@ -114,27 +114,23 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
         // ✅ Null-safe paid amount
-        Double totalPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
+        Double totalPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwnerAndDateRange(
+                ownerId,
+                dateRangeDto.getFromDate(),
+                dateRangeDto.getToDate()
+        );
         double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
 
         // ✅ Owner-wise, date-wise inventory calculation
-        Long totalReceivedBoxed = sareeTransactionRepository.sumTotalReceivedByOwner(
+        Long totalReturnedBoxed = sareeReturnRepository.sumReturnedByOwnerAndDateRange(
                 ownerId,
                 dateRangeDto.getFromDate(),
                 dateRangeDto.getToDate()
         );
 
-        Long totalReturnedBoxed = sareeTransactionRepository.sumTotalReturnedByOwner(
-                ownerId,
-                dateRangeDto.getFromDate(),
-                dateRangeDto.getToDate()
-        );
-
-        long totalReceived = totalReceivedBoxed == null ? 0 : totalReceivedBoxed;
         long totalReturned = totalReturnedBoxed == null ? 0 : totalReturnedBoxed;
 
-        long netSarees = totalReceived - totalReturned;
-        double totalPayable = netSarees * RATE_PER_SAREE;
+        double totalPayable = totalReturned * RATE_PER_SAREE;
 
         // ✅ NEVER allow negative pending
         double pendingAmount = Math.max(totalPayable - totalPaid, 0);

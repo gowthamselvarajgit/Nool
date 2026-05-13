@@ -13,6 +13,7 @@ import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.repository.employee.SalaryPaymentRepository;
+import com.nool.backend.repository.owner.SareeReturnRepository;
 import com.nool.backend.repository.owner.SareeTransactionRepository;
 import com.nool.backend.service.dashboard.AdminDashboardService;
 import com.nool.backend.dto.common.MonthYearRequestDto;
@@ -28,12 +29,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AdminDashboardServiceImpl implements AdminDashboardService {
-    private static final double RATE_PER_SAREE = 70.0;
-
     private final EmployeeRepository employeeRepository;
     private final EmployeeDailyWorkRepository employeeDailyWorkRepository;
     private final SalaryPaymentRepository salaryPaymentRepository;
     private final SareeTransactionRepository sareeTransactionRepository;
+    private final SareeReturnRepository sareeReturnRepository;
     private final AttendanceRepository attendanceRepository;
 
     @Override
@@ -52,18 +52,19 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         Long monthFreshWork = employeeDailyWorkRepository.sumFreshWorkByDateRange(startOfMonth, today);
         Long monthRepolishWork = employeeDailyWorkRepository.sumRePolishWorkByDateRange(startOfMonth, today);
 
-        double todayRevenue = todayFreshCount * RATE_PER_SAREE;
-        double monthRevenue = monthFreshWork * RATE_PER_SAREE;
+        double todayRevenue = calculateTotalSalaryEarned(today, today);
+        double monthRevenue = calculateTotalSalaryEarned(startOfMonth, today);
         double totalRevenue = monthRevenue;
 
 
         Long totalReceived = sareeTransactionRepository.sumTotalReceived(startOfMonth, today);
-        Long totalReturned = sareeTransactionRepository.sumTotalReturned(startOfMonth, today);
+        Long totalReturned = sareeReturnRepository.sumReturnedByDateRange(startOfMonth, today);
         long sareesInHand = totalReceived - totalReturned;
 
         double totalSalaryEarned = calculateTotalSalaryEarned(startOfMonth, today);
-        Double totalSalaryPaid = salaryPaymentRepository.sumTotalSalaryPaid();
-        double pendingSalary = totalSalaryEarned - totalSalaryPaid;
+        Double totalSalaryPaidBoxed = salaryPaymentRepository.sumTotalSalaryPaidByDateRange(startOfMonth, today);
+        double totalSalaryPaid = totalSalaryPaidBoxed == null ? 0.0 : totalSalaryPaidBoxed;
+        double pendingSalary = Math.max(totalSalaryEarned - totalSalaryPaid, 0);
 
         return AdminDashboardSummaryDto.builder()
                 .totalEmployees(totalEmployees)
@@ -93,7 +94,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                         dateRangeDto.getToDate()
                 );
 
-        double revenue = freshWork * RATE_PER_SAREE;
+        double revenue = calculateTotalSalaryEarned(dateRangeDto.getFromDate(), dateRangeDto.getToDate());
 
         return AdminRevenueAnalyticsDto.builder()
                 .fromDate(dateRangeDto.getFromDate())
@@ -121,7 +122,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                         endOfMonth
                 );
 
-        double revenue = freshWork * RATE_PER_SAREE;
+        double revenue = calculateTotalSalaryEarned(startOfMonth, endOfMonth);
 
         return AdminRevenueAnalyticsDto.builder()
                 .fromDate(startOfMonth)

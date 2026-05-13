@@ -1,6 +1,7 @@
 package com.nool.backend.service.impl.owner;
 
 import com.nool.backend.auth.security.CurrentUserUtil;
+import com.nool.backend.auth.entity.User;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.dto.common.PaginationRequestDto;
 import com.nool.backend.dto.common.PaginationResponseDto;
@@ -10,6 +11,8 @@ import com.nool.backend.enums.OwnerStatus;
 import com.nool.backend.exception.DuplicateResourceException;
 import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.owner.SareeOwnerRepository;
+import com.nool.backend.repository.auth.UserRepository;
+import com.nool.backend.repository.auth.UserProfileRepository;
 import com.nool.backend.service.owner.SareeOwnerService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +30,17 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
 
     private final SareeOwnerRepository sareeOwnerRepository;
     private final AdminUserService adminUserService;
+    private final UserRepository userRepository;
+    private final UserProfileRepository userProfileRepository;
     @Override
     @Transactional
     public SareeOwnerResponseDto createOwner(CreateSareeOwnerRequestDto requestDto) {
 
         if (sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
             throw new DuplicateResourceException("Owner with this mobile number already exists");
+        }
+        if (userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
         }
 
 
@@ -45,11 +53,13 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
         SareeOwner saved = sareeOwnerRepository.save(sareeOwner);
 
         // Create associated user account with login credentials
-        adminUserService.createOwnerUser(
+        User user = adminUserService.createOwnerUser(
             requestDto.getMobileNumber(),
             requestDto.getPassword(),
             saved.getId()
         );
+        saved.setUser(user);
+        saved = sareeOwnerRepository.save(saved);
 
         return SareeOwnerResponseDto.builder()
                 .ownerId(saved.getId())
@@ -68,8 +78,22 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
         if (!sareeOwner.getMobileNumber().equals(requestDto.getMobileNumber()) && sareeOwnerRepository.existsByMobileNumber(requestDto.getMobileNumber())){
             throw new DuplicateResourceException("Mobile number already in use");
         }
+        if (!sareeOwner.getMobileNumber().equals(requestDto.getMobileNumber()) && userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
+        }
         sareeOwner.setOwnerName(requestDto.getOwnerName());
         sareeOwner.setMobileNumber(requestDto.getMobileNumber());
+        User user = sareeOwner.getUser();
+        if (user == null) {
+            user = userProfileRepository.findByOwnerId(sareeOwner.getId())
+                    .map(profile -> profile.getUser())
+                    .orElse(null);
+        }
+        if (user != null) {
+            user.setMobileNumber(requestDto.getMobileNumber());
+            userRepository.save(user);
+            sareeOwner.setUser(user);
+        }
         sareeOwnerRepository.save(sareeOwner);
     }
 

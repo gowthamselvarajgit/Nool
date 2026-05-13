@@ -33,7 +33,10 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://localhost:5174",
-                "http://localhost:4173"
+                "http://localhost:4173",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:5174",
+                "http://127.0.0.1:4173"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
@@ -71,19 +74,22 @@ public class SecurityConfig {
                         // ── Attendance ────────────────────────────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/attendance").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/attendance/list").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST,   "/attendance/my-list").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/attendance/employee/*/summary").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/attendance/summary").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.GET,    "/attendance/**").hasAnyAuthority("ADMIN", "WORKER")
 
                         // ── Daily Work ────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/employee-daily-working/list").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working/my-list").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/employee-daily-working/employee/*/summary").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/employee-daily-working/summary").hasAnyAuthority("ADMIN", "WORKER")
 
                         // ── Salary ────────────────────────────────────────────────────────
                         .requestMatchers(HttpMethod.POST,   "/salary-payments").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/employee/*/history").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST,   "/salary-payments/history").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/summary").hasAnyAuthority("ADMIN", "WORKER")
                         .requestMatchers(HttpMethod.POST,   "/salary-payments/**").hasAuthority("ADMIN")
 

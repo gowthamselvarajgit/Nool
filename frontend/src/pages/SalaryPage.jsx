@@ -4,11 +4,14 @@ import {
   Card, Button, Input, Select, Badge, Modal, Loading, ErrorMessage, EmptyState,
 } from '../components/Common';
 import { Table } from '../components/Table';
+import { useAuth } from '../hooks/useAuth';
 import { salaryService, employeeService } from '../services/api';
 import { formatDate } from '../utils/formatters';
 import { DollarSign, TrendingUp, RefreshCw } from 'lucide-react';
 
 const SalaryPage = () => {
+  const { user } = useAuth();
+  const isWorker = user?.role === 'WORKER';
   const [employees, setEmployees] = useState([]);
   const [salaryRecords, setSalaryRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +22,6 @@ const SalaryPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const itemsPerPage = 10;
 
-  // ✅ Matches SalaryPaymentRequestDto exactly
   const [salaryForm, setSalaryForm] = useState({
     employeeId: '',
     fromDate: '',
@@ -32,20 +34,38 @@ const SalaryPage = () => {
 
   useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchInitialData() {
     try {
       setLoading(true);
       setError('');
-      const empResponse = await employeeService.getList(0, 200);
-      const empList = empResponse?.content || [];
-      setEmployees(empList.map(e => ({
-        id: e.employeeId,
-        name: e.employeeName,
-        mobileNumber: e.mobileNumber,
-        polishingRate: e.polishingRate,
-      })));
+
+      if (isWorker) {
+        const profile = await employeeService.getMe();
+        const workerEmployee = {
+          id: profile.employeeId,
+          name: profile.employeeName,
+          mobileNumber: profile.mobileNumber,
+          polishingRate: profile.polishingRate,
+        };
+
+        setEmployees([workerEmployee]);
+        setSelectedEmployee(String(workerEmployee.id));
+        setSalaryForm(prev => ({ ...prev, employeeId: String(workerEmployee.id) }));
+
+        const history = await salaryService.getMyHistory(0, 50);
+        setSalaryRecords(history?.content || []);
+      } else {
+        const empResponse = await employeeService.getList(0, 200);
+        const empList = empResponse?.content || [];
+        setEmployees(empList.map(e => ({
+          id: e.employeeId,
+          name: e.employeeName,
+          mobileNumber: e.mobileNumber,
+          polishingRate: e.polishingRate,
+        })));
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,10 +77,10 @@ const SalaryPage = () => {
     if (!empId) return;
     try {
       setLoading(true);
-      const response = await salaryService.getEmployeeHistory(empId, 0, 50);
-      const list = response?.content || [];
-      // ✅ SalaryPaymentHistoryDto: salaryPaymentId, employeeId, employeeName, amountPaid, paymentMode, paymentDate, fromDate, toDate, remarks
-      setSalaryRecords(list);
+      const response = isWorker
+        ? await salaryService.getMyHistory(0, 50)
+        : await salaryService.getEmployeeHistory(empId, 0, 50);
+      setSalaryRecords(response?.content || []);
     } catch (err) {
       setError(err.message);
       setSalaryRecords([]);
@@ -70,14 +90,16 @@ const SalaryPage = () => {
   }
 
   const handleEmployeeChange = (empId) => {
+    if (isWorker) return;
     setSelectedEmployee(empId);
     setSalaryForm(prev => ({ ...prev, employeeId: empId }));
+    setCurrentPage(1);
     if (empId) fetchSalaryHistory(empId);
     else setSalaryRecords([]);
   };
 
   const handlePaySalary = async () => {
-    const { employeeId, fromDate, toDate, amountPaid, paymentDate, paymentMode } = salaryForm;
+    const { employeeId, fromDate, toDate, amountPaid, paymentDate } = salaryForm;
     if (!employeeId || !fromDate || !toDate || !amountPaid || !paymentDate) {
       setError('Please fill in all required fields');
       return;
@@ -85,18 +107,25 @@ const SalaryPage = () => {
     try {
       setIsSubmitting(true);
       setError('');
-      // ✅ Correct DTO: employeeId, fromDate, toDate, amountPaid, paymentDate, paymentMode, remarks
       await salaryService.create({
-        employeeId: parseInt(employeeId),
+        employeeId: parseInt(employeeId, 10),
         fromDate,
         toDate,
         amountPaid: parseFloat(amountPaid),
         paymentDate,
-        paymentMode,
+        paymentMode: salaryForm.paymentMode,
         remarks: salaryForm.remarks,
       });
       setShowModal(false);
-      setSalaryForm({ employeeId: selectedEmployee, fromDate: '', toDate: '', amountPaid: '', paymentDate: new Date().toISOString().split('T')[0], paymentMode: 'CASH', remarks: '' });
+      setSalaryForm({
+        employeeId: selectedEmployee,
+        fromDate: '',
+        toDate: '',
+        amountPaid: '',
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentMode: 'CASH',
+        remarks: '',
+      });
       await fetchSalaryHistory(selectedEmployee);
     } catch (err) {
       setError(err.message);
@@ -105,15 +134,15 @@ const SalaryPage = () => {
     }
   };
 
-  // ✅ Stats derived from real data (SalaryPaymentHistoryDto)
   const stats = {
     total: salaryRecords.length,
-    totalPaid: salaryRecords.reduce((s, r) => s + (r.amountPaid || 0), 0),
+    totalPaid: salaryRecords.reduce((sum, record) => sum + (record.amountPaid || 0), 0),
   };
 
-  if (loading && employees.length === 0) return <MainLayout><Loading text="Loading salary data..." /></MainLayout>;
+  if (loading && employees.length === 0) {
+    return <MainLayout><Loading text="Loading salary data..." /></MainLayout>;
+  }
 
-  // ✅ Columns match SalaryPaymentHistoryDto
   const columns = [
     {
       key: 'employeeName',
@@ -125,14 +154,14 @@ const SalaryPage = () => {
       label: 'Period',
       render: (value, row) => (
         <span className="text-gray-600 text-sm">
-          {value ? formatDate(value) : '—'} → {row.toDate ? formatDate(row.toDate) : '—'}
+          {value ? formatDate(value) : '-'} to {row.toDate ? formatDate(row.toDate) : '-'}
         </span>
       ),
     },
     {
       key: 'amountPaid',
       label: 'Amount Paid',
-      render: (value) => <span className="font-bold text-green-600">₹{(value || 0).toLocaleString('en-IN')}</span>,
+      render: (value) => <span className="font-bold text-green-600">Rs {(value || 0).toLocaleString('en-IN')}</span>,
     },
     {
       key: 'paymentMode',
@@ -142,12 +171,12 @@ const SalaryPage = () => {
     {
       key: 'paymentDate',
       label: 'Payment Date',
-      render: (value) => <span className="text-gray-600">{value ? formatDate(value) : '—'}</span>,
+      render: (value) => <span className="text-gray-600">{value ? formatDate(value) : '-'}</span>,
     },
     {
       key: 'remarks',
       label: 'Remarks',
-      render: (value) => <span className="text-gray-500 text-sm">{value || '—'}</span>,
+      render: (value) => <span className="text-gray-500 text-sm">{value || '-'}</span>,
     },
   ];
 
@@ -158,27 +187,35 @@ const SalaryPage = () => {
     <MainLayout>
       <div className="space-y-6">
         <div className="slide-down">
-          <h1 className="text-4xl font-bold text-gray-900">💰 Salary Management</h1>
-          <p className="text-gray-600 mt-2">Process and view employee salary payments</p>
+          <h1 className="text-4xl font-bold text-gray-900">{isWorker ? 'My Salary' : 'Salary Management'}</h1>
+          <p className="text-gray-600 mt-2">{isWorker ? 'View your salary payment history' : 'Process and view employee salary payments'}</p>
         </div>
 
         {error && <ErrorMessage message={error} onRetry={fetchInitialData} />}
 
-        {/* Employee Selector + Action */}
         <Card className="flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between">
           <div className="flex-1">
-            <Select
-              label="Select Employee to View History"
-              value={selectedEmployee}
-              onChange={(e) => handleEmployeeChange(e.target.value)}
-              options={[
-                { value: '', label: '— Select Employee —' },
-                ...employees.map(emp => ({
-                  value: emp.id.toString(),
-                  label: `${emp.name} (₹${emp.polishingRate}/unit)`,
-                })),
-              ]}
-            />
+            {isWorker ? (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Employee</p>
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900">
+                  {employees[0] ? `${employees[0].name} (Rs ${employees[0].polishingRate}/unit)` : '-'}
+                </div>
+              </div>
+            ) : (
+              <Select
+                label="Select Employee to View History"
+                value={selectedEmployee}
+                onChange={(e) => handleEmployeeChange(e.target.value)}
+                options={[
+                  { value: '', label: '- Select Employee -' },
+                  ...employees.map(emp => ({
+                    value: emp.id.toString(),
+                    label: `${emp.name} (Rs ${emp.polishingRate}/unit)`,
+                  })),
+                ]}
+              />
+            )}
           </div>
           <div className="flex gap-2">
             {selectedEmployee && (
@@ -186,13 +223,14 @@ const SalaryPage = () => {
                 <RefreshCw className="w-4 h-4 mr-1" /> Refresh
               </Button>
             )}
-            <Button onClick={() => { setSalaryForm(prev => ({ ...prev, employeeId: selectedEmployee })); setShowModal(true); }}>
-              ➕ Pay Salary
-            </Button>
+            {!isWorker && (
+              <Button onClick={() => { setSalaryForm(prev => ({ ...prev, employeeId: selectedEmployee })); setShowModal(true); }}>
+                Add Payment
+              </Button>
+            )}
           </div>
         </Card>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <p className="text-gray-600 text-sm">Total Payments</p>
@@ -203,7 +241,7 @@ const SalaryPage = () => {
               <div>
                 <p className="text-gray-600 text-sm">Total Paid</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
-                  ₹{stats.totalPaid.toLocaleString('en-IN')}
+                  Rs {stats.totalPaid.toLocaleString('en-IN')}
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-green-600 opacity-20" />
@@ -212,18 +250,17 @@ const SalaryPage = () => {
           <Card>
             <p className="text-gray-600 text-sm">Avg per Payment</p>
             <p className="text-3xl font-bold text-blue-600 mt-1">
-              ₹{stats.total > 0 ? Math.round(stats.totalPaid / stats.total).toLocaleString('en-IN') : '0'}
+              Rs {stats.total > 0 ? Math.round(stats.totalPaid / stats.total).toLocaleString('en-IN') : '0'}
             </p>
           </Card>
         </div>
 
-        {/* Table */}
         {!selectedEmployee ? (
-          <EmptyState message="Select an employee to view salary history" icon="💰" />
+          <EmptyState message="Select an employee to view salary history" icon="Rs" />
         ) : loading ? (
           <Loading text="Loading salary history..." />
         ) : salaryRecords.length === 0 ? (
-          <EmptyState message="No salary payments found for this employee" icon="💰" />
+          <EmptyState message="No salary payments found" icon="Rs" />
         ) : (
           <Card className="overflow-hidden">
             <Table
@@ -236,21 +273,23 @@ const SalaryPage = () => {
         )}
       </div>
 
-      {/* Pay Salary Modal */}
       <Modal
-        isOpen={showModal}
-        onClose={() => { setShowModal(false); setSalaryForm(prev => ({ ...prev, fromDate: '', toDate: '', amountPaid: '', remarks: '' })); setError(''); }}
+        isOpen={showModal && !isWorker}
+        onClose={() => {
+          setShowModal(false);
+          setSalaryForm(prev => ({ ...prev, fromDate: '', toDate: '', amountPaid: '', remarks: '' }));
+          setError('');
+        }}
         title="Pay Salary"
         size="lg"
       >
         <div className="space-y-4">
-          {/* ✅ Employee selector in modal */}
           <Select
             label="Employee *"
             value={salaryForm.employeeId}
             onChange={(e) => setSalaryForm(prev => ({ ...prev, employeeId: e.target.value }))}
             options={[
-              { value: '', label: '— Select Employee —' },
+              { value: '', label: '- Select Employee -' },
               ...employees.map(emp => ({ value: emp.id.toString(), label: `${emp.name} (${emp.mobileNumber})` })),
             ]}
             required
@@ -275,7 +314,7 @@ const SalaryPage = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Amount Paid (₹) *"
+              label="Amount Paid *"
               type="number"
               value={salaryForm.amountPaid}
               onChange={(e) => setSalaryForm(prev => ({ ...prev, amountPaid: e.target.value }))}
@@ -296,9 +335,9 @@ const SalaryPage = () => {
             value={salaryForm.paymentMode}
             onChange={(e) => setSalaryForm(prev => ({ ...prev, paymentMode: e.target.value }))}
             options={[
-              { value: 'CASH', label: '💵 Cash' },
-              { value: 'ONLINE', label: '📱 Online Transfer' },
-              { value: 'CHEQUE', label: '🏦 Cheque' },
+              { value: 'CASH', label: 'Cash' },
+              { value: 'ONLINE', label: 'Online Transfer' },
+              { value: 'CHEQUE', label: 'Cheque' },
             ]}
           />
 
@@ -309,14 +348,13 @@ const SalaryPage = () => {
             placeholder="Optional notes"
           />
 
-          {/* Preview */}
           {salaryForm.amountPaid && (
             <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-gray-600 font-medium">Amount to Pay</p>
                   <p className="text-3xl font-bold text-green-600">
-                    ₹{parseFloat(salaryForm.amountPaid || 0).toLocaleString('en-IN')}
+                    Rs {parseFloat(salaryForm.amountPaid || 0).toLocaleString('en-IN')}
                   </p>
                 </div>
                 <DollarSign className="w-12 h-12 text-green-600 opacity-20" />
