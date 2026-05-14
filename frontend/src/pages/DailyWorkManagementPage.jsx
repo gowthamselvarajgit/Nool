@@ -2,18 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Button, Input, Select, Modal, Badge } from '../components/Common';
 import { dailyWorkService, employeeService } from '../services/api';
-import { formatDate, getInitials, friendlyStatus } from '../utils/formatters';
+import { formatDate, getInitials, friendlyStatus, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
 import {
   Plus, RefreshCw, AlertCircle, ArrowLeft, Calendar, Users,
-  TrendingUp, IndianRupee, Search, Download,
+  TrendingUp, IndianRupee, Search, Download, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
-const todayStr = () => new Date().toISOString().split('T')[0];
-const firstOfMonth = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
-};
+const todayStr = () => toLocalISODate(new Date());
 
 export default function DailyWorkManagementPage() {
   // Data
@@ -26,6 +22,9 @@ export default function DailyWorkManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Calendar month for the per-employee detail view
+  const [calMonth, setCalMonth] = useState(toLocalISODate(new Date()).slice(0, 7));
 
   // Add-work modal
   const [showModal, setShowModal] = useState(false);
@@ -47,7 +46,7 @@ export default function DailyWorkManagementPage() {
       setError('');
       const [empRes, workRes] = await Promise.all([
         employeeService.getList(0, 200),
-        dailyWorkService.getList(0, 500),
+        dailyWorkService.getList(0, 5000),
       ]);
       const empList = (empRes?.content || []).map(e => ({
         id: e.employeeId,
@@ -150,6 +149,58 @@ export default function DailyWorkManagementPage() {
       .filter(r => r.employeeId === selectedEmployee.id)
       .sort((a, b) => (b.workDate || '').localeCompare(a.workDate || ''));
   }, [workRecords, selectedEmployee]);
+
+  // ─── Calendar data for the detail view ─────────────────────────────────────
+  // Buckets the employee's work entries by date so each day cell can show
+  // total sarees polished plus the fresh / re-polish breakdown.
+  const calData = useMemo(() => {
+    if (!selectedEmployee) return null;
+    const [yStr, mStr] = calMonth.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10) - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+
+    const byDate = {}; // dateIso -> { fresh, repolish, earning }
+    let monthFresh = 0, monthRepolish = 0, monthEarning = 0, workedDays = 0;
+    for (const r of workRecords) {
+      if (r.employeeId !== selectedEmployee.id) continue;
+      if (!(r.workDate || '').startsWith(calMonth)) continue;
+      const cur = byDate[r.workDate] || { fresh: 0, repolish: 0, earning: 0 };
+      cur.fresh += r.freshCount || 0;
+      cur.repolish += r.rePolishCount || 0;
+      cur.earning += r.todayEarning || 0;
+      byDate[r.workDate] = cur;
+    }
+    for (const d in byDate) {
+      monthFresh += byDate[d].fresh;
+      monthRepolish += byDate[d].repolish;
+      monthEarning += byDate[d].earning;
+      workedDays += 1;
+    }
+    return { year, month, daysInMonth, firstWeekday, byDate, monthFresh, monthRepolish, monthEarning, workedDays };
+  }, [selectedEmployee, calMonth, workRecords]);
+
+  const monthLabel = (ym) => {
+    const [y, m] = ym.split('-');
+    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1)
+      .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
+  const shiftCalMonth = (delta) => {
+    const [y, m] = calMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const currentMonthIso = toLocalISODate(new Date()).slice(0, 7);
+  const todayIso = toLocalISODate(new Date());
+
+  // Reset to current month whenever opening a different employee's detail view
+  useEffect(() => {
+    if (selectedEmployeeId) setCalMonth(currentMonthIso);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployeeId]);
 
   // Aggregate totals across all employees
   const overallStats = useMemo(() => {
@@ -412,6 +463,150 @@ export default function DailyWorkManagementPage() {
                 );
               })()}
             </div>
+
+            {/* ── Beautiful Work Calendar ── */}
+            {calData && (
+              <Card className="!p-0 overflow-hidden">
+                {/* Month navigator */}
+                <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50 px-2 sm:px-5 py-2 sm:py-4 border-b border-emerald-100">
+                  <button
+                    onClick={() => shiftCalMonth(-1)}
+                    className="p-1.5 sm:p-2 rounded-xl bg-white border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+                    title="Previous month"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+                  </button>
+                  <div className="text-center px-1">
+                    <p className="text-sm sm:text-xl font-bold text-gray-900">{monthLabel(calMonth)}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 leading-snug">
+                      {calData.workedDays}d ·
+                      <strong className="text-emerald-700 ml-1">{calData.monthFresh}</strong> fresh ·
+                      <strong className="text-amber-700 ml-1">{calData.monthRepolish}</strong> re ·
+                      <strong className="text-purple-700 ml-1">₹{Math.round(calData.monthEarning).toLocaleString('en-IN')}</strong>
+                    </p>
+                    {calMonth !== currentMonthIso && (
+                      <button
+                        onClick={() => setCalMonth(currentMonthIso)}
+                        className="text-[10px] sm:text-xs text-emerald-700 hover:text-emerald-900 font-semibold mt-0.5"
+                      >
+                        Jump to this month
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => shiftCalMonth(1)}
+                    disabled={calMonth >= currentMonthIso}
+                    className="p-1.5 sm:p-2 rounded-xl bg-white border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Next month"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+                  </button>
+                </div>
+
+                <div className="p-2 sm:p-5">
+                  {/* Weekday header */}
+                  <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1.5 sm:mb-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+                      <div
+                        key={d}
+                        className={`text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 ${
+                          i === 0 ? 'text-rose-400' : 'text-gray-500'
+                        }`}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Day cells */}
+                  <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                    {Array.from({ length: calData.firstWeekday }).map((_, i) => (
+                      <div key={`blank-${i}`} />
+                    ))}
+                    {Array.from({ length: calData.daysInMonth }).map((_, idx) => {
+                      const day = idx + 1;
+                      const dateIso = `${calData.year}-${String(calData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const entry = calData.byDate[dateIso];
+                      const total = entry ? entry.fresh + entry.repolish : 0;
+                      const isToday = dateIso === todayIso;
+                      const isFuture = dateIso > todayIso;
+
+                      // Intensity tier — bigger numbers = greener cell
+                      let cellClasses;
+                      if (entry) {
+                        if (total >= 21) cellClasses = 'bg-emerald-600 text-white border-emerald-700 shadow-md';
+                        else if (total >= 11) cellClasses = 'bg-emerald-500 text-white border-emerald-600 shadow-sm';
+                        else if (total >= 6) cellClasses = 'bg-emerald-400 text-white border-emerald-500';
+                        else cellClasses = 'bg-emerald-200 text-emerald-900 border-emerald-300';
+                      } else if (isFuture) {
+                        cellClasses = 'bg-white text-gray-300 border-gray-100';
+                      } else {
+                        cellClasses = 'bg-gray-50 text-gray-400 border-gray-200';
+                      }
+
+                      const tooltip = entry
+                        ? `${formatDate(dateIso)} — ${entry.fresh} fresh + ${entry.repolish} re-polish · ₹${Math.round(entry.earning).toLocaleString('en-IN')}`
+                        : formatDate(dateIso);
+
+                      return (
+                        <div
+                          key={day}
+                          title={tooltip}
+                          onClick={() => !isFuture && openAddModal(selectedEmployee.id)}
+                          className={`min-h-[52px] sm:min-h-[70px] md:min-h-[78px] rounded-lg sm:rounded-xl border sm:border-2 flex flex-col items-center justify-center px-0.5 sm:px-1 py-1 sm:py-2 transition-transform hover:scale-105 ${cellClasses} ${
+                            isToday ? 'ring-2 ring-indigo-500 ring-offset-1 sm:ring-offset-2' : ''
+                          } ${!isFuture ? 'cursor-pointer' : ''}`}
+                        >
+                          <span className="text-[10px] sm:text-sm font-bold leading-none mb-0.5 sm:mb-1 opacity-90">{day}</span>
+                          {entry ? (
+                            <>
+                              <span className="text-base sm:text-xl md:text-2xl font-extrabold leading-none">{total}</span>
+                              <span className="hidden sm:inline text-[10px] font-semibold uppercase tracking-wider mt-1 opacity-90">
+                                {total === 1 ? 'saree' : 'sarees'}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap items-center justify-center gap-4 mt-5 pt-4 border-t border-gray-100 text-xs">
+                    <span className="text-gray-700 font-semibold mr-1">How many sarees:</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-md bg-emerald-200 border-2 border-emerald-300" />
+                      <span className="text-gray-700">1–5</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-md bg-emerald-400 border-2 border-emerald-500" />
+                      <span className="text-gray-700">6–10</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-md bg-emerald-500 border-2 border-emerald-600" />
+                      <span className="text-gray-700">11–20</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-md bg-emerald-600 border-2 border-emerald-700" />
+                      <span className="text-gray-700">21+</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-md bg-gray-50 border-2 border-gray-200" />
+                      <span className="text-gray-700">No work</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-md bg-white border-2 border-indigo-500" />
+                      <span className="text-gray-700">Today</span>
+                    </div>
+                  </div>
+                  <p className="text-center text-xs text-gray-400 mt-2">
+                    Tap any past or today's date to quickly add a work entry.
+                  </p>
+                </div>
+              </Card>
+            )}
 
             {/* Entries list */}
             <Card className="!p-0 overflow-hidden">

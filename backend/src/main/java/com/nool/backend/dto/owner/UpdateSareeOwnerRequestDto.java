@@ -21,4 +21,7 @@ public class UpdateSareeOwnerRequestDto {
             message = "Mobile number must be a valid 10-digit Indian mobile number"
     )
     private String mobileNumber;
+
+    @jakarta.validation.constraints.Positive(message = "Polish rate must be greater than zero")
+    private Double polishRatePerSaree;
 }

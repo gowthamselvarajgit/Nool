@@ -2,18 +2,19 @@ import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Button, Input, Modal, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { inventoryService, ownerService } from '../services/api';
-import { formatDate } from '../utils/formatters';
+import { formatDate, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
 import {
   Plus, RefreshCw, Package, ArrowDownCircle, ArrowUpCircle, RotateCcw,
   Download, ChevronRight, Search, AlertTriangle, Trash2, Filter, Users, Calendar,
+  ChevronLeft, CalendarDays, List, ArrowLeft,
 } from 'lucide-react';
 
-const todayIso = () => new Date().toISOString().split('T')[0];
+const todayIso = () => toLocalISODate(new Date());
 
 export const InventoryManagementPage = () => {
   const today = todayIso();
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const firstOfMonth = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const firstOfYear = `${new Date().getFullYear()}-01-01`;
 
   // ── Data state ─────────────────────────────────────────────────────────────
@@ -23,10 +24,12 @@ export const InventoryManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // ── Modal state ────────────────────────────────────────────────────────────
+  // ── Modal state (only for short Receipt/Return forms) ──────────────────────
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
-  const [showLedgerModal, setShowLedgerModal] = useState(false);
+
+  // ── Detail-view state (one owner's data shown in-page, not a modal) ────────
+  // selectedOwner !== null → grid is hidden, detail view is shown
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [ownerLedger, setOwnerLedger] = useState([]);
   const [ownerLedgerLoading, setOwnerLedgerLoading] = useState(false);
@@ -44,6 +47,10 @@ export const InventoryManagementPage = () => {
   const [filterOwner, setFilterOwner] = useState('');
   const [filterType, setFilterType] = useState('');
   const [search, setSearch] = useState('');
+
+  // ── View toggle for movements section ──────────────────────────────────────
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
+  const [calMonth, setCalMonth] = useState(toLocalISODate(new Date()).slice(0, 7));
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
@@ -80,16 +87,27 @@ export const InventoryManagementPage = () => {
     }
   }
 
-  async function openLedger(owner) {
+  async function openLedger(owner, mode) {
     setSelectedOwner(owner);
-    setShowLedgerModal(true);
     setOwnerLedger([]);
+    if (mode !== undefined) setViewMode(mode);
+    // Scroll to top so users see the detail view header right away.
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'instant' });
     try {
       setOwnerLedgerLoading(true);
       const res = await inventoryService.getOwnerLedger(owner.ownerId, 0, 200);
-      setOwnerLedger(res?.content || []);
+      const entries = res?.content || [];
+      setOwnerLedger(entries);
+      // Default the calendar to the most recent month that has an entry — falls
+      // back to the current month if this owner has no history yet.
+      const latest = entries
+        .map(e => e.entryDate || '')
+        .filter(Boolean)
+        .sort()
+        .pop();
+      setCalMonth(latest ? latest.slice(0, 7) : toLocalISODate(new Date()).slice(0, 7));
     } catch (err) {
-      setModalError(err.message);
+      setError(err.message);
     } finally {
       setOwnerLedgerLoading(false);
     }
@@ -124,6 +142,10 @@ export const InventoryManagementPage = () => {
       });
       setShowReceiptModal(false);
       setReceiptForm(blankForm);
+      // Refresh the detail view if we're viewing this owner
+      if (selectedOwner?.ownerId === parseInt(receiptForm.ownerId)) {
+        await openLedger(selectedOwner);
+      }
       await fetchAll();
     } catch (err) {
       setModalError(err.message);
@@ -151,7 +173,7 @@ export const InventoryManagementPage = () => {
       });
       setShowReturnModal(false);
       setReturnForm(blankForm);
-      if (showLedgerModal && selectedOwner?.ownerId === parseInt(returnForm.ownerId)) {
+      if (selectedOwner?.ownerId === parseInt(returnForm.ownerId)) {
         await openLedger(selectedOwner);
       }
       await fetchAll();
@@ -170,7 +192,7 @@ export const InventoryManagementPage = () => {
     try {
       await inventoryService.deleteEntry(entry.entryId);
       await fetchAll();
-      if (showLedgerModal && selectedOwner) {
+      if (selectedOwner) {
         await openLedger(selectedOwner);
       }
     } catch (err) {
@@ -266,6 +288,68 @@ export const InventoryManagementPage = () => {
 
   const periodReceived = filteredEntries.filter(e => e.entryType === 'RECEIPT').reduce((s, e) => s + (e.quantity ?? 0), 0);
   const periodReturned = filteredEntries.filter(e => e.entryType === 'RETURN').reduce((s, e) => s + (e.quantity ?? 0), 0);
+
+  // Running balance map: entryId -> "Sarees Still With Us" total *after* that entry.
+  // When an owner is filter-selected we walk only that owner's entries (per-owner balance);
+  // otherwise we walk all entries (workshop-wide balance).
+  const balanceAfterByEntryId = useMemo(() => {
+    const scope = filterOwner
+      ? allEntries.filter(e => e.ownerId === parseInt(filterOwner))
+      : allEntries;
+    const sortedAsc = [...scope].sort((a, b) => {
+      const cmp = (a.entryDate || '').localeCompare(b.entryDate || '');
+      return cmp !== 0 ? cmp : (a.entryId ?? 0) - (b.entryId ?? 0);
+    });
+    let bal = 0;
+    const map = new Map();
+    for (const e of sortedAsc) {
+      bal += e.entryType === 'RECEIPT' ? (e.quantity || 0) : -(e.quantity || 0);
+      map.set(e.entryId, bal);
+    }
+    return map;
+  }, [allEntries, filterOwner]);
+
+  // ── Calendar data for the per-owner ledger modal ───────────────────────────
+  // Each owner has their own calendar, scoped to just their entries (no mixing).
+  const ownerCalData = useMemo(() => {
+    const [yStr, mStr] = calMonth.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10) - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+
+    const byDate = {};
+    let monthReceived = 0, monthReturned = 0, activeDays = 0;
+    for (const e of ownerLedger) {
+      const d = e.entryDate || '';
+      if (!d.startsWith(calMonth)) continue;
+      const cur = byDate[d] || { received: 0, returned: 0 };
+      if (e.entryType === 'RECEIPT') cur.received += e.quantity || 0;
+      else if (e.entryType === 'RETURN') cur.returned += e.quantity || 0;
+      byDate[d] = cur;
+    }
+    for (const d in byDate) {
+      monthReceived += byDate[d].received;
+      monthReturned += byDate[d].returned;
+      activeDays += 1;
+    }
+    return { year, month, daysInMonth, firstWeekday, byDate, monthReceived, monthReturned, activeDays };
+  }, [ownerLedger, calMonth]);
+
+  const currentMonthIso = toLocalISODate(new Date()).slice(0, 7);
+  const todayIsoNow = toLocalISODate(new Date());
+
+  const monthLabel = (ym) => {
+    const [y, m] = ym.split('-');
+    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1)
+      .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
+  const shiftCalMonth = (delta) => {
+    const [y, m] = calMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
 
   // ── Excel export (full ledger view) ────────────────────────────────────────
   const handleExportLedger = () => {
@@ -365,38 +449,38 @@ export const InventoryManagementPage = () => {
 
         {/* ── Weekly Breakdown for Current Month ── */}
         <Card className="!p-0 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-indigo-500" />
-            <div>
-              <h2 className="font-bold text-gray-900 text-lg">Week-by-week summary</h2>
-              <p className="text-sm text-gray-500">{monthName} — how many sarees came in, went back, and are still with us</p>
+          <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-center gap-2 sm:gap-3">
+            <Calendar className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+            <div className="min-w-0">
+              <h2 className="font-bold text-gray-900 text-base sm:text-lg">Week-by-week summary</h2>
+              <p className="text-xs sm:text-sm text-gray-500 truncate">{monthName} — sarees received, returned, still with us</p>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-gray-600 text-xs font-semibold uppercase tracking-wider">
-                  <th className="px-6 py-3 text-left">Week</th>
-                  <th className="px-6 py-3 text-center">Sarees Received</th>
-                  <th className="px-6 py-3 text-center">Sarees Returned</th>
-                  <th className="px-6 py-3 text-center">Sarees Still With Us</th>
+                <tr className="bg-gray-50 text-gray-600 text-[10px] sm:text-xs font-semibold uppercase tracking-wider">
+                  <th className="px-2 sm:px-6 py-2 sm:py-3 text-left">Week</th>
+                  <th className="px-2 sm:px-6 py-2 sm:py-3 text-center">Received</th>
+                  <th className="px-2 sm:px-6 py-2 sm:py-3 text-center">Returned</th>
+                  <th className="px-2 sm:px-6 py-2 sm:py-3 text-center">Still With Us</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {weekly.map((w, i) => (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-gray-900">Week {i + 1}</div>
-                      <div className="text-xs text-gray-500">{w.dateLabel} {monthName.split(' ')[0]}</div>
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
+                      <div className="font-bold text-gray-900 text-xs sm:text-sm">Week {i + 1}</div>
+                      <div className="text-[10px] sm:text-xs text-gray-500">{w.dateLabel} {monthName.split(' ')[0]}</div>
                     </td>
-                    <td className="px-6 py-4 text-center text-xl font-bold text-indigo-600">
+                    <td className="px-2 sm:px-6 py-2 sm:py-4 text-center text-base sm:text-xl font-bold text-indigo-600">
                       {w.received > 0 ? w.received : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-6 py-4 text-center text-xl font-bold text-emerald-600">
+                    <td className="px-2 sm:px-6 py-2 sm:py-4 text-center text-base sm:text-xl font-bold text-emerald-600">
                       {w.returned > 0 ? w.returned : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`text-xl font-bold ${
+                    <td className="px-2 sm:px-6 py-2 sm:py-4 text-center">
+                      <span className={`text-base sm:text-xl font-bold ${
                         w.endBalance < 0 ? 'text-rose-600' : 'text-amber-700'
                       }`}>
                         {w.endBalance}
@@ -407,14 +491,14 @@ export const InventoryManagementPage = () => {
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-bold border-t-2 border-gray-200">
-                  <td className="px-6 py-3 text-sm text-gray-700">Month total</td>
-                  <td className="px-6 py-3 text-center text-indigo-700 text-lg">
+                  <td className="px-2 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm text-gray-700">Month total</td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-3 text-center text-indigo-700 text-sm sm:text-lg">
                     {weekly.reduce((s, w) => s + w.received, 0)}
                   </td>
-                  <td className="px-6 py-3 text-center text-emerald-700 text-lg">
+                  <td className="px-2 sm:px-6 py-2 sm:py-3 text-center text-emerald-700 text-sm sm:text-lg">
                     {weekly.reduce((s, w) => s + w.returned, 0)}
                   </td>
-                  <td className="px-6 py-3 text-center text-amber-700 text-lg">
+                  <td className="px-2 sm:px-6 py-2 sm:py-3 text-center text-amber-700 text-sm sm:text-lg">
                     {weekly.length ? weekly[weekly.length - 1].endBalance : totals.inHand}
                   </td>
                 </tr>
@@ -431,7 +515,8 @@ export const InventoryManagementPage = () => {
           </div>
         </Card>
 
-        {/* ── Per-Owner Cards ── */}
+        {/* ── Per-Owner Cards (grid mode) ── */}
+        {!selectedOwner && (
         <div>
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
             <div>
@@ -465,19 +550,9 @@ export const InventoryManagementPage = () => {
                       isNegative ? 'border-rose-200' : 'border-gray-200 hover:border-indigo-300'
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => openLedger(o)}
-                      className="flex items-start justify-between text-left w-full group"
-                    >
-                      <div>
-                        <p className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors">
-                          {o.ownerName}
-                        </p>
-                        <p className="text-sm text-gray-500">Tap to view ledger</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-indigo-400 transition-colors" />
-                    </button>
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">{o.ownerName}</p>
+                    </div>
 
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="bg-indigo-50 rounded-xl p-2.5">
@@ -502,7 +577,23 @@ export const InventoryManagementPage = () => {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 pt-1">
+                    {/* View buttons — open the ledger pre-set to a specific view */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openLedger(o, 'list')}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors border border-gray-200"
+                      >
+                        <List className="w-4 h-4" /> List View
+                      </button>
+                      <button
+                        onClick={() => openLedger(o, 'calendar')}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-2 rounded-lg transition-colors border border-violet-200"
+                      >
+                        <CalendarDays className="w-4 h-4" /> Calendar View
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
                       <button
                         onClick={() => openReceipt(o)}
                         className="flex-1 flex items-center justify-center gap-1 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors border border-indigo-200"
@@ -523,6 +614,234 @@ export const InventoryManagementPage = () => {
             </div>
           )}
         </div>
+        )}
+
+        {/* ── Per-Owner Detail View (replaces owner cards while an owner is selected) ── */}
+        {selectedOwner && (() => {
+          // Pull fresh stats from ownersInventory so the header reflects recent receipts/returns.
+          const fresh = ownersInventory.find(o => o.ownerId === selectedOwner.ownerId) || selectedOwner;
+          const inHand = fresh.sareesInHand ?? 0;
+          const hasStock = inHand > 0;
+          const isNegative = inHand < 0;
+          return (
+            <div className="space-y-4">
+              {/* Back + header + view toggle */}
+              <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { setSelectedOwner(null); setOwnerLedger([]); }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Back
+                  </button>
+                  <div className="min-w-0">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{fresh.ownerName}</h2>
+                    <p className="text-xs text-gray-500">Owner ledger</p>
+                  </div>
+                </div>
+                <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 self-stretch sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" /> List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('calendar')}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      viewMode === 'calendar'
+                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <CalendarDays className="w-3.5 h-3.5" /> Calendar
+                  </button>
+                </div>
+              </Card>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-indigo-50 rounded-xl p-3 text-center border border-indigo-100">
+                  <p className="text-2xl font-bold text-indigo-700">{fresh.totalSareesGiven ?? 0}</p>
+                  <p className="text-xs text-indigo-600 font-medium">Total Received</p>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100">
+                  <p className="text-2xl font-bold text-emerald-700">{fresh.totalSareesReturned ?? 0}</p>
+                  <p className="text-xs text-emerald-600 font-medium">Total Returned</p>
+                </div>
+                <div className={`rounded-xl p-3 text-center border ${
+                  isNegative ? 'bg-rose-50 border-rose-200' : hasStock ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <p className={`text-2xl font-bold ${
+                    isNegative ? 'text-rose-700' : hasStock ? 'text-amber-700' : 'text-gray-400'
+                  }`}>{inHand}</p>
+                  <p className={`text-xs font-medium ${
+                    isNegative ? 'text-rose-600' : hasStock ? 'text-amber-600' : 'text-gray-500'
+                  }`}>In Hand</p>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={() => openReceipt(fresh)}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Receipt
+                </Button>
+                <Button
+                  className="flex-1"
+                  variant="outline"
+                  disabled={!hasStock}
+                  onClick={() => openReturn(fresh)}
+                >
+                  <RotateCcw className="w-4 h-4 mr-1" /> Add Return
+                </Button>
+              </div>
+
+              {/* Calendar OR List */}
+              {ownerLedgerLoading ? (
+                <Card className="text-center py-8 text-gray-400">Loading entries...</Card>
+              ) : !ownerLedger.length ? (
+                <Card className="text-center py-8 text-gray-400 italic">No entries recorded yet</Card>
+              ) : viewMode === 'calendar' ? (
+                <Card className="!p-0 overflow-hidden">
+                  {/* Month navigator */}
+                  <div className="flex items-center justify-between bg-gradient-to-r from-indigo-50 to-violet-50 px-3 py-2.5 border-b border-indigo-100">
+                    <button
+                      onClick={() => shiftCalMonth(-1)}
+                      className="p-1.5 rounded-lg bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                      title="Previous month"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-gray-700" />
+                    </button>
+                    <div className="text-center px-2 min-w-0">
+                      <p className="text-sm sm:text-base font-bold text-gray-900 truncate">{monthLabel(calMonth)}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 truncate">
+                        <strong className="text-indigo-700">{ownerCalData.monthReceived}</strong> received ·
+                        <strong className="text-emerald-700 ml-1">{ownerCalData.monthReturned}</strong> returned
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => shiftCalMonth(1)}
+                      disabled={calMonth >= currentMonthIso}
+                      className="p-1.5 rounded-lg bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Next month"
+                    >
+                      <ChevronRight className="w-4 h-4 text-gray-700" />
+                    </button>
+                  </div>
+                  <div className="p-3 sm:p-4">
+                    {/* Weekday header */}
+                    <div className="grid grid-cols-7 gap-1 mb-1.5">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+                        <div
+                          key={d}
+                          className={`text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 ${
+                            i === 0 ? 'text-rose-400' : 'text-gray-500'
+                          }`}
+                        >
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                    {/* Day cells */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {Array.from({ length: ownerCalData.firstWeekday }).map((_, i) => (
+                        <div key={`blank-${i}`} />
+                      ))}
+                      {Array.from({ length: ownerCalData.daysInMonth }).map((_, idx) => {
+                        const day = idx + 1;
+                        const dateIso = `${ownerCalData.year}-${String(ownerCalData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const entry = ownerCalData.byDate[dateIso];
+                        const isToday = dateIso === todayIsoNow;
+                        const isFuture = dateIso > todayIsoNow;
+                        const hasActivity = entry && (entry.received > 0 || entry.returned > 0);
+                        let cellClasses;
+                        if (hasActivity) cellClasses = 'bg-amber-50 border-amber-200';
+                        else if (isFuture) cellClasses = 'bg-white text-gray-300 border-gray-100';
+                        else cellClasses = 'bg-gray-50 text-gray-400 border-gray-200';
+                        const tooltip = hasActivity
+                          ? `${formatDate(dateIso)} — received ${entry.received}, returned ${entry.returned}`
+                          : formatDate(dateIso);
+                        return (
+                          <div
+                            key={day}
+                            title={tooltip}
+                            className={`aspect-square rounded-lg border flex flex-col items-center justify-center transition-transform hover:scale-105 ${cellClasses} ${
+                              isToday ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                            }`}
+                          >
+                            <span className="text-xs sm:text-sm font-bold leading-none text-gray-900">{day}</span>
+                            {hasActivity && (
+                              <div className="flex flex-col items-center leading-none mt-0.5">
+                                {entry.received > 0 && (
+                                  <span className="text-[9px] sm:text-xs font-extrabold text-indigo-700 leading-tight">+{entry.received}</span>
+                                )}
+                                {entry.returned > 0 && (
+                                  <span className="text-[9px] sm:text-xs font-extrabold text-emerald-700 leading-tight">−{entry.returned}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Legend */}
+                    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-100 text-[10px] sm:text-xs">
+                      <span><strong className="text-indigo-700">+N</strong> received</span>
+                      <span><strong className="text-emerald-700">−N</strong> returned</span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-3 rounded bg-white border-2 border-indigo-500" />today
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="!p-0 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="font-semibold text-gray-700">All Entries</p>
+                  </div>
+                  <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
+                    {ownerLedger.map(e => {
+                      const isReceipt = e.entryType === 'RECEIPT';
+                      return (
+                        <div key={e.entryId} className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50">
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm flex-shrink-0 ${
+                            isReceipt ? 'bg-indigo-100' : 'bg-emerald-100'
+                          }`}>
+                            {isReceipt ? '📥' : '📤'}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-gray-900 truncate">{formatDate(e.entryDate)}</div>
+                            {e.remarks && (
+                              <div className="text-xs text-gray-500 truncate" title={e.remarks}>{e.remarks}</div>
+                            )}
+                          </div>
+                          <span className={`text-base font-bold flex-shrink-0 ${
+                            isReceipt ? 'text-indigo-700' : 'text-emerald-700'
+                          }`}>
+                            {isReceipt ? '+' : '−'}{e.quantity}
+                          </span>
+                          <button
+                            onClick={() => deleteEntry(e)}
+                            className="text-rose-400 hover:text-rose-600 p-1 flex-shrink-0"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Ledger Report Section ── */}
         <Card className="!p-0 overflow-hidden">
@@ -618,6 +937,7 @@ export const InventoryManagementPage = () => {
               <EmptyState message="No ledger entries match the filters" icon="📋" />
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -627,6 +947,7 @@ export const InventoryManagementPage = () => {
                     <th className="px-4 py-3 text-left">Date</th>
                     <th className="px-4 py-3 text-left">What Happened</th>
                     <th className="px-4 py-3 text-center">Sarees</th>
+                    <th className="px-4 py-3 text-center">Sarees Still With Us</th>
                     <th className="px-4 py-3 text-left">Notes</th>
                     <th className="px-4 py-3 text-center w-16"><span className="sr-only">Delete</span></th>
                   </tr>
@@ -634,6 +955,8 @@ export const InventoryManagementPage = () => {
                 <tbody className="divide-y divide-gray-100">
                   {filteredEntries.map((e, i) => {
                     const isReceipt = e.entryType === 'RECEIPT';
+                    const balanceAfter = balanceAfterByEntryId.get(e.entryId);
+                    const balanceNegative = balanceAfter != null && balanceAfter < 0;
                     return (
                       <tr key={e.entryId || i} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
@@ -654,6 +977,15 @@ export const InventoryManagementPage = () => {
                             {e.quantity ?? 0}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-center">
+                          {balanceAfter != null && (
+                            <span className={`text-base font-bold ${
+                              balanceNegative ? 'text-rose-600' : 'text-amber-700'
+                            }`}>
+                              {balanceAfter}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-gray-500 text-xs max-w-[240px] truncate" title={e.remarks || ''}>
                           {e.remarks || '—'}
                         </td>
@@ -672,112 +1004,14 @@ export const InventoryManagementPage = () => {
                 </tbody>
               </table>
             </div>
+            <div className="px-4 py-2 bg-amber-50/50 border-t border-amber-100 text-xs text-gray-600">
+              <strong className="text-amber-700">Sarees Still With Us</strong> is the running total
+              {filterOwner ? ' for the selected owner' : ' across all owners'} immediately after each entry.
+            </div>
+            </>
           )}
         </Card>
       </div>
-
-      {/* ── Ledger Drawer ── */}
-      <Modal
-        isOpen={showLedgerModal}
-        onClose={() => { setShowLedgerModal(false); setSelectedOwner(null); setOwnerLedger([]); }}
-        title={`📚 ${selectedOwner?.ownerName ?? ''} — Ledger`}
-        size="lg"
-      >
-        {selectedOwner && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-indigo-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-indigo-700">{selectedOwner.totalSareesGiven ?? 0}</p>
-                <p className="text-xs text-indigo-500 font-medium">Total Received</p>
-              </div>
-              <div className="bg-emerald-50 rounded-xl p-4 text-center">
-                <p className="text-2xl font-bold text-emerald-700">{selectedOwner.totalSareesReturned ?? 0}</p>
-                <p className="text-xs text-emerald-500 font-medium">Total Returned</p>
-              </div>
-              <div className={`rounded-xl p-4 text-center ${
-                (selectedOwner.sareesInHand ?? 0) < 0 ? 'bg-rose-50' : 'bg-amber-50'
-              }`}>
-                <p className={`text-2xl font-bold ${
-                  (selectedOwner.sareesInHand ?? 0) < 0 ? 'text-rose-700' : 'text-amber-700'
-                }`}>
-                  {selectedOwner.sareesInHand ?? 0}
-                </p>
-                <p className={`text-xs font-medium ${
-                  (selectedOwner.sareesInHand ?? 0) < 0 ? 'text-rose-500' : 'text-amber-500'
-                }`}>In Hand</p>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                onClick={() => { setShowLedgerModal(false); openReceipt(selectedOwner); }}
-              >
-                <Plus className="w-4 h-4 mr-1" /> Add Receipt
-              </Button>
-              <Button
-                className="flex-1"
-                variant="outline"
-                disabled={(selectedOwner.sareesInHand ?? 0) <= 0}
-                onClick={() => { setShowLedgerModal(false); openReturn(selectedOwner); }}
-              >
-                <RotateCcw className="w-4 h-4 mr-1" /> Add Return
-              </Button>
-            </div>
-
-            <div>
-              <p className="font-semibold text-gray-700 mb-2">All Entries</p>
-              {ownerLedgerLoading ? (
-                <p className="text-sm text-gray-400 text-center py-4">Loading entries...</p>
-              ) : !ownerLedger.length ? (
-                <p className="text-sm text-gray-400 italic text-center py-6">No entries recorded yet</p>
-              ) : (
-                <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden max-h-96 overflow-y-auto">
-                  <div className="grid grid-cols-12 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky top-0">
-                    <span className="col-span-2">Type</span>
-                    <span className="col-span-3">Date</span>
-                    <span className="col-span-2 text-right">Qty</span>
-                    <span className="col-span-4">Remarks</span>
-                    <span className="col-span-1 text-right">·</span>
-                  </div>
-                  {ownerLedger.map(e => {
-                    const isReceipt = e.entryType === 'RECEIPT';
-                    return (
-                      <div key={e.entryId} className="grid grid-cols-12 px-4 py-3 text-sm items-center hover:bg-gray-50">
-                        <span className="col-span-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-                            isReceipt ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {isReceipt ? '📥' : '📤'}
-                          </span>
-                        </span>
-                        <span className="col-span-3 text-gray-700 font-medium">{formatDate(e.entryDate)}</span>
-                        <span className={`col-span-2 text-right font-bold ${
-                          isReceipt ? 'text-indigo-700' : 'text-emerald-700'
-                        }`}>
-                          {isReceipt ? '+' : '−'}{e.quantity}
-                        </span>
-                        <span className="col-span-4 text-gray-500 text-xs truncate" title={e.remarks || ''}>
-                          {e.remarks || '—'}
-                        </span>
-                        <span className="col-span-1 text-right">
-                          <button
-                            onClick={() => deleteEntry(e)}
-                            className="text-rose-400 hover:text-rose-600"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* ── Receipt Modal ── */}
       <Modal

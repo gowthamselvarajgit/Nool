@@ -4,6 +4,7 @@ import com.nool.backend.dto.common.DateRangeDto;
 import com.nool.backend.dto.dashboard.admin.AdminDashboardSummaryDto;
 import com.nool.backend.dto.dashboard.admin.AdminRevenueAnalyticsDto;
 import com.nool.backend.dto.dashboard.admin.AdminWorkforceAnalyticsDto;
+import com.nool.backend.dto.dashboard.admin.EmployeeEarningsTodayDto;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
 import com.nool.backend.enums.AttendanceStatus;
@@ -54,10 +55,18 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         Long monthFreshWork = nz(employeeDailyWorkRepository.sumFreshWorkByDateRange(startOfMonth, today));
         Long monthRepolishWork = nz(employeeDailyWorkRepository.sumRePolishWorkByDateRange(startOfMonth, today));
 
-        double todayRevenue = calculateTotalSalaryEarned(today, today);
-        double monthRevenue = calculateTotalSalaryEarned(startOfMonth, today);
-        double totalRevenue = monthRevenue;
+        // Workshop revenue = sarees returned × that owner's polish rate.
+        double todayWorkshopRevenue = nzD(sareeLedgerRepository.sumRevenueByTypeAndDateRange(
+                LedgerEntryType.RETURN, today, today));
+        double monthWorkshopRevenue = nzD(sareeLedgerRepository.sumRevenueByTypeAndDateRange(
+                LedgerEntryType.RETURN, startOfMonth, today));
+        double totalWorkshopRevenue = nzD(sareeLedgerRepository.sumRevenueByType(LedgerEntryType.RETURN));
 
+        // Employee wages (workshop's payroll obligation) = fresh × per-employee rate.
+        double todayEmployeeWages = calculateTotalSalaryEarned(today, today);
+        double monthEmployeeWages = calculateTotalSalaryEarned(startOfMonth, today);
+
+        List<EmployeeEarningsTodayDto> earningsToday = buildEmployeeEarningsToday(today);
 
         Long totalReceived = nz(sareeLedgerRepository.sumQuantityByTypeAndDateRange(
                 LedgerEntryType.RECEIPT, startOfMonth, today));
@@ -67,10 +76,9 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         long allTimeReturned = nz(sareeLedgerRepository.sumQuantityByType(LedgerEntryType.RETURN));
         long sareesInHand = Math.max(allTimeReceived - allTimeReturned, 0);
 
-        double totalSalaryEarned = calculateTotalSalaryEarned(startOfMonth, today);
         Double totalSalaryPaidBoxed = salaryPaymentRepository.sumTotalSalaryPaidByDateRange(startOfMonth, today);
         double totalSalaryPaid = totalSalaryPaidBoxed == null ? 0.0 : totalSalaryPaidBoxed;
-        double pendingSalary = Math.max(totalSalaryEarned - totalSalaryPaid, 0);
+        double pendingSalary = Math.max(monthEmployeeWages - totalSalaryPaid, 0);
 
         return AdminDashboardSummaryDto.builder()
                 .totalEmployees(totalEmployees)
@@ -81,9 +89,12 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .todayRepolishWork(todayRepolishCount)
                 .monthFreshWork(monthFreshWork)
                 .monthRepolishWork(monthRepolishWork)
-                .todayRevenue(todayRevenue)
-                .monthRevenue(monthRevenue)
-                .totalRevenue(totalRevenue)
+                .todayWorkshopRevenue(todayWorkshopRevenue)
+                .monthWorkshopRevenue(monthWorkshopRevenue)
+                .totalWorkshopRevenue(totalWorkshopRevenue)
+                .todayEmployeeWages(todayEmployeeWages)
+                .monthEmployeeWages(monthEmployeeWages)
+                .employeeEarningsToday(earningsToday)
                 .totalSareesReceived(totalReceived)
                 .totalSareesReturned(totalReturned)
                 .sareesInHand(sareesInHand)
@@ -91,6 +102,39 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .pendingSalary(pendingSalary)
                 .build();
     }
+
+    /** Builds per-employee earnings cards for the dashboard. */
+    private List<EmployeeEarningsTodayDto> buildEmployeeEarningsToday(LocalDate day) {
+        List<Object[]> rows = employeeDailyWorkRepository.aggregateByEmployee(day, day);
+        if (rows.isEmpty()) return java.util.Collections.emptyList();
+
+        // Bulk-load employees in one query, then map.
+        List<Long> empIds = rows.stream().map(r -> (Long) r[0]).collect(Collectors.toList());
+        java.util.Map<Long, Employee> empById = employeeRepository.findAllById(empIds).stream()
+                .collect(Collectors.toMap(Employee::getId, e -> e));
+
+        List<EmployeeEarningsTodayDto> list = new java.util.ArrayList<>(rows.size());
+        for (Object[] r : rows) {
+            Long empId = (Long) r[0];
+            long fresh = ((Number) r[1]).longValue();
+            long repolish = ((Number) r[2]).longValue();
+            Employee emp = empById.get(empId);
+            if (emp == null) continue;
+            double rate = emp.getPolishRate() == null ? 0.0 : emp.getPolishRate();
+            list.add(EmployeeEarningsTodayDto.builder()
+                    .employeeId(empId)
+                    .employeeName(emp.getName())
+                    .freshCount(fresh)
+                    .rePolishCount(repolish)
+                    .polishRate(rate)
+                    .todayEarnings(fresh * rate)
+                    .build());
+        }
+        list.sort((a, b) -> Double.compare(b.getTodayEarnings(), a.getTodayEarnings()));
+        return list;
+    }
+
+    private static double nzD(Double v) { return v == null ? 0.0 : v; }
 
     @Override
     public AdminRevenueAnalyticsDto getRevenueAnalytics(DateRangeDto dateRangeDto) {

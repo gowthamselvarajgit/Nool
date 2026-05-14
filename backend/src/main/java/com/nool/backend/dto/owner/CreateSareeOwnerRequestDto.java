@@ -2,6 +2,7 @@ package com.nool.backend.dto.owner;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 @Data
@@ -19,4 +20,8 @@ public class CreateSareeOwnerRequestDto {
 
     @NotBlank(message = "Password is required")
     private String password;
+
+    // Optional. Defaults to ₹70 if not provided.
+    @Positive(message = "Polish rate must be greater than zero")
+    private Double polishRatePerSaree;
 }

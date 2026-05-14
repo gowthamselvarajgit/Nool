@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Button, Card, Input, Modal, Badge, Select, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { Table } from '../components/Table';
-import { employeeService } from '../services/api';
+import { employeeService, attendanceService } from '../services/api';
 import { formatDate, getEmployeeStatusColor, getInitials, friendlyStatus } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
 import { Edit2, Eye, ToggleLeft, ToggleRight, Download } from 'lucide-react';
+import AttendanceCalendar from '../components/AttendanceCalendar';
 
 const EmployeeForm = ({ initialData, onSubmit, isLoading }) => {
   const [formData, setFormData] = useState(
@@ -102,6 +103,8 @@ export const EmployeesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [empAttendance, setEmpAttendance] = useState([]);
+  const [empAttendanceLoading, setEmpAttendanceLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -228,9 +231,21 @@ export const EmployeesPage = () => {
     setShowModal(true);
   };
 
-  const handleViewDetails = (employee) => {
+  const handleViewDetails = async (employee) => {
     setSelectedEmployee(employee);
     setShowDetailsModal(true);
+    // Load this employee's attendance for the calendar.
+    setEmpAttendance([]);
+    try {
+      setEmpAttendanceLoading(true);
+      const res = await attendanceService.getList(0, 5000);
+      const all = res?.content || [];
+      setEmpAttendance(all.filter(r => String(r.employeeId) === String(employee.id)));
+    } catch {
+      // Non-fatal — calendar simply shows empty.
+    } finally {
+      setEmpAttendanceLoading(false);
+    }
   };
 
   if (loading) return <MainLayout><Loading text="Loading employees..." /></MainLayout>;
@@ -369,18 +384,18 @@ export const EmployeesPage = () => {
       {/* Details Modal */}
       <Modal
         isOpen={showDetailsModal}
-        onClose={() => { setShowDetailsModal(false); setSelectedEmployee(null); }}
+        onClose={() => { setShowDetailsModal(false); setSelectedEmployee(null); setEmpAttendance([]); }}
         title={`Employee Details - ${selectedEmployee?.name}`}
-        size="md"
+        size="lg"
       >
         {selectedEmployee && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+            <div className="flex items-center gap-3 sm:gap-4 pb-4 border-b border-gray-200">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-lg sm:text-2xl flex-shrink-0">
                 {getInitials(selectedEmployee.name)}
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{selectedEmployee.name}</h3>
+                <h3 className="text-base sm:text-xl font-bold text-gray-900">{selectedEmployee.name}</h3>
                 <Badge variant={getEmployeeStatusColor(selectedEmployee.status)}>
                   {friendlyStatus(selectedEmployee.status)}
                 </Badge>
@@ -392,6 +407,16 @@ export const EmployeesPage = () => {
               <DetailRow label="Mobile" value={selectedEmployee.mobileNumber} />
               <DetailRow label="Joining Date" value={formatDate(selectedEmployee.joiningDate)} />
               <DetailRow label="Polishing Rate" value={`₹${selectedEmployee.polishingRate || 0} per unit`} />
+            </div>
+
+            {/* Attendance calendar */}
+            <div className="pt-3 border-t border-gray-200">
+              <p className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">📅 Attendance Calendar</p>
+              {empAttendanceLoading ? (
+                <p className="text-sm text-gray-400 text-center py-3">Loading attendance...</p>
+              ) : (
+                <AttendanceCalendar records={empAttendance} />
+              )}
             </div>
 
             <div className="pt-4 border-t border-gray-200 flex gap-2">

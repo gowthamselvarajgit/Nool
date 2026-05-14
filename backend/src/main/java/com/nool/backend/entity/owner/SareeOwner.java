@@ -31,6 +31,12 @@ public class SareeOwner {
     @Column(name = "status", nullable = false)
     private OwnerStatus status;
 
+    // Rate (in INR) the owner pays the workshop per returned saree.
+    // Different owners can negotiate different rates and the rate may change over time.
+    @Column(name = "polish_rate_per_saree", nullable = false)
+    @lombok.Builder.Default
+    private Double polishRatePerSaree = 70.0;
+
     @OneToOne
     @JoinColumn(name = "user_id", unique = true)
     private User user;

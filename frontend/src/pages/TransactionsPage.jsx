@@ -4,7 +4,7 @@ import { Card, Loading, ErrorMessage } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { inventoryService } from '../services/api';
 import { exportToExcel } from '../utils/excelExporter';
-import { formatDate } from '../utils/formatters';
+import { formatDate, toLocalISODate } from '../utils/formatters';
 import { RefreshCw, ArrowDownCircle, ArrowUpCircle, Package, Search, Download } from 'lucide-react';
 
 export const TransactionsPage = () => {
@@ -18,8 +18,8 @@ export const TransactionsPage = () => {
   const pageSize = 10;
 
   const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const firstDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const lastDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 
   useEffect(() => {
     const fetchData = async () => {

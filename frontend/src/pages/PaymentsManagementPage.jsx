@@ -2,14 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Button, Input, Select, Modal, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { ownerPaymentService } from '../services/api';
-import { formatDate } from '../utils/formatters';
+import { formatDate, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
 import {
   CreditCard, RefreshCw, Plus, ChevronRight, CheckCircle2, AlertCircle,
-  Search, Users, IndianRupee, TrendingUp, Download,
+  Search, Users, IndianRupee, TrendingUp, Download, CalendarDays, List,
 } from 'lucide-react';
+import PaymentCalendar from '../components/PaymentCalendar';
 
-const todayIso = () => new Date().toISOString().split('T')[0];
+const todayIso = () => toLocalISODate(new Date());
 const inr = (n) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 export const PaymentsManagementPage = () => {
@@ -33,6 +34,7 @@ export const PaymentsManagementPage = () => {
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
@@ -53,6 +55,7 @@ export const PaymentsManagementPage = () => {
     setSelectedOwner(o);
     setShowDetailModal(true);
     setHistory([]);
+    setViewMode('list');
     try {
       setHistoryLoading(true);
       const res = await ownerPaymentService.getOwnerHistory(o.ownerId, 0, 200);
@@ -407,11 +410,39 @@ export const PaymentsManagementPage = () => {
             </div>
 
             <div>
-              <p className="font-semibold text-gray-700 mb-2">All Payments</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold text-gray-700">All Payments</p>
+                <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" /> List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('calendar')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      viewMode === 'calendar'
+                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <CalendarDays className="w-3.5 h-3.5" /> Calendar View
+                  </button>
+                </div>
+              </div>
               {historyLoading ? (
                 <p className="text-sm text-gray-400 text-center py-4">Loading history...</p>
               ) : !history.length ? (
                 <p className="text-sm text-gray-400 italic text-center py-6">No payments made yet</p>
+              ) : viewMode === 'calendar' ? (
+                <PaymentCalendar payments={history} tone="indigo" />
               ) : (() => {
                 const sortedAsc = [...history].sort((a, b) => (a.paymentDate || '').localeCompare(b.paymentDate || ''));
                 let cum = 0;

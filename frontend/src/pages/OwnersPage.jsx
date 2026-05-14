@@ -4,10 +4,11 @@ import {
   Card, Button, Input, Badge, Modal, Loading, ErrorMessage, EmptyState,
 } from '../components/Common';
 import { Table } from '../components/Table';
-import { ownerService } from '../services/api';
+import { ownerService, inventoryService } from '../services/api';
 import { getInitials, friendlyStatus } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
 import { Edit2, Eye, ToggleLeft, ToggleRight, Plus, RefreshCw, Download } from 'lucide-react';
+import InventoryActivityCalendar from '../components/InventoryActivityCalendar';
 
 const OwnersPage = () => {
   const [owners, setOwners] = useState([]);
@@ -17,6 +18,8 @@ const OwnersPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedOwner, setSelectedOwner] = useState(null);
+  const [ownerEntries, setOwnerEntries] = useState([]);
+  const [ownerEntriesLoading, setOwnerEntriesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -33,6 +36,7 @@ const OwnersPage = () => {
         ownerName: owner.ownerName,
         mobileNumber: owner.mobileNumber,
         status: owner.ownerStatus,
+        polishRatePerSaree: owner.polishRatePerSaree,
       }));
       setOwners(mapped);
       setTotalPages(response?.totalPages || 1);
@@ -55,13 +59,30 @@ const OwnersPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchKeyword]);
 
+  const handleViewDetails = async (owner) => {
+    setSelectedOwner(owner);
+    setShowDetailsModal(true);
+    setOwnerEntries([]);
+    try {
+      setOwnerEntriesLoading(true);
+      const res = await inventoryService.getOwnerLedger(owner.id, 0, 500);
+      setOwnerEntries(res?.content || []);
+    } catch {
+      // Calendar shows empty on failure — non-fatal for the rest of the modal.
+    } finally {
+      setOwnerEntriesLoading(false);
+    }
+  };
+
   const handleCreate = async (formData) => {
     try {
       setIsSubmitting(true); setError('');
+      const rate = parseFloat(formData.polishRatePerSaree);
       await ownerService.create({
         ownerName: formData.ownerName,
         mobileNumber: formData.mobileNumber,
         password: formData.password,
+        polishRatePerSaree: Number.isFinite(rate) && rate > 0 ? rate : undefined,
       });
       setShowModal(false); setSelectedOwner(null); fetchOwners();
     } catch (err) { setError(err.message); }
@@ -71,10 +92,12 @@ const OwnersPage = () => {
   const handleUpdate = async (formData) => {
     try {
       setIsSubmitting(true); setError('');
+      const rate = parseFloat(formData.polishRatePerSaree);
       await ownerService.update({
         ownerId: selectedOwner.id,
         ownerName: formData.ownerName,
         mobileNumber: formData.mobileNumber,
+        polishRatePerSaree: Number.isFinite(rate) && rate > 0 ? rate : undefined,
       });
       setShowModal(false); setSelectedOwner(null); fetchOwners();
     } catch (err) { setError(err.message); }
@@ -89,12 +112,13 @@ const OwnersPage = () => {
         'Owner Name': o.ownerName,
         'Mobile': o.mobileNumber,
         'Status': friendlyStatus(o.ownerStatus),
+        'Polish Rate (₹/saree)': o.polishRatePerSaree ?? 70,
       }));
       exportToExcel({
         rows: all,
         fileName: 'Nool_Owners',
         sheetName: 'Owners',
-        columnWidths: [10, 22, 14, 14],
+        columnWidths: [10, 22, 14, 14, 18],
       });
     } catch (err) {
       setError(err.message);
@@ -140,6 +164,13 @@ const OwnersPage = () => {
       render: (v) => <span className="text-gray-600">{v}</span>,
     },
     {
+      key: 'polishRatePerSaree',
+      label: 'Rate (₹/saree)',
+      render: (v) => (
+        <span className="font-semibold text-indigo-700">₹{v ?? 70}</span>
+      ),
+    },
+    {
       key: 'status',
       label: 'Status',
       render: (v) => (
@@ -154,7 +185,7 @@ const OwnersPage = () => {
       render: (_, row) => (
         <div className="flex items-center gap-1">
           <button
-            onClick={() => { setSelectedOwner(row); setShowDetailsModal(true); }}
+            onClick={() => handleViewDetails(row)}
             className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
             title="View details"
           >
@@ -264,18 +295,18 @@ const OwnersPage = () => {
       {/* Details Modal */}
       <Modal
         isOpen={showDetailsModal}
-        onClose={() => { setShowDetailsModal(false); setSelectedOwner(null); }}
+        onClose={() => { setShowDetailsModal(false); setSelectedOwner(null); setOwnerEntries([]); }}
         title="Owner Details"
-        size="sm"
+        size="lg"
       >
         {selectedOwner && (
           <div className="space-y-4">
-            <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-2xl">
+            <div className="flex items-center gap-3 sm:gap-4 pb-4 border-b border-gray-100">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg sm:text-2xl flex-shrink-0">
                 {getInitials(selectedOwner.ownerName)}
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{selectedOwner.ownerName}</h3>
+                <h3 className="text-base sm:text-xl font-bold text-gray-900">{selectedOwner.ownerName}</h3>
                 <Badge variant={selectedOwner.status === 'ACTIVE' ? 'success' : 'danger'}>
                   {selectedOwner.status}
                 </Badge>
@@ -286,6 +317,7 @@ const OwnersPage = () => {
                 { label: 'Owner ID', value: `#${selectedOwner.id}` },
                 { label: 'Mobile', value: selectedOwner.mobileNumber },
                 { label: 'Status', value: selectedOwner.status },
+                { label: 'Rate per saree', value: `₹${selectedOwner.polishRatePerSaree ?? 70}` },
               ].map((r, i) => (
                 <div key={i} className="flex justify-between py-1.5">
                   <span className="text-gray-500">{r.label}</span>
@@ -293,6 +325,17 @@ const OwnersPage = () => {
                 </div>
               ))}
             </div>
+
+            {/* Activity calendar */}
+            <div className="pt-3 border-t border-gray-100">
+              <p className="font-semibold text-gray-700 mb-2 text-sm sm:text-base">📅 Saree Activity Calendar</p>
+              {ownerEntriesLoading ? (
+                <p className="text-sm text-gray-400 text-center py-3">Loading activity...</p>
+              ) : (
+                <InventoryActivityCalendar entries={ownerEntries} />
+              )}
+            </div>
+
             <div className="pt-4 border-t border-gray-100 flex gap-2">
               <Button className="flex-1" onClick={() => { setShowDetailsModal(false); setShowModal(true); }}>Edit</Button>
               <Button
@@ -316,6 +359,7 @@ const OwnerForm = ({ initialData, isEdit, onSubmit, isLoading, error }) => {
     ownerName: initialData?.ownerName || '',
     mobileNumber: initialData?.mobileNumber || '',
     password: '',
+    polishRatePerSaree: initialData?.polishRatePerSaree != null ? String(initialData.polishRatePerSaree) : '70',
   });
 
   const handleChange = (e) => {
@@ -332,6 +376,22 @@ const OwnerForm = ({ initialData, isEdit, onSubmit, isLoading, error }) => {
       {!isEdit && (
         <Input label="Password *" type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Set login password" required />
       )}
+      <div>
+        <Input
+          label="Rate per Polished Saree (₹) *"
+          type="number"
+          name="polishRatePerSaree"
+          min="1"
+          step="0.5"
+          value={formData.polishRatePerSaree}
+          onChange={handleChange}
+          placeholder="e.g. 70"
+          required
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          What this owner pays the workshop per saree returned. You can change it later.
+        </p>
+      </div>
       {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2">{error}</p>}
       <div className="flex gap-2 pt-2">
         <Button type="submit" isLoading={isLoading} className="flex-1">

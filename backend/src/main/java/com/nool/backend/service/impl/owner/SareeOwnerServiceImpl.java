@@ -60,11 +60,14 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
             userRepository.flush();
         });
 
-        SareeOwner sareeOwner = SareeOwner.builder()
+        SareeOwner.SareeOwnerBuilder builder = SareeOwner.builder()
                 .ownerName(requestDto.getOwnerName())
                 .mobileNumber(mobile)
-                .status(OwnerStatus.ACTIVE)
-                .build();
+                .status(OwnerStatus.ACTIVE);
+        if (requestDto.getPolishRatePerSaree() != null) {
+            builder.polishRatePerSaree(requestDto.getPolishRatePerSaree());
+        }
+        SareeOwner sareeOwner = builder.build();
 
         SareeOwner saved = sareeOwnerRepository.save(sareeOwner);
 
@@ -82,6 +85,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .ownerName(saved.getOwnerName())
                 .mobileNumber(saved.getMobileNumber())
                 .ownerStatus(saved.getStatus())
+                .polishRatePerSaree(saved.getPolishRatePerSaree())
                 .build();
 
     }
@@ -99,6 +103,9 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
         }
         sareeOwner.setOwnerName(requestDto.getOwnerName());
         sareeOwner.setMobileNumber(requestDto.getMobileNumber());
+        if (requestDto.getPolishRatePerSaree() != null) {
+            sareeOwner.setPolishRatePerSaree(requestDto.getPolishRatePerSaree());
+        }
         User user = sareeOwner.getUser();
         if (user == null) {
             user = userProfileRepository.findByOwnerId(sareeOwner.getId())
@@ -129,6 +136,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .ownerName(sareeOwner.getOwnerName())
                 .mobileNumber(sareeOwner.getMobileNumber())
                 .ownerStatus(sareeOwner.getStatus())
+                .polishRatePerSaree(sareeOwner.getPolishRatePerSaree())
                 .build();
     }
 
@@ -162,6 +170,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                         .ownerName(sareeOwner.getOwnerName())
                         .mobileNumber(sareeOwner.getMobileNumber())
                         .ownerStatus(sareeOwner.getStatus())
+                        .polishRatePerSaree(sareeOwner.getPolishRatePerSaree())
                         .build())
                 .collect(Collectors.toList());
 
@@ -188,6 +197,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
                 .ownerName(sareeOwner.getOwnerName())
                 .mobileNumber(sareeOwner.getMobileNumber())
                 .ownerStatus(sareeOwner.getStatus())
+                .polishRatePerSaree(sareeOwner.getPolishRatePerSaree())
                 .build();
     }
 }

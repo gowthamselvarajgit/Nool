@@ -13,31 +13,51 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
     navigate('/login');
   };
 
+  // Menu items grouped to mirror the daily business workflow:
+  //   1. From the owner — receive sarees
+  //   2. Polish at the workshop — assign work & track who's in
+  //   3. Money — collect from owners, pay employees
   const menuItems = {
     ADMIN: [
-      { label: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
-      { label: 'Employees', href: '/admin/employees', icon: '👥' },
-      { label: 'Owners', href: '/admin/owners', icon: '🧵' },
-      { label: 'Attendance', href: '/admin/attendance', icon: '📍' },
-      { label: 'Salary', href: '/admin/salary', icon: '💰' },
-      { label: 'Payments', href: '/admin/payments', icon: '💳' },
-      { label: 'Inventory', href: '/admin/inventory', icon: '📦' },
-      { label: 'Daily Work', href: '/admin/daily-work', icon: '📝' },
-      { label: 'Analytics', href: '/admin/analytics', icon: '📈' },
+      { type: 'item', label: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
+
+      { type: 'section', label: '① From the Owner' },
+      { type: 'item', label: 'Owners', href: '/admin/owners', icon: '🧵' },
+      { type: 'item', label: 'Inventory', href: '/admin/inventory', icon: '📦' },
+
+      { type: 'section', label: '② Polish at Workshop' },
+      { type: 'item', label: 'Employees', href: '/admin/employees', icon: '👥' },
+      { type: 'item', label: 'Daily Work', href: '/admin/daily-work', icon: '📝' },
+      { type: 'item', label: 'Attendance', href: '/admin/attendance', icon: '📍' },
+
+      { type: 'section', label: '③ Money' },
+      { type: 'item', label: 'Owner Payments', href: '/admin/payments', icon: '💳' },
+      { type: 'item', label: 'Employee Salary', href: '/admin/salary', icon: '💰' },
+
+      { type: 'section', label: 'Insights' },
+      { type: 'item', label: 'Analytics', href: '/admin/analytics', icon: '📈' },
     ],
     WORKER: [
-      { label: 'Dashboard', href: '/employee/dashboard', icon: '📊' },
-      { label: 'Profile', href: '/employee/profile', icon: '👤' },
-      { label: 'Attendance', href: '/employee/attendance', icon: '📍' },
-      { label: 'Salary', href: '/employee/salary', icon: '💰' },
-      { label: 'Daily Work', href: '/employee/daily-work', icon: '📝' },
+      { type: 'item', label: 'Dashboard', href: '/employee/dashboard', icon: '📊' },
+      { type: 'item', label: 'Profile', href: '/employee/profile', icon: '👤' },
+
+      { type: 'section', label: 'My Work' },
+      { type: 'item', label: 'Daily Work', href: '/employee/daily-work', icon: '📝' },
+      { type: 'item', label: 'Attendance', href: '/employee/attendance', icon: '📍' },
+
+      { type: 'section', label: 'My Earnings' },
+      { type: 'item', label: 'Salary', href: '/employee/salary', icon: '💰' },
     ],
     SAREE_OWNER: [
-      { label: 'Dashboard', href: '/owner/dashboard', icon: '📊' },
-      { label: 'Profile', href: '/owner/profile', icon: '👤' },
-      { label: 'Inventory', href: '/owner/inventory', icon: '📦' },
-      { label: 'Transactions', href: '/owner/transactions', icon: '📊' },
-      { label: 'Payments', href: '/owner/payments', icon: '💳' },
+      { type: 'item', label: 'Dashboard', href: '/owner/dashboard', icon: '📊' },
+      { type: 'item', label: 'Profile', href: '/owner/profile', icon: '👤' },
+
+      { type: 'section', label: 'My Sarees' },
+      { type: 'item', label: 'Inventory', href: '/owner/inventory', icon: '📦' },
+      { type: 'item', label: 'Transactions', href: '/owner/transactions', icon: '📊' },
+
+      { type: 'section', label: 'Money' },
+      { type: 'item', label: 'Payments', href: '/owner/payments', icon: '💳' },
     ],
   };
 
@@ -88,6 +108,19 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
         {/* Navigation */}
         <nav className="flex-1 px-4 overflow-y-auto space-y-1 scrollbar-hide">
           {items.map((item, index) => {
+            // Section divider — non-clickable label that groups the items below it.
+            if (item.type === 'section') {
+              return (
+                <div
+                  key={`sec-${index}`}
+                  className={`px-4 pt-5 pb-1 text-[11px] font-bold uppercase tracking-wider text-secondary-500 ${
+                    index === 0 ? '!pt-2' : ''
+                  }`}
+                >
+                  {item.label}
+                </div>
+              );
+            }
             const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
             return (
               <Link

@@ -138,7 +138,9 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
 
         long totalReturned = totalReturnedBoxed == null ? 0 : totalReturnedBoxed;
 
-        double totalPayable = totalReturned * ratePerSaree;
+        // Use the owner's configured rate; fall back to global config if unset (legacy rows).
+        double rate = owner.getPolishRatePerSaree() != null ? owner.getPolishRatePerSaree() : ratePerSaree;
+        double totalPayable = totalReturned * rate;
 
         // ✅ NEVER allow negative pending
         double pendingAmount = Math.max(totalPayable - totalPaid, 0);
@@ -203,7 +205,8 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
         List<OwnerPaymentSummaryDto> result = new java.util.ArrayList<>(owners.size());
         for (SareeOwner owner : owners) {
             long returned = returnedByOwner.getOrDefault(owner.getId(), 0L);
-            double payable = returned * ratePerSaree;
+            double rate = owner.getPolishRatePerSaree() != null ? owner.getPolishRatePerSaree() : ratePerSaree;
+            double payable = returned * rate;
             double paid = paidByOwner.getOrDefault(owner.getId(), 0.0);
             double pending = Math.max(payable - paid, 0);
             result.add(OwnerPaymentSummaryDto.builder()

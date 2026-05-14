@@ -3,6 +3,7 @@ import { MainLayout } from '../components/Layout';
 import { Card, Loading, ErrorMessage } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { inventoryService } from '../services/api';
+import { toLocalISODate } from '../utils/formatters';
 import { Package, ArrowUpRight, ArrowDownRight, Clock, Box, Calendar } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -32,8 +33,8 @@ export const InventoryPage = () => {
   const [error, setError] = useState('');
 
   const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const firstDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const lastDay = toLocalISODate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   const monthName = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
   useEffect(() => {

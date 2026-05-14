@@ -7,14 +7,15 @@ import {
 } from 'lucide-react';
 import { dashboardService, leaveProductivityService } from '../services/api';
 import { exportToExcel } from '../utils/excelExporter';
+import { toLocalISODate } from '../utils/formatters';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTip,
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
-const today = new Date().toISOString().split('T')[0];
-const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+const today = toLocalISODate(new Date());
+const firstOfMonth = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
 const fmt = (n) => (n || 0).toLocaleString('en-IN');
 
@@ -132,9 +133,14 @@ export const AdminDashboard = () => {
         todayRepolishWork: data.todayRepolishWork || 0,
         monthFreshWork: data.monthFreshWork || 0,
         monthRepolishWork: data.monthRepolishWork || 0,
-        todayRevenue: data.todayRevenue || 0,
-        monthRevenue: data.monthRevenue || 0,
-        totalRevenue: data.totalRevenue || 0,
+        // Workshop revenue (what owners pay us)
+        todayWorkshopRevenue: data.todayWorkshopRevenue || 0,
+        monthWorkshopRevenue: data.monthWorkshopRevenue || 0,
+        totalWorkshopRevenue: data.totalWorkshopRevenue || 0,
+        // Employee wages (what we owe staff)
+        todayEmployeeWages: data.todayEmployeeWages || 0,
+        monthEmployeeWages: data.monthEmployeeWages || 0,
+        employeeEarningsToday: data.employeeEarningsToday || [],
         totalSareesReceived: data.totalSareesReceived || 0,
         totalSareesReturned: data.totalSareesReturned || 0,
         sareesInHand: data.sareesInHand || 0,
@@ -243,10 +249,57 @@ export const AdminDashboard = () => {
                   sub={`Month: ${fmt(summary?.monthFreshWork)}`} color="success" />
                 <StatCard title="Re-Polish Today" value={summary?.todayRepolishWork} icon={Activity}
                   sub={`Month: ${fmt(summary?.monthRepolishWork)}`} color="warning" />
-                <StatCard title="Today's Revenue" value={`₹${fmt(summary?.todayRevenue)}`} icon={DollarSign}
-                  sub={`Month: ₹${fmt(summary?.monthRevenue)}`} color="info" />
-                <StatCard title="All-time Revenue" value={`₹${fmt(summary?.totalRevenue)}`} icon={TrendingUp} color="primary" />
+                <StatCard title="Workshop Earned Today" value={`₹${fmt(summary?.todayWorkshopRevenue)}`} icon={DollarSign}
+                  sub={`From sarees returned to owners`} color="info" />
+                <StatCard title="Workshop Earned (Total)" value={`₹${fmt(summary?.totalWorkshopRevenue)}`} icon={TrendingUp}
+                  sub={`This month: ₹${fmt(summary?.monthWorkshopRevenue)}`} color="primary" />
               </div>
+            </div>
+
+            {/* ── Section 2b: Per-Employee Earnings Today ────────────── */}
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-500" /> What Each Employee Earned Today
+              </h2>
+              <p className="text-sm text-gray-500 mb-3">
+                Total today: <span className="font-bold text-purple-700">₹{fmt(summary?.todayEmployeeWages)}</span>
+                {' · '}This month: <span className="font-bold text-purple-700">₹{fmt(summary?.monthEmployeeWages)}</span>
+              </p>
+              {(!summary?.employeeEarningsToday || summary.employeeEarningsToday.length === 0) ? (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center text-gray-500">
+                  No employees have logged work today yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {summary.employeeEarningsToday.map(emp => (
+                    <div key={emp.employeeId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-all">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 text-white font-bold flex items-center justify-center text-sm flex-shrink-0">
+                          {(emp.employeeName || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 truncate" title={emp.employeeName}>{emp.employeeName}</p>
+                          <p className="text-xs text-gray-500">Rate: ₹{emp.polishRate}/saree</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                          <p className="text-lg font-bold text-emerald-700">{emp.freshCount || 0}</p>
+                          <p className="text-xs text-emerald-600 font-medium">Fresh</p>
+                        </div>
+                        <div className="bg-amber-50 rounded-lg p-2 text-center">
+                          <p className="text-lg font-bold text-amber-700">{emp.rePolishCount || 0}</p>
+                          <p className="text-xs text-amber-600 font-medium">Re-polish</p>
+                        </div>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-3 text-center border-2 border-purple-100">
+                        <p className="text-xs text-purple-600 font-medium mb-0.5">Earned Today</p>
+                        <p className="text-2xl font-bold text-purple-700">₹{fmt(emp.todayEarnings)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ── Section 3: Inventory & Salary ───────────────────────── */}
@@ -383,8 +436,12 @@ export const AdminDashboard = () => {
                     <div className="flex justify-between"><span className="text-indigo-200">Fresh</span><span className="font-bold">{summary?.todayFreshWork}</span></div>
                     <div className="flex justify-between"><span className="text-indigo-200">Re-Polish</span><span className="font-bold">{summary?.todayRepolishWork}</span></div>
                     <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
-                      <span className="text-indigo-200">Revenue</span>
-                      <span className="font-bold">₹{fmt(summary?.todayRevenue)}</span>
+                      <span className="text-indigo-200">Workshop earned</span>
+                      <span className="font-bold">₹{fmt(summary?.todayWorkshopRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-indigo-200">Wages owed today</span>
+                      <span className="font-bold">₹{fmt(summary?.todayEmployeeWages)}</span>
                     </div>
                   </div>
                 </div>

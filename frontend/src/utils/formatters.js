@@ -1,3 +1,15 @@
+// Local-timezone "YYYY-MM-DD" string. Use this for any date the user thinks of
+// in local terms (today, first of month, etc.). Why not toISOString().split('T')[0]?
+// In IST (+05:30), midnight local is yesterday's 18:30 UTC — so toISOString() shifts
+// the date back a day and would show, e.g., April for a May 1st query.
+export const toLocalISODate = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 export const formatDate = (date) => {
   if (!date) return '';
   return new Date(date).toLocaleDateString('en-IN', {

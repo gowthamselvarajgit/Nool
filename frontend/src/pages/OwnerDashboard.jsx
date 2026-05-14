@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Badge, Loading, ErrorMessage } from '../components/Common';
 import { ownerService, inventoryService, ownerPaymentService } from '../services/api';
-import { formatDate, friendlyStatus } from '../utils/formatters';
+import { formatDate, friendlyStatus, toLocalISODate } from '../utils/formatters';
 import { CreditCard, AlertCircle, Package, ArrowUpRight, ArrowDownRight, User } from 'lucide-react';
 
 const OwnerDashboard = () => {
@@ -29,8 +29,8 @@ const OwnerDashboard = () => {
       });
 
       // ✅ Fetch my saree transactions using correct API
-      const today = new Date().toISOString().split('T')[0];
-      const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const today = toLocalISODate(new Date());
+      const fromDate = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
       const [ledgerRes, summaryRes, paymentRes] = await Promise.all([
         inventoryService.getMyLedger(0, 100).catch(() => ({ content: [] })),

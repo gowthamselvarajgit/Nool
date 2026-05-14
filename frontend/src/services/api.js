@@ -334,7 +334,7 @@ export const leaveProductivityService = {
 
 // ─── Saree Owner ─────────────────────────────────────────────────────────────
 export const ownerService = {
-  // Backend: POST /owners → { ownerName, mobileNumber, password }
+  // Backend: POST /owners → { ownerName, mobileNumber, password, polishRatePerSaree? }
   create: async (data) => {
     const response = await fetch(`${API_BASE_URL}/owners`, {
       method: 'POST',
@@ -343,6 +343,7 @@ export const ownerService = {
         ownerName: data.ownerName,
         mobileNumber: data.mobileNumber,
         password: data.password,
+        polishRatePerSaree: data.polishRatePerSaree,
       }),
     });
     return handleResponse(response);
@@ -364,7 +365,7 @@ export const ownerService = {
     return handleResponse(response);
   },
 
-  // Backend: PUT /owners → { ownerId, ownerName, mobileNumber }
+  // Backend: PUT /owners → { ownerId, ownerName, mobileNumber, polishRatePerSaree? }
   update: async (data) => {
     const response = await fetch(`${API_BASE_URL}/owners`, {
       method: 'PUT',
@@ -373,6 +374,7 @@ export const ownerService = {
         ownerId: data.ownerId,
         ownerName: data.ownerName,
         mobileNumber: data.mobileNumber,
+        polishRatePerSaree: data.polishRatePerSaree,
       }),
     });
     return handleResponse(response);

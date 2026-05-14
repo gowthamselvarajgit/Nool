@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Card, Loading, ErrorMessage, Badge } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { dailyWorkService } from '../services/api';
 import { exportToExcel } from '../utils/excelExporter';
-import { formatDate } from '../utils/formatters';
-import { ClipboardList, CheckCircle2, TrendingUp, Calendar, Zap, Download } from 'lucide-react';
+import { formatDate, toLocalISODate } from '../utils/formatters';
+import { ClipboardList, CheckCircle2, TrendingUp, Calendar, Zap, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -33,19 +33,35 @@ export const DailyWorkPage = () => {
   const now = new Date();
   const monthName = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
+  // Calendar state — independent of the summary's "current month" so the
+  // user can browse past months without changing the summary above.
+  const currentMonthIso = toLocalISODate(new Date()).slice(0, 7);
+  const todayIso = toLocalISODate(new Date());
+  const [calMonth, setCalMonth] = useState(currentMonthIso);
+
+  const shiftCalMonth = (delta) => {
+    const [y, m] = calMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const monthLabel = (ym) => {
+    const [y, m] = ym.split('-');
+    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1)
+      .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // ✅ Correct date strings for fromDate/toDate params
-        const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-        const toDate = new Date().toISOString().split('T')[0];
+        const fromDate = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+        const toDate = toLocalISODate(new Date());
 
-        // ✅ Correct method: getMyWorkSummary(fromDate, toDate)
-        // ✅ Correct method: getList(page, size) instead of non-existent getWorkLogsList
+        // Bumped to 5000 so the calendar can browse past months without re-fetching.
         const [summaryRes, logsRes] = await Promise.all([
           dailyWorkService.getMyWorkSummary(fromDate, toDate).catch(() => null),
-          dailyWorkService.getMyList(0, 30).catch(() => ({ content: [] })),
+          dailyWorkService.getMyList(0, 5000).catch(() => ({ content: [] })),
         ]);
 
         // ✅ Map summary — field names from EmployeeDailyWorkSummaryDto
@@ -81,6 +97,34 @@ export const DailyWorkPage = () => {
     };
     fetchData();
   }, [user]);
+
+  // Bucket workLogs by date for the calendar
+  const calData = useMemo(() => {
+    const [yStr, mStr] = calMonth.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10) - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+
+    const byDate = {};
+    let monthFresh = 0, monthRepolish = 0, monthEarning = 0, workedDays = 0;
+    for (const log of workLogs) {
+      const d = log.date || '';
+      if (!d.startsWith(calMonth)) continue;
+      const cur = byDate[d] || { fresh: 0, repolish: 0, earning: 0 };
+      cur.fresh += log.freshCount || 0;
+      cur.repolish += log.rePolishCount || 0;
+      cur.earning += log.todayEarning || 0;
+      byDate[d] = cur;
+    }
+    for (const d in byDate) {
+      monthFresh += byDate[d].fresh;
+      monthRepolish += byDate[d].repolish;
+      monthEarning += byDate[d].earning;
+      workedDays += 1;
+    }
+    return { year, month, daysInMonth, firstWeekday, byDate, monthFresh, monthRepolish, monthEarning, workedDays };
+  }, [workLogs, calMonth]);
 
   if (loading) return <MainLayout><Loading text="Loading your work logs..." /></MainLayout>;
   
@@ -179,6 +223,139 @@ export const DailyWorkPage = () => {
             </div>
           </div>
         </div>
+
+        {/* ── My Work Calendar ── */}
+        <Card className="!p-0 overflow-hidden">
+          <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-teal-50 px-2 sm:px-5 py-2 sm:py-4 border-b border-emerald-100">
+            <button
+              onClick={() => shiftCalMonth(-1)}
+              className="p-1.5 sm:p-2 rounded-xl bg-white border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+              title="Previous month"
+            >
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+            </button>
+            <div className="text-center px-1">
+              <p className="text-sm sm:text-xl font-bold text-gray-900">{monthLabel(calMonth)}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 leading-snug">
+                {calData.workedDays}d ·
+                <strong className="text-emerald-700 ml-1">{calData.monthFresh}</strong> fresh ·
+                <strong className="text-amber-700 ml-1">{calData.monthRepolish}</strong> re ·
+                <strong className="text-purple-700 ml-1">₹{Math.round(calData.monthEarning).toLocaleString('en-IN')}</strong>
+              </p>
+              {calMonth !== currentMonthIso && (
+                <button
+                  onClick={() => setCalMonth(currentMonthIso)}
+                  className="text-[10px] sm:text-xs text-emerald-700 hover:text-emerald-900 font-semibold mt-0.5"
+                >
+                  Jump to this month
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => shiftCalMonth(1)}
+              disabled={calMonth >= currentMonthIso}
+              className="p-1.5 sm:p-2 rounded-xl bg-white border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Next month"
+            >
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+            </button>
+          </div>
+
+          <div className="p-2 sm:p-5">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1.5 sm:mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+                <div
+                  key={d}
+                  className={`text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 ${
+                    i === 0 ? 'text-rose-400' : 'text-gray-500'
+                  }`}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              {Array.from({ length: calData.firstWeekday }).map((_, i) => (
+                <div key={`blank-${i}`} />
+              ))}
+              {Array.from({ length: calData.daysInMonth }).map((_, idx) => {
+                const day = idx + 1;
+                const dateIso = `${calData.year}-${String(calData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const entry = calData.byDate[dateIso];
+                const total = entry ? entry.fresh + entry.repolish : 0;
+                const isToday = dateIso === todayIso;
+                const isFuture = dateIso > todayIso;
+
+                let cellClasses;
+                if (entry) {
+                  if (total >= 21) cellClasses = 'bg-emerald-600 text-white border-emerald-700 shadow-md';
+                  else if (total >= 11) cellClasses = 'bg-emerald-500 text-white border-emerald-600 shadow-sm';
+                  else if (total >= 6) cellClasses = 'bg-emerald-400 text-white border-emerald-500';
+                  else cellClasses = 'bg-emerald-200 text-emerald-900 border-emerald-300';
+                } else if (isFuture) {
+                  cellClasses = 'bg-white text-gray-300 border-gray-100';
+                } else {
+                  cellClasses = 'bg-gray-50 text-gray-400 border-gray-200';
+                }
+
+                const tooltip = entry
+                  ? `${formatDate(dateIso)} — ${entry.fresh} fresh + ${entry.repolish} re-polish · ₹${Math.round(entry.earning).toLocaleString('en-IN')}`
+                  : formatDate(dateIso);
+
+                return (
+                  <div
+                    key={day}
+                    title={tooltip}
+                    className={`min-h-[52px] sm:min-h-[70px] md:min-h-[78px] rounded-lg sm:rounded-xl border sm:border-2 flex flex-col items-center justify-center px-0.5 sm:px-1 py-1 sm:py-2 transition-transform hover:scale-105 ${cellClasses} ${
+                      isToday ? 'ring-2 ring-indigo-500 ring-offset-1 sm:ring-offset-2' : ''
+                    }`}
+                  >
+                    <span className="text-[10px] sm:text-sm font-bold leading-none mb-0.5 sm:mb-1 opacity-90">{day}</span>
+                    {entry ? (
+                      <>
+                        <span className="text-base sm:text-xl md:text-2xl font-extrabold leading-none">{total}</span>
+                        <span className="hidden sm:inline text-[10px] font-semibold uppercase tracking-wider mt-1 opacity-90">
+                          {total === 1 ? 'saree' : 'sarees'}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 mt-5 pt-4 border-t border-gray-100 text-xs">
+              <span className="text-gray-700 font-semibold mr-1">Sarees polished:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-md bg-emerald-200 border-2 border-emerald-300" />
+                <span className="text-gray-700">1–5</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-md bg-emerald-400 border-2 border-emerald-500" />
+                <span className="text-gray-700">6–10</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-md bg-emerald-500 border-2 border-emerald-600" />
+                <span className="text-gray-700">11–20</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-md bg-emerald-600 border-2 border-emerald-700" />
+                <span className="text-gray-700">21+</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-md bg-gray-50 border-2 border-gray-200" />
+                <span className="text-gray-700">No work</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-md bg-white border-2 border-indigo-500" />
+                <span className="text-gray-700">Today</span>
+              </div>
+            </div>
+          </div>
+        </Card>
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Chart */}

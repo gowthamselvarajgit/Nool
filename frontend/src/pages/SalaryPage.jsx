@@ -5,14 +5,15 @@ import {
 } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { salaryService, employeeService } from '../services/api';
-import { formatDate } from '../utils/formatters';
+import { formatDate, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
 import {
   Wallet, TrendingUp, RefreshCw, Download, Plus, ChevronRight,
-  CheckCircle2, AlertCircle, Search, Users, IndianRupee,
+  CheckCircle2, AlertCircle, Search, Users, IndianRupee, CalendarDays, List,
 } from 'lucide-react';
+import PaymentCalendar from '../components/PaymentCalendar';
 
-const todayIso = () => new Date().toISOString().split('T')[0];
+const todayIso = () => toLocalISODate(new Date());
 const inr = (n) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 const SalaryPage = () => {
@@ -26,7 +27,7 @@ const SalaryPage = () => {
    ──────────────────────────────────────────────────────────────────────── */
 const AdminView = () => {
   const today = todayIso();
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const firstOfMonth = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,7 @@ const AdminView = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
@@ -67,6 +69,7 @@ const AdminView = () => {
     setSelectedEmployee(emp);
     setShowDetailModal(true);
     setHistory([]);
+    setViewMode('list');
     try {
       setHistoryLoading(true);
       const res = await salaryService.getEmployeeHistory(emp.employeeId, 0, 200);
@@ -436,13 +439,41 @@ const AdminView = () => {
               </Button>
             </div>
 
-            {/* History table */}
+            {/* History — list or calendar */}
             <div>
-              <p className="font-semibold text-gray-700 mb-2">All Payments</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold text-gray-700">All Payments</p>
+                <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" /> List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('calendar')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      viewMode === 'calendar'
+                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <CalendarDays className="w-3.5 h-3.5" /> Calendar View
+                  </button>
+                </div>
+              </div>
               {historyLoading ? (
                 <p className="text-sm text-gray-400 text-center py-4">Loading history...</p>
               ) : !history.length ? (
                 <p className="text-sm text-gray-400 italic text-center py-6">No payments made yet</p>
+              ) : viewMode === 'calendar' ? (
+                <PaymentCalendar payments={history} tone="emerald" />
               ) : (() => {
                 // Sort ascending for running cumulative, then reverse for display
                 const sortedAsc = [...history].sort((a, b) => (a.paymentDate || '').localeCompare(b.paymentDate || ''));
@@ -507,13 +538,14 @@ const AdminView = () => {
    ──────────────────────────────────────────────────────────────────────── */
 const WorkerView = () => {
   const today = todayIso();
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const firstOfMonth = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   const [profile, setProfile] = useState(null);
   const [summary, setSummary] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('list');
 
   useEffect(() => { fetchData(); }, []); // eslint-disable-line
 
@@ -586,38 +618,68 @@ const WorkerView = () => {
 
         {/* History */}
         <Card className="!p-0 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Payment History</h2>
               <p className="text-sm text-gray-500">All payments you've received · total: {inr(totalPaidAllTime)}</p>
             </div>
-            {history.length > 0 && (
-              <button
-                onClick={() => exportToExcel({
-                  rows: withCum.map((p, i) => ({
-                    '#': i + 1,
-                    'Payment Date': p.paymentDate ? formatDate(p.paymentDate) : '',
-                    'Amount Paid (₹)': p.amountPaid ?? 0,
-                    'Cumulative Paid (₹)': p.cumulativePaid,
-                    'Period From': p.fromDate ? formatDate(p.fromDate) : '',
-                    'Period To': p.toDate ? formatDate(p.toDate) : '',
-                    'Mode': p.paymentMode || '',
-                    'Notes': p.remarks || '',
-                  })),
-                  fileName: 'Nool_My_Salary',
-                  sheetName: 'Salary History',
-                  columnWidths: [4, 14, 16, 18, 14, 14, 12, 24],
-                })}
-                className="flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-semibold transition-colors"
-              >
-                <Download className="w-4 h-4" /> Export
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" /> List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('calendar')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    viewMode === 'calendar'
+                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <CalendarDays className="w-3.5 h-3.5" /> Calendar View
+                </button>
+              </div>
+              {history.length > 0 && (
+                <button
+                  onClick={() => exportToExcel({
+                    rows: withCum.map((p, i) => ({
+                      '#': i + 1,
+                      'Payment Date': p.paymentDate ? formatDate(p.paymentDate) : '',
+                      'Amount Paid (₹)': p.amountPaid ?? 0,
+                      'Cumulative Paid (₹)': p.cumulativePaid,
+                      'Period From': p.fromDate ? formatDate(p.fromDate) : '',
+                      'Period To': p.toDate ? formatDate(p.toDate) : '',
+                      'Mode': p.paymentMode || '',
+                      'Notes': p.remarks || '',
+                    })),
+                    fileName: 'Nool_My_Salary',
+                    sheetName: 'Salary History',
+                    columnWidths: [4, 14, 16, 18, 14, 14, 12, 24],
+                  })}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  <Download className="w-4 h-4" /> Export
+                </button>
+              )}
+            </div>
           </div>
 
           {history.length === 0 ? (
             <div className="py-12">
               <EmptyState message="No salary payments yet" icon="💰" />
+            </div>
+          ) : viewMode === 'calendar' ? (
+            <div className="p-4">
+              <PaymentCalendar payments={history} tone="emerald" />
             </div>
           ) : (
             <div className="overflow-x-auto">

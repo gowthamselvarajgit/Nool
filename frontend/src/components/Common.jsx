@@ -221,7 +221,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 
   return (
     <div className="fixed inset-0 bg-secondary-950/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
-      <div className={`bg-surface rounded-3xl shadow-2xl w-full ${sizes[size]} animate-slide-up border border-border/50 overflow-hidden flex flex-col max-h-[90vh]`}>
+      <div className={`bg-surface rounded-3xl shadow-2xl w-full ${sizes[size]} max-w-[calc(100vw-2rem)] animate-slide-up border border-border/50 overflow-hidden flex flex-col max-h-[90vh] min-w-0`}>
         <div className="flex justify-between items-center px-6 py-5 border-b border-border bg-surface-hover/50">
           <h2 className="text-xl font-bold text-text-main">{title}</h2>
           <button

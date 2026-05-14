@@ -11,4 +11,5 @@ public class SareeOwnerListDto{
     private String ownerName;
     private String mobileNumber;
     private OwnerStatus ownerStatus;
+    private Double polishRatePerSaree;
 }

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
 import { Button, Modal, Loading, ErrorMessage } from '../components/Common';
 import { attendanceService, employeeService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { formatDate, friendlyStatus } from '../utils/formatters';
+import { formatDate, friendlyStatus, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
-import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Plus, User, ChevronRight, Download } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, Download } from 'lucide-react';
 
 const AttendancePage = () => {
   const { user } = useAuth();
@@ -14,19 +14,20 @@ const AttendancePage = () => {
   const [allRecords, setAllRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(toLocalISODate(new Date()).slice(0, 7));
 
   // Mark modal
   const [showMarkModal, setShowMarkModal] = useState(false);
   const [markEmployee, setMarkEmployee] = useState('');
-  const [markDate, setMarkDate] = useState(new Date().toISOString().split('T')[0]);
+  const [markDate, setMarkDate] = useState(toLocalISODate(new Date()));
   const [markStatus, setMarkStatus] = useState('PRESENT');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [markError, setMarkError] = useState('');
 
-  // Detail modal
+  // Detail modal — independent month so users can browse past months freely
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailEmployee, setDetailEmployee] = useState(null);
+  const [detailMonth, setDetailMonth] = useState(toLocalISODate(new Date()).slice(0, 7));
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line
 
@@ -36,7 +37,7 @@ const AttendancePage = () => {
       if (isWorker) {
         const [profileRes, attRes] = await Promise.all([
           employeeService.getMe(),
-          attendanceService.getMyList(0, 1000),
+          attendanceService.getMyList(0, 5000),
         ]);
         setEmployees([{
           employeeId: profileRes.employeeId,
@@ -49,7 +50,7 @@ const AttendancePage = () => {
       } else {
         const [empRes, attRes] = await Promise.all([
           employeeService.getList(0, 200),
-          attendanceService.getList(0, 1000),
+          attendanceService.getList(0, 5000),
         ]);
         setEmployees(empRes?.content || []);
         setAllRecords(attRes?.content || []);
@@ -108,7 +109,54 @@ const AttendancePage = () => {
     finally { setIsSubmitting(false); }
   };
 
-  const openDetail = (emp) => { setDetailEmployee(emp); setShowDetailModal(true); };
+  const openDetail = (emp) => {
+    setDetailEmployee(emp);
+    setDetailMonth(selectedMonth);
+    setShowDetailModal(true);
+  };
+
+  // ── Calendar data for the detail modal ──────────────────────────────────────
+  // Recomputed for whichever month the user is currently viewing in the modal.
+  const detailMonthData = useMemo(() => {
+    if (!detailEmployee) return null;
+    const [yStr, mStr] = detailMonth.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10) - 1; // 0-indexed
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay(); // 0=Sun … 6=Sat
+
+    const records = allRecords.filter(r =>
+      String(r.employeeId) === String(detailEmployee.employeeId) &&
+      (r.attendanceDate || '').toString().startsWith(detailMonth)
+    );
+    const byDate = {};
+    for (const r of records) byDate[r.attendanceDate] = r.status;
+
+    let present = 0, absent = 0, leave = 0;
+    for (const r of records) {
+      if (r.status === 'PRESENT') present++;
+      else if (r.status === 'ABSENT') absent++;
+      else leave++;
+    }
+    const total = records.length;
+    const rate = total > 0 ? Math.round((present / total) * 100) : null;
+
+    return { year, month, daysInMonth, firstWeekday, byDate, records, present, absent, leave, total, rate };
+  }, [detailEmployee, detailMonth, allRecords]);
+
+  const monthLabel = (ym) => {
+    const [y, m] = ym.split('-');
+    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1)
+      .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
+  const shiftDetailMonth = (delta) => {
+    const [y, m] = detailMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setDetailMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const currentMonthIso = toLocalISODate(new Date()).slice(0, 7);
 
   const statusColor = s => s === 'PRESENT'
     ? 'bg-emerald-100 text-emerald-700'
@@ -256,63 +304,167 @@ const AttendancePage = () => {
         </div>
       </div>
 
-      {/* ── Employee Detail Modal ── */}
+      {/* ── Employee Detail Modal — Beautiful Calendar ── */}
       <Modal
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
         title={`📅 ${detailEmployee?.employeeName || ''} — Attendance`}
         size="lg"
       >
-        {detailEmployee && (
-          <div className="space-y-4">
-            {/* Summary */}
+        {detailEmployee && detailMonthData && (
+          <div className="space-y-5">
+            {/* Month navigator */}
+            <div className="flex items-center justify-between bg-gradient-to-r from-indigo-50 to-violet-50 rounded-2xl px-2 sm:px-4 py-2 sm:py-3 border border-indigo-100">
+              <button
+                onClick={() => shiftDetailMonth(-1)}
+                className="p-1.5 sm:p-2 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                title="Previous month"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+              </button>
+              <div className="text-center px-1">
+                <p className="text-base sm:text-xl font-bold text-gray-900">{monthLabel(detailMonth)}</p>
+                {detailMonth !== currentMonthIso && (
+                  <button
+                    onClick={() => setDetailMonth(currentMonthIso)}
+                    className="text-[10px] sm:text-xs text-indigo-600 hover:text-indigo-800 font-semibold mt-0.5"
+                  >
+                    Jump to this month
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => shiftDetailMonth(1)}
+                disabled={detailMonth >= currentMonthIso}
+                className="p-1.5 sm:p-2 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Next month"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+              </button>
+            </div>
+
+            {/* Summary for this month */}
             <div className="grid grid-cols-4 gap-3 text-center">
-              <div className="bg-emerald-50 rounded-xl p-3">
-                <p className="text-xl font-bold text-emerald-700">{detailEmployee.present}</p>
-                <p className="text-xs text-emerald-500">Present</p>
+              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                <p className="text-2xl font-bold text-emerald-700">{detailMonthData.present}</p>
+                <p className="text-xs text-emerald-600 font-medium">Present</p>
               </div>
-              <div className="bg-rose-50 rounded-xl p-3">
-                <p className="text-xl font-bold text-rose-700">{detailEmployee.absent}</p>
-                <p className="text-xs text-rose-500">Absent</p>
+              <div className="bg-rose-50 rounded-xl p-3 border border-rose-100">
+                <p className="text-2xl font-bold text-rose-700">{detailMonthData.absent}</p>
+                <p className="text-xs text-rose-600 font-medium">Absent</p>
               </div>
-              <div className="bg-amber-50 rounded-xl p-3">
-                <p className="text-xl font-bold text-amber-700">{detailEmployee.leave}</p>
-                <p className="text-xs text-amber-500">Leave</p>
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                <p className="text-2xl font-bold text-amber-700">{detailMonthData.leave}</p>
+                <p className="text-xs text-amber-600 font-medium">Leave</p>
               </div>
               {(() => {
-                const r = detailEmployee.rate;
-                const bg = r === null ? 'bg-gray-50' : r >= 80 ? 'bg-emerald-50' : r >= 50 ? 'bg-amber-50' : 'bg-rose-50';
-                const fg = r === null ? 'text-gray-600' : r >= 80 ? 'text-emerald-700' : r >= 50 ? 'text-amber-700' : 'text-rose-700';
+                const r = detailMonthData.rate;
+                const bg = r === null ? 'bg-gray-50 border-gray-200'
+                  : r >= 80 ? 'bg-emerald-50 border-emerald-100'
+                  : r >= 50 ? 'bg-amber-50 border-amber-100'
+                  : 'bg-rose-50 border-rose-100';
+                const fg = r === null ? 'text-gray-600'
+                  : r >= 80 ? 'text-emerald-700'
+                  : r >= 50 ? 'text-amber-700'
+                  : 'text-rose-700';
                 return (
-                  <div className={`rounded-xl p-3 ${bg}`}>
-                    <p className={`text-xl font-bold ${fg}`}>{r !== null ? `${r}%` : '—'}</p>
-                    <p className="text-xs text-gray-500">Rate</p>
+                  <div className={`rounded-xl p-3 border ${bg}`}>
+                    <p className={`text-2xl font-bold ${fg}`}>{r !== null ? `${r}%` : '—'}</p>
+                    <p className="text-xs text-gray-600 font-medium">Rate</p>
                   </div>
                 );
               })()}
             </div>
 
-            {/* Records list */}
-            {detailEmployee.records.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <Calendar className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p>No attendance records for {selectedMonth}</p>
-              </div>
-            ) : (
-              <div className="max-h-80 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
-                <div className="grid grid-cols-2 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky top-0">
-                  <span>Date</span><span className="text-right">Status</span>
-                </div>
-                {detailEmployee.records.map((r, i) => (
-                  <div key={i} className="grid grid-cols-2 px-4 py-2.5 items-center hover:bg-gray-50">
-                    <span className="text-sm text-gray-700 font-medium">{formatDate(r.attendanceDate)}</span>
-                    <div className="flex justify-end">
-                      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${statusColor(r.status)}`}>
-                        {statusIcon(r.status)}{r.status}
-                      </span>
-                    </div>
+            {/* Calendar grid */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-2 sm:p-4">
+              {/* Weekday header */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1.5 sm:mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+                  <div
+                    key={d}
+                    className={`text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 ${
+                      i === 0 ? 'text-rose-400' : 'text-gray-500'
+                    }`}
+                  >
+                    {d}
                   </div>
                 ))}
+              </div>
+
+              {/* Day cells */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {/* Leading blanks */}
+                {Array.from({ length: detailMonthData.firstWeekday }).map((_, i) => (
+                  <div key={`blank-${i}`} />
+                ))}
+                {/* Days */}
+                {Array.from({ length: detailMonthData.daysInMonth }).map((_, idx) => {
+                  const day = idx + 1;
+                  const dateIso = `${detailMonthData.year}-${String(detailMonthData.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const status = detailMonthData.byDate[dateIso];
+                  const isToday = dateIso === toLocalISODate(new Date());
+                  const isFuture = dateIso > toLocalISODate(new Date());
+
+                  let cellClasses = 'bg-gray-50 text-gray-400 border-gray-200';
+                  let label = null;
+                  if (status === 'PRESENT') {
+                    cellClasses = 'bg-emerald-500 text-white border-emerald-600 shadow-sm';
+                    label = <CheckCircle className="w-3.5 h-3.5" />;
+                  } else if (status === 'ABSENT') {
+                    cellClasses = 'bg-rose-500 text-white border-rose-600 shadow-sm';
+                    label = <XCircle className="w-3.5 h-3.5" />;
+                  } else if (status === 'HALF_DAY' || status === 'LEAVE') {
+                    cellClasses = 'bg-amber-400 text-white border-amber-500 shadow-sm';
+                    label = <Clock className="w-3.5 h-3.5" />;
+                  } else if (isFuture) {
+                    cellClasses = 'bg-white text-gray-300 border-gray-100';
+                  }
+
+                  return (
+                    <div
+                      key={day}
+                      title={status ? `${formatDate(dateIso)} — ${friendlyStatus(status)}` : formatDate(dateIso)}
+                      className={`aspect-square rounded-lg sm:rounded-xl border sm:border-2 flex flex-col items-center justify-center transition-transform hover:scale-105 ${cellClasses} ${
+                        isToday ? 'ring-2 ring-indigo-500 ring-offset-1 sm:ring-offset-2' : ''
+                      }`}
+                    >
+                      <span className="text-sm sm:text-lg font-bold leading-none">{day}</span>
+                      {label && <span className="mt-0.5 sm:mt-1 [&>svg]:w-2.5 [&>svg]:h-2.5 sm:[&>svg]:w-3.5 sm:[&>svg]:h-3.5">{label}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-4 border-t border-gray-100 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-md bg-emerald-500 border-2 border-emerald-600" />
+                  <span className="text-gray-700 font-medium">Present</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-md bg-rose-500 border-2 border-rose-600" />
+                  <span className="text-gray-700 font-medium">Absent</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-md bg-amber-400 border-2 border-amber-500" />
+                  <span className="text-gray-700 font-medium">Half Day / Leave</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-md bg-gray-50 border-2 border-gray-200" />
+                  <span className="text-gray-700 font-medium">Not Marked</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-md bg-white border-2 border-indigo-500" />
+                  <span className="text-gray-700 font-medium">Today</span>
+                </div>
+              </div>
+            </div>
+
+            {detailMonthData.total === 0 && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                <Calendar className="w-8 h-8 mx-auto mb-1 opacity-40" />
+                No attendance marked for {monthLabel(detailMonth)} yet.
               </div>
             )}
           </div>

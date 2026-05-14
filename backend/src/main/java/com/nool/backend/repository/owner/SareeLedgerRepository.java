@@ -69,6 +69,26 @@ public interface SareeLedgerRepository extends JpaRepository<SareeLedgerEntry, L
            """)
     List<Object[]> aggregateAllOwnersByType();
 
+    // Workshop revenue = SUM(qty × owner.polishRatePerSaree) for entries of a type in a date range.
+    @Query("""
+           SELECT COALESCE(SUM(e.quantity * e.sareeOwner.polishRatePerSaree), 0)
+           FROM SareeLedgerEntry e
+           WHERE e.entryType = :type
+             AND e.entryDate BETWEEN :fromDate AND :toDate
+           """)
+    Double sumRevenueByTypeAndDateRange(
+            LedgerEntryType type,
+            LocalDate fromDate,
+            LocalDate toDate
+    );
+
+    @Query("""
+           SELECT COALESCE(SUM(e.quantity * e.sareeOwner.polishRatePerSaree), 0)
+           FROM SareeLedgerEntry e
+           WHERE e.entryType = :type
+           """)
+    Double sumRevenueByType(LedgerEntryType type);
+
     @EntityGraph(attributePaths = "sareeOwner")
     List<SareeLedgerEntry> findBySareeOwnerIdOrderByEntryDateDescIdDesc(Long ownerId);
 }
