@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 08 · The 6 Enums · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 08 · The Vocabulary of NOOL</span>
+    <h1>
+      The 6 <span class="gradient">Enums</span> —<br/>
+      The fixed list of choices
+    </h1>
+    <p class="subtitle">
+      Before we build entities, services, or controllers, we need to define the <em>fixed
+      vocabulary</em> the system uses: what counts as a role? What's a valid attendance status?
+      What payment methods do we accept? In Java, the answer to "fixed list of choices" is
+      an <strong>enum</strong>. NOOL has six of them.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📚</div>
+      <div class="fmeta">
+        <h3>backend/.../enums/ (6 files)</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/enums/</span>
+        <div class="ftags"><span>Enums</span><span>Vocabulary</span><span>6 files · ~7 lines each</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What is an enum ──────── -->
+    <h2><span class="h2-emoji">🤔</span> What is an Enum?</h2>
+    <p>
+      An <strong>enum</strong> (short for "enumeration") is a Java type that has a fixed, finite
+      set of allowed values. Once you declare:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">A minimal enum example</span><span class="lang">Java</span></div>
+<pre><span class="kw">public enum</span> Role {
+    ADMIN,
+    WORKER,
+    SAREE_OWNER
+}</pre>
+    </div>
+
+    <p>
+      ...then anywhere in the code that expects a <code>Role</code>, only those three values are
+      legal. The compiler refuses to let you write <code>Role.PRESIDENT</code> — it doesn't
+      exist. You can't typo <code>"admin"</code> vs <code>"ADMIN"</code> because there are no
+      strings involved. It's compile-time-enforced spelling.
+    </p>
+
+    <div class="callout brain">
+      <strong>Why we use enums everywhere:</strong> NOOL has a lot of "this can only be one of
+      a few things" situations — what's the role? What's the attendance status? What's the
+      payment mode? Each of these is an enum. Three benefits: (1) spelling is enforced, (2) the
+      list of valid choices lives in ONE place, (3) IDEs auto-complete the options.
+    </div>
+
+    <!-- ──────── The 6 enums summary ──────── -->
+    <h2><span class="h2-emoji">📋</span> All 6 Enums at a Glance</h2>
+
+    <table class="ftable">
+      <thead>
+        <tr><th>Enum</th><th>Values</th><th>Used on</th><th>Where in DB</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Role</code></td><td>ADMIN, WORKER, SAREE_OWNER</td><td>User.role</td><td><code>users.role</code></td></tr>
+        <tr><td><code>EmployeeStatus</code></td><td>ACTIVE, LEFT</td><td>Employee.status</td><td><code>employees.status</code></td></tr>
+        <tr><td><code>OwnerStatus</code></td><td>ACTIVE, INACTIVE</td><td>SareeOwner.status</td><td><code>saree_owner.status</code></td></tr>
+        <tr><td><code>AttendanceStatus</code></td><td>PRESENT, ABSENT</td><td>Attendance.attendanceStatus</td><td><code>attendance.attendance_status</code></td></tr>
+        <tr><td><code>LedgerEntryType</code></td><td>RECEIPT, RETURN</td><td>SareeLedgerEntry.entryType</td><td><code>saree_ledger.entry_type</code></td></tr>
+        <tr><td><code>PaymentMode</code></td><td>CASH, UPI, BANK_TRANSFER</td><td>SalaryPayment.paymentMode + OwnerPayment.paymentMode</td><td><code>*_payment.payment_mode</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      All six live in the same folder: <code>backend/src/main/java/com/nool/backend/enums/</code>.
+      Each file is tiny — usually 5-7 lines including the package declaration. Let's walk through
+      them one by one.
+    </p>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- ENUM 1: Role -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">1️⃣</span> <code>Role</code> — Three Kinds of Users</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">enums/Role.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.enums;
+
+<span class="kw">public enum</span> Role {
+    ADMIN,           <span class="com">// my mom and dad — full control</span>
+    WORKER,          <span class="com">// polishers like Prema</span>
+    SAREE_OWNER      <span class="com">// clients like Rahul</span>
+}</pre>
+    </div>
+
+    <h3>What each value means</h3>
+    <ul>
+      <li><strong>ADMIN</strong> — can do <em>everything</em>: add/edit workers and owners, mark attendance, record inventory, pay salaries, see analytics. There are 1-2 admins (my mom and dad).</li>
+      <li><strong>WORKER</strong> — a polisher. Sees only their own attendance, work, and salary. Cannot edit anyone else's data.</li>
+      <li><strong>SAREE_OWNER</strong> — a client. Sees only their own inventory and payments. Cannot edit anything.</li>
+    </ul>
+
+    <h3>Where it's used</h3>
+    <ul>
+      <li>Stored in the <code>users.role</code> column for every login row</li>
+      <li>Embedded in every JWT token as a claim — every API request carries the user's role</li>
+      <li>Drives the per-role sidebar in <code>Layout.jsx</code> (different menus per role)</li>
+      <li>Drives <code>SecurityConfig</code>'s URL rules — <code>.hasAuthority("ADMIN")</code> etc.</li>
+    </ul>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- ENUM 2: EmployeeStatus -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>EmployeeStatus</code> — Is This Worker Still With Us?</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">enums/EmployeeStatus.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.enums;
+
+<span class="kw">public enum</span> EmployeeStatus {
+    ACTIVE,    <span class="com">// currently employed</span>
+    LEFT       <span class="com">// no longer with the workshop (soft-deleted)</span>
+}</pre>
+    </div>
+
+    <h3>What each value means</h3>
+    <ul>
+      <li><strong>ACTIVE</strong> — the worker is still employed. Default for new hires. Their row counts in payroll lists, attendance forms, etc.</li>
+      <li><strong>LEFT</strong> — they've stopped working at the workshop. Their row stays in the DB (for salary history, audit, etc.), but they're hidden from the "current employees" list and can't log in.</li>
+    </ul>
+
+    <div class="callout tip">
+      <strong>Why "LEFT" and not "DELETE"?</strong> Because soft delete is safer. If we hard-deleted
+      a worker, all their daily-work, attendance, and salary-payment records would either get
+      orphaned or cascade-deleted (losing history). Flipping the status to LEFT preserves
+      everything.
+    </div>
+
+    <h3>Real-world scenario</h3>
+    <div class="scenario">
+      <h5>A worker leaves the workshop</h5>
+      <ol>
+        <li>One of the polishers, Suresh, decides to move to another city.</li>
+        <li>Dad opens NOOL → Employees → Suresh's row → clicks "Mark as Left".</li>
+        <li>Backend runs: <code>UPDATE employees SET status='LEFT' WHERE employee_id = 7</code>.</li>
+        <li>Suresh's user account also gets <code>active = false</code> so he can't log in anymore.</li>
+        <li>All of Suresh's historical daily-work and salary rows remain in the DB — Dad can still pull up "what did we pay Suresh last March?" any time.</li>
+      </ol>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- ENUM 3: OwnerStatus -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>OwnerStatus</code> — Is This Client Still Active?</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">enums/OwnerStatus.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.enums;
+
+<span class="kw">public enum</span> OwnerStatus {
+    ACTIVE,      <span class="com">// currently a client</span>
+    INACTIVE     <span class="com">// no longer doing business with the workshop</span>
+}</pre>
+    </div>
+
+    <h3>What each value means</h3>
+    <ul>
+      <li><strong>ACTIVE</strong> — currently doing business with the workshop. Appears in dropdowns, can be selected for new receipts/returns.</li>
+      <li><strong>INACTIVE</strong> — no longer a client. Historical ledger rows preserved. Hidden from selection in new transactions.</li>
+    </ul>
+
+    <div class="callout info">
+      <strong>Why "INACTIVE" for owners but "LEFT" for employees?</strong> They mean essentially
+      the same thing, but the words match how my parents naturally describe each role. A worker
+      "left the job"; a client "isn't buying anymore". Domain language &gt; technical uniformity.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- ENUM 4: AttendanceStatus -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>AttendanceStatus</code> — Did They Show Up Today?</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">enums/AttendanceStatus.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.enums;
+
+<span class="kw">public enum</span> AttendanceStatus {
+    PRESENT,    <span class="com">// worker came to the workshop today</span>
+    ABSENT      <span class="com">// worker did not come</span>
+}</pre>
+    </div>
+
+    <h3>Two values — kept deliberately simple</h3>
+    <p>
+      My parents wanted the simplest possible attendance system. <strong>"Did Prema come today
+      or not?"</strong> — that's it. They mark PRESENT or ABSENT, and that's the whole story.
+    </p>
+
+    <div class="callout tip">
+      <strong>Could we add HALF_DAY, LEAVE, HOLIDAY?</strong> Yes, and the codebase has hooks
+      ready for it — the React UI (<code>formatters.js</code>) can already render labels for
+      "Half Day", "On Leave", "Holiday" etc. But the actual backend enum stops at PRESENT/ABSENT
+      to match my parents' real-world workflow. Adding more values later is a one-line change:
+      add to the enum, the DB column already accepts any string up to 255 chars.
+    </div>
+
+    <h3>Where it's used</h3>
+    <ul>
+      <li>Stored in <code>attendance.attendance_status</code></li>
+      <li>The Attendance calendar (worker dashboard) colors days green (PRESENT) or red (ABSENT)</li>
+      <li>The salary summary uses it to compute "worked days vs. absent days" trends</li>
+    </ul>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- ENUM 5: LedgerEntryType -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>LedgerEntryType</code> — Sarees IN or OUT?</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">enums/LedgerEntryType.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.enums;
+
+<span class="kw">public enum</span> LedgerEntryType {
+    RECEIPT,    <span class="com">// sarees coming INTO the workshop from an owner</span>
+    RETURN      <span class="com">// sarees going OUT, returned to the owner after polishing</span>
+}</pre>
+    </div>
+
+    <h3>The cornerstone of the inventory system</h3>
+    <p>
+      Remember from Chapter 04 — NOOL's inventory is an append-only ledger. Every transaction
+      becomes a row in <code>saree_ledger</code>, and this enum decides what kind of transaction
+      it is. The in-hand balance formula uses this enum directly:
+    </p>
+
+    <div class="formula">
+      <div class="label">In-hand balance for one owner</div>
+      <div class="eq">
+        <span class="var">inHand</span> = SUM(quantity WHERE type=<span class="op">RECEIPT</span>) − SUM(quantity WHERE type=<span class="op">RETURN</span>)
+      </div>
+    </div>
+
+    <h3>Real-world scenario</h3>
+    <div class="scenario">
+      <h5>Walking through Rahul's week</h5>
+      <p>Monday: Rahul drops off 100 sarees. NOOL inserts:</p>
+      <pre style="background:#1a1530; color:#86efac; padding:10px; border-radius:8px; font-size:12px;">INSERT INTO saree_ledger
+  (owner_id, entry_type, entry_date, quantity)
+VALUES (1, 'RECEIPT', '2026-05-11', 100);</pre>
+
+      <p>Friday: Dad returns 50 polished. NOOL inserts:</p>
+      <pre style="background:#1a1530; color:#86efac; padding:10px; border-radius:8px; font-size:12px;">INSERT INTO saree_ledger
+  (owner_id, entry_type, entry_date, quantity)
+VALUES (1, 'RETURN', '2026-05-15', 50);</pre>
+
+      <p>Rahul's current in-hand: <code>100 − 50 = 50 still being polished</code>.</p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- ENUM 6: PaymentMode -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">6️⃣</span> <code>PaymentMode</code> — How the Money Moved</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">enums/PaymentMode.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.enums;
+
+<span class="kw">public enum</span> PaymentMode {
+    CASH,            <span class="com">// physical rupee notes — most common in the workshop</span>
+    UPI,             <span class="com">// PhonePe / Google Pay / etc.</span>
+    BANK_TRANSFER    <span class="com">// NEFT / IMPS / cheque deposits</span>
+}</pre>
+    </div>
+
+    <h3>Why all three matter</h3>
+    <ul>
+      <li><strong>CASH</strong> — still the default in small Indian businesses. My parents pay most workers in cash at the end of the week.</li>
+      <li><strong>UPI</strong> — phone-based instant payments (PhonePe, GPay). Increasingly common, especially for owner payments.</li>
+      <li><strong>BANK_TRANSFER</strong> — for larger amounts. Cheque deposits, NEFT.</li>
+    </ul>
+
+    <p>
+      Recording the mode is useful for two reasons: tax/audit ("show me all CASH payments
+      this month for the books") and reconciliation (cross-checking with the bank statement).
+    </p>
+
+    <h3>Where it's used</h3>
+    <ul>
+      <li><code>salary_payment.payment_mode</code> — how a worker was paid</li>
+      <li><code>owner_payment.payment_mode</code> — how a client paid us</li>
+      <li>Frontend payment forms have a dropdown with these three options</li>
+    </ul>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- HOW ENUMS GET STORED -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">🗄️</span> How Enums Get Stored in MySQL</h2>
+    <p>
+      Every entity that uses an enum field has it marked with <code>@Enumerated(EnumType.STRING)</code>:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Example from User.java</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Enumerated</span>(EnumType.STRING)
+<span class="ann">@Column</span>(name = <span class="str">"role"</span>, nullable = <span class="kw">false</span>)
+<span class="kw">private</span> Role role;</pre>
+    </div>
+
+    <p>
+      <code>EnumType.STRING</code> tells Hibernate: <strong>store the enum's NAME as text</strong>,
+      not as a number. So the <code>users.role</code> column ends up with values like
+      <code>'ADMIN'</code>, <code>'WORKER'</code>, <code>'SAREE_OWNER'</code> — readable in
+      any SQL client.
+    </p>
+
+    <div class="sqlbox">
+<pre><span class="sc">-- A sample query showing how enums look in the DB:</span>
+<span class="sk">SELECT</span> user_id, mobile_number, role, active_status
+<span class="sk">FROM</span>   users;
+
+user_id | mobile_number | role         | active_status
+   1    | 9876543210    | <span class="ss">ADMIN</span>        | true
+   2    | 9000000001    | <span class="ss">SAREE_OWNER</span>  | true
+   3    | 9000000002    | <span class="ss">WORKER</span>       | true
+
+<span class="sc">-- Same idea on saree_ledger:</span>
+entry_id | owner_id | entry_type | quantity
+   1     | 1        | <span class="ss">RECEIPT</span>    | 100
+   2     | 1        | <span class="ss">RETURN</span>     | 50</pre>
+    </div>
+
+    <div class="callout warn">
+      <strong>The other option is <code>EnumType.ORDINAL</code></strong> — store the value as
+      an integer position (ADMIN=0, WORKER=1, SAREE_OWNER=2). It's slightly smaller, but
+      <strong>dangerous</strong>: if you ever reorder the enum (move SAREE_OWNER to position 1),
+      all the historical data silently becomes wrong. STRING is safer. Always use STRING for
+      production enums.
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common enum mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Using <code>EnumType.ORDINAL</code> (storing as a number)</div>
+        <div class="good">Always <code>EnumType.STRING</code>. Reordering the enum in Java code shouldn't silently break the database. Stringy is forwards-compatible; ordinal is fragile.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Enumerated(EnumType.STRING)</code> annotation</div>
+        <div class="good">Without it, Hibernate defaults to ORDINAL — opening the trap above. Always declare it explicitly on every enum field.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using a String field instead of an enum ("just store the role as text")</div>
+        <div class="good">Strings invite typos (<code>"admin"</code> vs <code>"ADMIN"</code> vs <code>"Admin"</code>). Enums force exact match at compile time. The slight extra ceremony of declaring an enum is worth it many times over.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Renaming an enum value casually (e.g., LEFT → RESIGNED)</div>
+        <div class="good">If you rename, you must also UPDATE the database column to match — otherwise old rows with the old value can't be deserialized. Be deliberate.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding new values at the START of the enum</div>
+        <div class="good">If you use ORDINAL storage, that shifts all positions. Even with STRING storage, prefer adding new values at the END to keep code reviews focused. (Though with STRING storage, the order doesn't actually matter at runtime.)</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about enums</h5>
+
+      <div class="qa">
+        <div class="q">Why use enums instead of just strings or integers?</div>
+        <div class="a">
+          Three reasons: compile-time spell-checking (you can't typo
+          <code>Role.ADMINN</code> — it doesn't compile), exhaustive switch statements
+          (compiler warns if you miss a case), and self-documenting code (everyone reading
+          <code>Role.ADMIN</code> knows exactly the value is). Strings give you none of those.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Difference between <code>EnumType.STRING</code> and <code>EnumType.ORDINAL</code>?</div>
+        <div class="a">
+          STRING stores the enum's name as text ("ADMIN", "WORKER"). ORDINAL stores its
+          position as a number (0, 1). STRING is human-readable, survives reordering, and is
+          safer in long-lived databases. ORDINAL is more compact but brittle. Always use STRING
+          for production enums — the size savings are not worth the risk.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How would you add a new value to an existing enum?</div>
+        <div class="a">
+          Three steps. (1) Add the new constant to the Java enum (preferably at the end).
+          (2) If using STRING storage and the column is sized large enough, MySQL needs no
+          schema change — it just accepts the new string. (3) Update any switch statements
+          that previously assumed only the old values. With <code>EnumType.STRING</code> + a
+          wide enough VARCHAR column, this is a one-line, backwards-compatible addition.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Can a Java enum have methods?</div>
+        <div class="a">
+          Yes. Enums in Java are full-fledged classes — they can have fields, constructors,
+          and methods. For example, you could add a <code>displayName()</code> method to Role
+          that returns "Administrator" instead of "ADMIN". NOOL's enums don't currently need
+          methods — they're pure value lists — but the option exists if needed.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does NOOL's AttendanceStatus only have PRESENT and ABSENT? Real attendance has half-days, leaves, holidays...</div>
+        <div class="a">
+          Deliberate simplicity. My parents' real workflow is binary — a worker either showed
+          up that day or didn't. Half-days are rare and handled informally (paid or unpaid by
+          mutual agreement). The frontend's <code>formatters.js</code> already has display
+          labels for HALF_DAY, LEAVE, HOLIDAY etc., so when the business needs it, adding the
+          values is a tiny change to the enum and the DB column.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How do you serialize a Java enum to JSON for the React frontend?</div>
+        <div class="a">
+          By default, Jackson serializes enums by their <code>.name()</code> — so
+          <code>Role.ADMIN</code> becomes <code>"ADMIN"</code> in JSON. The frontend receives
+          a string and displays it directly. NOOL doesn't customize this (no
+          <code>@JsonValue</code> on enums) — the default works fine.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With enums defined, we've established the vocabulary. The next chapter covers NOOL's
+      <strong>custom exceptions</strong> and the <strong>global exception handler</strong> —
+      how the system reports errors back to the user in a clean, consistent way.
+    </p>
+
+    <div class="chapnav">
+      <a href="07-backend-application.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 07 · BackendApplication.java</span>
+      </a>
+      <a class="dim next">
+        <span class="arrow next">Coming soon →</span>
+        <span class="title">Ch 09 · Custom Exceptions</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 08 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

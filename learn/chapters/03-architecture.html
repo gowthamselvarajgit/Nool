@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 03 · Architecture &amp; Tech Stack · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 03 · How It's Built</span>
+    <h1>
+      <span class="gradient">Architecture</span> &amp;<br/>
+      Tech Stack
+    </h1>
+    <p class="subtitle">
+      A bird's-eye view of how NOOL is put together — the three big pieces,
+      how they talk to each other, and what tools/libraries we use at each layer.
+      Once you have this mental map, every code file will make sense.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <!-- ──────── The three pieces ──────── -->
+    <h2><span class="h2-emoji">🏗️</span> The Three Big Pieces</h2>
+    <p>
+      NOOL is split into three independent halves that talk to each other. Think of them
+      as three separate "places", each with a different job:
+    </p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="icon">🌐</div>
+        <h4>1. Frontend</h4>
+        <p>The website my parents see in the browser — buttons, forms, calendars, charts. Built with React. Lives in <code>frontend/</code>.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚙️</div>
+        <h4>2. Backend</h4>
+        <p>The "brain". Stores data, checks who you are, calculates totals, enforces rules. Spring Boot. Lives in <code>backend/</code>.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🗄️</div>
+        <h4>3. Database</h4>
+        <p>The permanent memory. Stores every saree, every payment, every worker. MySQL. Database name: <code>nool_db</code>.</p>
+      </div>
+    </div>
+
+    <!-- ──────── The full architecture diagram ──────── -->
+    <h2><span class="h2-emoji">🗺️</span> The Architecture Diagram</h2>
+    <p>Here's how the three pieces stack on top of each other:</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        🌐 <strong>React SPA</strong> · Vite + Tailwind<br/>
+        <small>Port 5173 · what my parents see in the browser</small>
+      </div>
+      <div class="arch-arrow"><span class="label">HTTP + JWT Token</span></div>
+      <div class="arch-layer api">
+        ⚙️ <strong>Spring Boot REST API</strong> · stateless<br/>
+        <small>Port 8083 · context-path /api · the business brain</small>
+      </div>
+      <div class="arch-arrow"><span class="label">JDBC + Hibernate</span></div>
+      <div class="arch-layer db">
+        🗄️ <strong>MySQL 8</strong><br/>
+        <small>nool_db · Port 3306</small>
+      </div>
+    </div>
+
+    <!-- ──────── How they talk ──────── -->
+    <h2><span class="h2-emoji">📡</span> How They Talk To Each Other</h2>
+    <p>The three pieces communicate using just <strong>two technologies</strong>:</p>
+
+    <h3>Frontend ↔ Backend: HTTP + JSON</h3>
+    <p>
+      When Dad clicks "Save" on a form, the React app makes an <strong>HTTP request</strong> to
+      the backend, sending the form data as <strong>JSON</strong>. The backend processes it and
+      sends back a JSON response. Every request also carries a <strong>JWT token</strong>
+      (the "ID card") in the <code>Authorization</code> header so the backend knows who's asking.
+    </p>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">A real HTTP request from the frontend</span>
+        <span class="lang">HTTP</span>
+      </div>
+<pre><span class="ann">POST</span> /api/inventory/receipt <span class="ann">HTTP/1.1</span>
+<span class="kw">Host:</span> localhost:8083
+<span class="kw">Content-Type:</span> application/json
+<span class="kw">Authorization:</span> <span class="str">Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEsInJv...</span>
+
+{
+  <span class="str">"ownerId"</span>: 1,
+  <span class="str">"entryDate"</span>: <span class="str">"2026-05-11"</span>,
+  <span class="str">"quantity"</span>: 100,
+  <span class="str">"remarks"</span>: <span class="str">"Diwali batch"</span>
+}</pre>
+    </div>
+
+    <h3>Backend ↔ Database: JDBC (via Hibernate)</h3>
+    <p>
+      The backend never writes raw SQL by hand. Instead, it uses <strong>Hibernate</strong>
+      (an ORM — Object-Relational Mapper) which translates Java method calls into SQL
+      automatically. So when the service writes <code>sareeLedgerRepository.save(entry)</code>,
+      Hibernate produces an <code>INSERT INTO saree_ledger ...</code> statement and sends
+      it to MySQL over JDBC. Saves us from writing hundreds of SQL strings by hand.
+    </p>
+
+    <!-- ──────── Why stateless ──────── -->
+    <h2><span class="h2-emoji">🎯</span> A Key Choice — Stateless Backend</h2>
+    <p>
+      One of the most important architectural choices in NOOL: <strong>the backend doesn't
+      remember anyone</strong>. There's no "logged-in users" table. No session memory. After
+      every request finishes, the backend forgets you exist.
+    </p>
+    <p>
+      How does login work then? Every request carries a JWT token that <em>contains</em> the
+      user's identity. The backend just verifies the token (checks its signature), reads the
+      user info out of it, and processes the request. This is called <strong>stateless authentication</strong>.
+    </p>
+
+    <div class="callout info">
+      <strong>Why stateless matters:</strong>
+      <ul style="margin-bottom: 0;">
+        <li>I can run multiple backend instances behind a load balancer — they don't need to share state</li>
+        <li>If the server restarts, no one is "logged out" mid-action (their token still works)</li>
+        <li>No database writes on login (BCrypt comparison is pure CPU work, very fast)</li>
+        <li>The same auth model works for web, mobile apps, third-party integrations — all the same JWT</li>
+      </ul>
+    </div>
+
+    <!-- ──────── Layered backend ──────── -->
+    <h2><span class="h2-emoji">🥞</span> The Backend's Internal Layers</h2>
+    <p>
+      Inside the backend itself, code is organized into <strong>four layers</strong>. Each layer
+      only talks to the one directly below it. This is the classic "MVC + Service" pattern.
+    </p>
+
+    <table class="t">
+      <thead>
+        <tr><th>Layer</th><th>Folder</th><th>Job</th><th>Example file</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Controller</strong></td>
+          <td><code>controller/</code></td>
+          <td>Receives HTTP request, returns HTTP response. Doesn't contain business logic.</td>
+          <td><code>SareeInventoryController.java</code></td>
+        </tr>
+        <tr>
+          <td><strong>Service</strong></td>
+          <td><code>service/</code></td>
+          <td>The business logic. Validations, calculations, workflows. <em>Where the brain lives.</em></td>
+          <td><code>SareeInventoryServiceImpl.java</code></td>
+        </tr>
+        <tr>
+          <td><strong>Repository</strong></td>
+          <td><code>repository/</code></td>
+          <td>Talks to the database. Just CRUD operations. No business logic.</td>
+          <td><code>SareeLedgerRepository.java</code></td>
+        </tr>
+        <tr>
+          <td><strong>Entity</strong></td>
+          <td><code>entity/</code></td>
+          <td>Java classes that map to database tables. Plain data, no behavior.</td>
+          <td><code>SareeLedgerEntry.java</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      Plus two supporting layers:
+    </p>
+    <ul>
+      <li><strong>DTO</strong> (Data Transfer Object) — folder <code>dto/</code> — the shape of data sent over HTTP. Separated from entities for security and validation.</li>
+      <li><strong>Exception</strong> — folder <code>exception/</code> — custom error types + a global handler that converts them to clean HTTP responses.</li>
+    </ul>
+
+    <!-- ──────── Full request walkthrough ──────── -->
+    <h2><span class="h2-emoji">🔍</span> A Complete Request — Top to Bottom</h2>
+    <p>
+      Let's trace one complete request: <strong>Dad clicks "Add Receipt" to record 100 sarees
+      from Rahul</strong>. Here's every layer that gets touched:
+    </p>
+
+    <ol>
+      <li><strong>React:</strong> The form's <code>onSubmit</code> handler calls <code>inventoryService.addReceipt(data)</code> in <code>api.js</code>.</li>
+      <li><strong>api.js:</strong> Attaches the JWT token as <code>Bearer ...</code> header, sends <code>POST /api/inventory/receipt</code>.</li>
+      <li><strong>Vite dev server:</strong> Proxies <code>/api/*</code> to <code>localhost:8083</code>.</li>
+      <li><strong>JwtAuthenticationFilter:</strong> Reads the token, verifies its signature, sets the security context to "admin".</li>
+      <li><strong>SecurityConfig:</strong> Checks the rule for <code>POST /inventory/receipt</code> — requires ADMIN. Passes.</li>
+      <li><strong>SareeInventoryController:</strong> Receives the deserialized DTO, calls <code>sareeInventoryService.addReceipt(dto)</code>.</li>
+      <li><strong>SareeInventoryServiceImpl:</strong> Locks the owner row, validates the date, builds a <code>SareeLedgerEntry</code>.</li>
+      <li><strong>SareeLedgerRepository:</strong> Calls <code>save(entry)</code>. Hibernate generates the SQL.</li>
+      <li><strong>MySQL:</strong> Executes <code>INSERT INTO saree_ledger ...</code> Returns the new row's ID.</li>
+      <li><strong>Response flows back up:</strong> Entity → DTO → JSON → HTTP 200 → React.</li>
+      <li><strong>React:</strong> Shows a green "Saved!" toast, refreshes the inventory list.</li>
+    </ol>
+
+    <p>
+      Total time: usually under 100 milliseconds. The user sees no delay. <em>That's why we
+      organize code into layers</em> — each layer does its small job and delegates the rest.
+    </p>
+
+    <!-- ──────── Tech stack ──────── -->
+    <h2><span class="h2-emoji">🧰</span> The Complete Tech Stack</h2>
+    <p>
+      Here are every library, tool, and framework used in NOOL, grouped by layer:
+    </p>
+
+    <div class="stack-grid">
+      <div class="stack-col">
+        <h4>⚙️ Backend</h4>
+        <p>The server-side machinery.</p>
+        <div class="tech-pills">
+          <span>Java 21</span>
+          <span>Spring Boot 4.0.6</span>
+          <span>Spring Security 6</span>
+          <span>Spring Data JPA</span>
+          <span>Hibernate 6</span>
+          <span>jjwt 0.11.5</span>
+          <span>Lombok</span>
+          <span>Maven 3.9+</span>
+          <span>Bean Validation (Jakarta)</span>
+        </div>
+      </div>
+      <div class="stack-col">
+        <h4>🌐 Frontend</h4>
+        <p>The browser-side interface.</p>
+        <div class="tech-pills">
+          <span>React 19</span>
+          <span>Vite 8</span>
+          <span>React Router 6</span>
+          <span>Tailwind CSS 3</span>
+          <span>Recharts (charts)</span>
+          <span>lucide-react (icons)</span>
+          <span>framer-motion (animations)</span>
+          <span>xlsx (Excel export)</span>
+        </div>
+      </div>
+      <div class="stack-col">
+        <h4>🗄️ Database</h4>
+        <p>The permanent memory.</p>
+        <div class="tech-pills">
+          <span>MySQL 8</span>
+          <span>JDBC</span>
+          <span>UTF-8 mb4 charset</span>
+          <span>Asia/Kolkata timezone</span>
+        </div>
+      </div>
+      <div class="stack-col">
+        <h4>🔐 Auth &amp; Security</h4>
+        <p>Who-are-you checks.</p>
+        <div class="tech-pills">
+          <span>JWT (HS256)</span>
+          <span>BCrypt</span>
+          <span>24h tokens</span>
+          <span>Role-based ACL</span>
+          <span>CORS</span>
+          <span>Stateless sessions</span>
+        </div>
+      </div>
+      <div class="stack-col">
+        <h4>🛠️ Tooling</h4>
+        <p>Build &amp; dev tools.</p>
+        <div class="tech-pills">
+          <span>ESLint</span>
+          <span>npm</span>
+          <span>Maven Wrapper (mvnw)</span>
+          <span>PostCSS</span>
+          <span>Autoprefixer</span>
+          <span>Spring DevTools</span>
+        </div>
+      </div>
+      <div class="stack-col">
+        <h4>📦 Project Structure</h4>
+        <p>Repo layout.</p>
+        <div class="tech-pills">
+          <span>Monorepo</span>
+          <span>Two folders: frontend/ + backend/</span>
+          <span>One DB instance</span>
+          <span>One JWT secret</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── Why these choices ──────── -->
+    <h2><span class="h2-emoji">💭</span> Why These Choices?</h2>
+
+    <h3>Why Spring Boot?</h3>
+    <p>
+      Spring Boot is the most popular Java backend framework. It has built-in support for
+      security, database, REST APIs, validation — everything I needed for NOOL. The
+      <code>@SpringBootApplication</code> annotation alone replaces hundreds of lines of
+      manual server configuration. And every Indian tech company uses it, so it's
+      job-friendly too.
+    </p>
+
+    <h3>Why MySQL (not PostgreSQL or MongoDB)?</h3>
+    <p>
+      MySQL is mature, free, fast, and runs on a laptop. Our data is highly relational
+      (workers ↔ attendance ↔ daily work ↔ salary, all linked by foreign keys), so a SQL
+      database is the right fit — not a document store like MongoDB. PostgreSQL would also
+      work; MySQL is just more familiar in the Indian ecosystem.
+    </p>
+
+    <h3>Why React + Vite (not Next.js or Angular)?</h3>
+    <p>
+      NOOL is a single-page app (SPA), not a SEO-driven public website. We don't need
+      server-side rendering. Vite + React is dramatically faster to develop with — hot reloads
+      happen in milliseconds — and the bundle is small and fast. Angular felt too heavy for
+      a focused tool like this.
+    </p>
+
+    <h3>Why Tailwind CSS?</h3>
+    <p>
+      Utility-first CSS lets me style components directly in JSX without flipping between
+      CSS files. For a solo developer building 30+ pages quickly, this is a huge productivity
+      win. Yes, the markup looks busy at first — but the trade-off is worth it.
+    </p>
+
+    <h3>Why JWT (not server-side sessions)?</h3>
+    <p>
+      Stateless. Easier to scale. Same model works for future mobile apps or third-party
+      integrations. The only real downside (you can't revoke a token until it expires) is
+      acceptable for a small workshop with trusted users.
+    </p>
+
+    <!-- ──────── Folder structure ──────── -->
+    <h2><span class="h2-emoji">📁</span> The Repository Folder Structure</h2>
+    <p>Here's what the project tree looks like at the top level:</p>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">NOOL/</span>
+        <span class="lang">repo layout</span>
+      </div>
+<pre>NOOL/
+├── backend/                              <span class="com">← Spring Boot REST API</span>
+│   ├── src/main/java/com/nool/backend/
+│   │   ├── BackendApplication.java       <span class="com">← entry point</span>
+│   │   ├── auth/                         <span class="com">← JWT, login, security</span>
+│   │   │   ├── bootstrap/                <span class="com">← seed-admin runner</span>
+│   │   │   ├── controller/
+│   │   │   ├── dto/
+│   │   │   ├── entity/                   <span class="com">← User, UserProfile</span>
+│   │   │   ├── security/                 <span class="com">← JwtUtil, SecurityConfig, filter</span>
+│   │   │   └── service/
+│   │   ├── controller/                   <span class="com">← REST controllers (dashboard, employee, owner)</span>
+│   │   ├── dto/                          <span class="com">← Request/response DTOs</span>
+│   │   ├── entity/                       <span class="com">← JPA entities</span>
+│   │   ├── enums/                        <span class="com">← Role, EmployeeStatus, etc.</span>
+│   │   ├── exception/                    <span class="com">← Custom exceptions + handler</span>
+│   │   ├── repository/                   <span class="com">← Spring Data JPA repos</span>
+│   │   └── service/                      <span class="com">← Service interfaces + impls</span>
+│   ├── src/main/resources/
+│   │   └── application.properties        <span class="com">← DB, JWT, port config</span>
+│   └── pom.xml                           <span class="com">← Maven dependencies</span>
+│
+├── frontend/                             <span class="com">← React SPA</span>
+│   ├── src/
+│   │   ├── App.jsx                       <span class="com">← Route table</span>
+│   │   ├── main.jsx                      <span class="com">← React entry</span>
+│   │   ├── index.css                     <span class="com">← Global styles + Tailwind</span>
+│   │   ├── components/                   <span class="com">← Layout, Common, Table, calendars</span>
+│   │   ├── context/                      <span class="com">← AuthContext.jsx</span>
+│   │   ├── hooks/                        <span class="com">← useAuth.js</span>
+│   │   ├── pages/                        <span class="com">← Route-level pages, one per screen</span>
+│   │   ├── services/api.js               <span class="com">← Centralized REST client</span>
+│   │   ├── styles/globals.css
+│   │   └── utils/                        <span class="com">← formatters, validators, excelExporter</span>
+│   ├── public/                           <span class="com">← favicon, icons</span>
+│   ├── package.json                      <span class="com">← npm dependencies</span>
+│   ├── vite.config.js                    <span class="com">← Vite + dev-proxy config</span>
+│   ├── tailwind.config.js
+│   └── index.html                        <span class="com">← The shell HTML Vite builds into</span>
+│
+├── learn/                                <span class="com">← THIS tutorial (the one you're reading)</span>
+└── README.md                             <span class="com">← Project overview</span></pre>
+    </div>
+
+    <!-- ──────── Important conventions ──────── -->
+    <h2><span class="h2-emoji">📏</span> Important Conventions</h2>
+    <p>A few project-wide rules to keep in mind as you read the code:</p>
+
+    <ul>
+      <li><strong>Time zone:</strong> Everything stored and shown in <code>Asia/Kolkata</code> (IST). No UTC anywhere visible to users.</li>
+      <li><strong>Currency:</strong> All money in Indian Rupees (₹) using <code>Intl.NumberFormat('en-IN')</code> (which produces "1,23,456" not "123,456").</li>
+      <li><strong>Date strings:</strong> The frontend uses a helper called <code>toLocalISODate()</code> to avoid a sneaky timezone bug (covered in Chapter 61).</li>
+      <li><strong>Data integrity:</strong> Inventory operations use database row-level locking to prevent concurrent receipt/return races (covered in Chapter 45).</li>
+      <li><strong>Soft delete:</strong> Disabling something (a worker, an owner) never deletes the row — we flip a status flag instead. History is preserved.</li>
+      <li><strong>Ledger pattern:</strong> Inventory is an append-only ledger (one row per event). Balance is always derived, never stored.</li>
+    </ul>
+
+    <!-- ──────── What's coming next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Now that you understand the overall architecture and what's used, the next chapter
+      zooms into the <strong>database</strong> — every table, every column, every relationship.
+      Once you know the data model, every line of code we read after that will make sense.
+    </p>
+
+    <div class="chapnav">
+      <a href="02-what-nool-does.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 02 · What NOOL Does</span>
+      </a>
+      <a href="04-database-model.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 04 · The Database Model</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 03 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

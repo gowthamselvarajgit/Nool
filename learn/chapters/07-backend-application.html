@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 07 · BackendApplication.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 07 · The Spark That Lights Everything</span>
+    <h1>
+      <span class="gradient">BackendApplication.java</span> —<br/>
+      The entry point
+    </h1>
+    <p class="subtitle">
+      The shortest, simplest Java file in the entire project — but the one without which
+      nothing else runs. It's only 14 lines long, but every single one of those lines does
+      something important. Let's break it down.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🚀</div>
+      <div class="fmeta">
+        <h3>BackendApplication.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/BackendApplication.java</span>
+        <div class="ftags"><span>Entry point</span><span>main()</span><span>@SpringBootApplication</span><span>14 lines</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── Why this file ──────── -->
+    <h2><span class="h2-emoji">🤔</span> Why Java Needs an Entry Point</h2>
+    <p>
+      Every Java program needs <strong>exactly one method</strong> with this exact signature:
+    </p>
+    <div class="codewrap">
+      <div class="head"><span class="path">The universal Java entry point</span><span class="lang">Java</span></div>
+<pre><span class="kw">public static void</span> main(String[] args) { ... }</pre>
+    </div>
+    <p>
+      When the JVM (Java Virtual Machine) starts, it looks for this method and calls it. Whatever
+      you put inside is what your program does. For a simple "Hello World" program, you'd put
+      <code>System.out.println("Hello World")</code>. For a Spring Boot app like NOOL, you put
+      one magic line that boots up the entire framework.
+    </p>
+
+    <div class="callout brain">
+      <strong>Think of this file as the ignition switch on a car:</strong> turning the key
+      doesn't drive the car — but without that one tiny action, the engine never starts. The
+      14 lines in <code>BackendApplication.java</code> are NOOL's ignition.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">backend/src/main/java/com/nool/backend/BackendApplication.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend;
+<span class="com">// ↑ Declares that this class belongs to the "folder" com.nool.backend.
+//   In real terms: this .java file MUST live in:
+//     backend/src/main/java/com/nool/backend/BackendApplication.java
+//   The package name and the folder structure must match exactly,
+//   or Java refuses to compile.</span>
+
+<span class="kw">import</span> org.springframework.boot.SpringApplication;
+<span class="com">// ↑ The class that contains the magic .run() method we'll call below.
+//   It's the "starter motor" for Spring Boot.</span>
+
+<span class="kw">import</span> org.springframework.boot.autoconfigure.SpringBootApplication;
+<span class="com">// ↑ The annotation that turns this class into a full Spring Boot app.
+//   We use it as @SpringBootApplication on the next line.</span>
+
+<span class="ann">@SpringBootApplication</span>
+<span class="com">// ↑ ★★★ THE MOST IMPORTANT LINE IN THE FILE ★★★
+//   This single annotation does THREE things at once:
+//
+//   1. @Configuration   → marks this class as a source of Spring beans
+//   2. @EnableAutoConfiguration → tells Spring to look at the classpath
+//      and auto-configure beans based on what's there. Found JPA on
+//      classpath? Auto-configure a DataSource. Found Spring Security?
+//      Auto-configure a default filter chain. Etc.
+//   3. @ComponentScan   → tells Spring to scan THIS PACKAGE and ALL
+//      sub-packages for classes annotated with @Component, @Service,
+//      @Controller, @Repository, etc., and create instances of them.
+//
+//   This last point is why every controller and service we write later
+//   "just works" — Spring finds them automatically because they live
+//   under com.nool.backend.*</span>
+<span class="kw">public class</span> BackendApplication {
+<span class="com">// ↑ Standard public class declaration.
+//   The name MUST match the filename (BackendApplication.java).
+//   This is Java's strict rule for public top-level classes.</span>
+
+    <span class="kw">public static void</span> main(String[] args) {
+    <span class="com">// ↑ THE entry point.
+    //   public → JVM can call it from outside the package
+    //   static → no instance of BackendApplication needs to exist first
+    //   void   → returns nothing
+    //   String[] args → command-line args (e.g., when running
+    //                   `java -jar backend.jar --server.port=9090`,
+    //                   the "--server.port=9090" arrives in this array)</span>
+
+        SpringApplication.run(BackendApplication.class, args);
+        <span class="com">// ↑ ★ The line that boots up EVERYTHING.
+        //   It tells Spring Boot:
+        //
+        //   "Here's my main class. Scan its package for components,
+        //   read application.properties, instantiate every @Component,
+        //   wire up dependencies, start the embedded Tomcat server,
+        //   and keep running until shut down."
+        //
+        //   This single call:
+        //     • Reads application.properties
+        //     • Creates the IoC container (where all our beans live)
+        //     • Wires @Autowired / final-field dependencies
+        //     • Auto-configures DataSource, EntityManager, Security, etc.
+        //     • Starts Tomcat on port 8083
+        //     • Runs every CommandLineRunner (like AdminBootstrapRunner)
+        //     • Logs the giant Spring banner
+        //     • Then blocks forever, serving HTTP requests</span>
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── What @SpringBootApplication unpacks to ──────── -->
+    <h2><span class="h2-emoji">🎁</span> What <code>@SpringBootApplication</code> Actually Does</h2>
+    <p>
+      That one annotation is a <strong>shortcut</strong>. Internally, it expands into three
+      separate annotations. Here's the equivalent un-shortened version:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Equivalent expanded form (what @SpringBootApplication means)</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Configuration</span>           <span class="com">// "This class can define Spring beans"</span>
+<span class="ann">@EnableAutoConfiguration</span>  <span class="com">// "Auto-set-up beans based on classpath"</span>
+<span class="ann">@ComponentScan</span>           <span class="com">// "Find all @Component classes in this package"</span>
+<span class="kw">public class</span> BackendApplication {
+    <span class="kw">public static void</span> main(String[] args) {
+        SpringApplication.run(BackendApplication.class, args);
+    }
+}</pre>
+    </div>
+
+    <p>Each piece in detail:</p>
+
+    <table class="ftable">
+      <thead>
+        <tr><th>Annotation</th><th>What it does</th><th>Concrete effect in NOOL</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>@Configuration</code></td>
+          <td>Marks the class as a Java-based bean configuration source</td>
+          <td>Lets us define <code>@Bean</code> methods here if needed (we don't, but the option exists)</td>
+        </tr>
+        <tr>
+          <td><code>@EnableAutoConfiguration</code></td>
+          <td>Tells Spring Boot to read its master list of auto-configurations and activate the ones whose conditions match</td>
+          <td>Because <code>spring-boot-starter-data-jpa</code> is on the classpath, Hibernate gets configured. Because MySQL driver is there, a DataSource is auto-wired. Because Spring Security is there, a filter chain is set up. We get all this for free.</td>
+        </tr>
+        <tr>
+          <td><code>@ComponentScan</code></td>
+          <td>Looks for <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, <code>@Controller</code>, <code>@RestController</code> annotated classes</td>
+          <td>Spring discovers <em>every</em> controller and service in NOOL automatically — we never manually register any. <strong>This is why placement matters</strong> (see below).</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Why placement matters ──────── -->
+    <h2><span class="h2-emoji">📁</span> Why This File's Location MATTERS</h2>
+    <p>
+      <code>@ComponentScan</code> (part of <code>@SpringBootApplication</code>) scans
+      <strong>the package this class is in, plus everything below</strong>. Look at our project structure:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Why BackendApplication.java sits where it does</span><span class="lang">tree</span></div>
+<pre>backend/src/main/java/com/nool/backend/
+├── BackendApplication.java       <span class="com">← @SpringBootApplication sits HERE</span>
+├── auth/
+│   ├── controller/...
+│   ├── service/...
+│   └── entity/...
+├── controller/...
+├── entity/...
+├── enums/...
+├── exception/...
+├── repository/...
+├── service/...
+└── ...                           <span class="com">← all of these get scanned automatically</span></pre>
+    </div>
+
+    <p>
+      Because <code>BackendApplication</code> is in package <code>com.nool.backend</code>,
+      ComponentScan automatically picks up every class in <code>com.nool.backend.auth</code>,
+      <code>com.nool.backend.controller</code>, <code>com.nool.backend.service</code>, etc.
+    </p>
+
+    <div class="callout warn">
+      <strong>Don't move this file!</strong> If you ever drop <code>BackendApplication.java</code>
+      into a sub-package like <code>com.nool.backend.config</code>, ComponentScan starts there
+      — and stops seeing siblings like <code>com.nool.backend.controller</code>, <code>com.nool.backend.entity</code>,
+      etc. The result: cryptic "no bean found" errors at startup. <strong>The entry point file
+      must always live at the highest package level</strong>.
+    </div>
+
+    <!-- ──────── What happens on startup ──────── -->
+    <h2><span class="h2-emoji">⏱️</span> The Full Startup Sequence (~4 seconds)</h2>
+    <p>
+      When you run <code>./mvnw spring-boot:run</code>, here's <em>everything</em> that
+      happens between pressing Enter and the app being ready:
+    </p>
+
+    <ol>
+      <li>Maven compiles all <code>.java</code> files into <code>.class</code> files (if not already done).</li>
+      <li>Maven invokes <code>java -cp ... com.nool.backend.BackendApplication</code> with all libraries on the classpath.</li>
+      <li>JVM starts, loads BackendApplication, calls <code>main(args)</code>.</li>
+      <li><code>SpringApplication.run(...)</code> begins. The Spring banner is printed.</li>
+      <li>Spring reads <code>application.properties</code> from the classpath.</li>
+      <li>The IoC container (ApplicationContext) is created — an empty registry of beans.</li>
+      <li><strong>Auto-configuration:</strong> Spring Boot looks at every JAR on the classpath and activates matching auto-configs. Examples:
+        <ul>
+          <li>Found <code>HikariCP</code> → create a connection pool bean</li>
+          <li>Found <code>spring-jdbc</code> → create a JdbcTemplate bean</li>
+          <li>Found <code>spring-data-jpa</code> → create EntityManagerFactory + repositories</li>
+          <li>Found <code>spring-security</code> → set up SecurityFilterChain</li>
+          <li>Found <code>spring-webmvc</code> + Tomcat → set up DispatcherServlet</li>
+        </ul>
+      </li>
+      <li><strong>Component scan:</strong> Spring walks <code>com.nool.backend.*</code> looking for annotated classes. Every <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, <code>@RestController</code> gets instantiated and added to the IoC container.</li>
+      <li><strong>Dependency injection:</strong> for every bean, Spring resolves constructor arguments by looking up other beans. <code>AuthServiceImpl</code> needs <code>UserRepository</code>, <code>PasswordEncoder</code>, <code>JwtUtil</code> — Spring finds them in the container and passes them in.</li>
+      <li><strong>Hibernate boots:</strong> reads all <code>@Entity</code> classes, builds an in-memory metamodel, opens a database connection, and (with <code>ddl-auto=update</code>) runs ALTER TABLE statements if needed.</li>
+      <li><strong>Embedded Tomcat starts</strong> on port 8083, binds the DispatcherServlet to <code>/api/*</code>.</li>
+      <li><strong>CommandLineRunners run.</strong> <code>AdminBootstrapRunner</code> fires here — it checks if any ADMIN exists, and seeds one if not.</li>
+      <li>Spring logs <code>"Started BackendApplication in 4.2 seconds (process running for 4.5)"</code>.</li>
+      <li>The main thread blocks. The app is now listening for HTTP requests.</li>
+    </ol>
+
+    <!-- ──────── The startup log ──────── -->
+    <h2><span class="h2-emoji">📺</span> What You Actually See in the Console</h2>
+    <p>The first few seconds of console output, in real life:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Console output on `./mvnw spring-boot:run`</span><span class="lang">log</span></div>
+<pre>
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v4.0.6)
+
+2026-05-14 10:30:11.412  INFO   --- [main] c.nool.backend.BackendApplication        : Starting BackendApplication using Java 21.0.5
+2026-05-14 10:30:11.421  INFO   --- [main] c.nool.backend.BackendApplication        : No active profile set, falling back to 1 default profile: "default"
+2026-05-14 10:30:12.108  INFO   --- [main] o.s.d.r.config.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories
+2026-05-14 10:30:12.467  INFO   --- [main] o.s.d.r.config.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 348 ms. Found 10 JPA repository interfaces.
+2026-05-14 10:30:13.012  INFO   --- [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2026-05-14 10:30:13.235  INFO   --- [main] o.h.j.i.SqlExceptionHelper               : (DDL) Schema 'nool_db' does not exist; creating
+2026-05-14 10:30:13.804  INFO   --- [main] o.h.t.s.SchemaUpdateProcessor            : Hibernate: alter table employees ...   <span class="com"># schema sync</span>
+✅ DEFAULT ADMIN ACCOUNT CREATED SUCCESSFULLY                                                                      <span class="com"># from AdminBootstrapRunner</span>
+2026-05-14 10:30:13.998  INFO   --- [main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/api'
+2026-05-14 10:30:14.012  INFO   --- [main] c.nool.backend.BackendApplication        : Started BackendApplication in 4.234 seconds (process running for 4.521)</pre>
+    </div>
+
+    <p>
+      Once you see <code>"Started BackendApplication in X seconds"</code>, the API is alive.
+      Opening <code>http://localhost:8083/api/auth/login</code> in a browser would now respond
+      (with a 405 Method Not Allowed, since it only accepts POST — but that's a sign of life).
+    </p>
+
+    <!-- ──────── Real scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Adding a new endpoint and seeing it picked up</h5>
+      <ol>
+        <li>I create a new class <code>com.nool.backend.controller.HelloController</code> annotated with <code>@RestController</code>.</li>
+        <li>Save the file. Stop and restart the backend.</li>
+        <li>On startup, ComponentScan finds the new class, instantiates it, and registers its mappings.</li>
+        <li>Without touching <code>BackendApplication.java</code> at all, the new endpoint is live.</li>
+      </ol>
+      <p>That's the whole point of ComponentScan — no central registry, no manual wiring. Drop a file in the right package, restart, done.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: First boot on an empty database</h5>
+      <ol>
+        <li>Fresh MySQL instance, no <code>nool_db</code> database.</li>
+        <li>Start NOOL. <code>SpringApplication.run</code> kicks off.</li>
+        <li>JDBC URL has <code>createDatabaseIfNotExist=true</code> → MySQL creates the empty <code>nool_db</code>.</li>
+        <li>Hibernate's <code>ddl-auto=update</code> sees no tables, CREATEs all 9 from the entity classes.</li>
+        <li><code>AdminBootstrapRunner</code> sees no ADMIN row, inserts one with credentials from properties.</li>
+        <li>App ready. I can log in immediately with <code>9876543210 / Admin@123</code>.</li>
+      </ol>
+      <p>Zero manual database setup. The app bootstraps itself.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Adding a new field to an entity</h5>
+      <ol>
+        <li>I add <code>private String emergencyContact;</code> to <code>Employee.java</code>.</li>
+        <li>Restart the backend.</li>
+        <li>Hibernate compares the entity to the schema, sees a missing column.</li>
+        <li>Runs <code>ALTER TABLE employees ADD COLUMN emergency_contact VARCHAR(255)</code>.</li>
+        <li>App boots normally. New field is now writable.</li>
+      </ol>
+      <p>Again — no manual SQL. Just restart. This is the magic of <code>ddl-auto=update</code>
+      working together with Spring Boot's startup sequence.</p>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes with the entry point</h5>
+
+      <div class="item">
+        <div class="bad">Putting business logic inside <code>main()</code></div>
+        <div class="good"><code>main()</code> should only call <code>SpringApplication.run()</code>. Anything else (creating beans, opening connections, reading files) belongs in a <code>@Component</code> or <code>@Configuration</code> class.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting the <code>@SpringBootApplication</code> annotation</div>
+        <div class="good">Without it, <code>SpringApplication.run()</code> still starts a context but doesn't scan packages — so none of your controllers are found. App boots but the API is empty.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Moving this file into a sub-package thinking "it's just configuration"</div>
+        <div class="good">It must live at the top of the package tree. Otherwise ComponentScan misses sibling packages.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding multiple <code>@SpringBootApplication</code>-annotated classes</div>
+        <div class="good">There should be exactly ONE entry-point class per app. Multiple is a confusing setup that usually means someone forked another module incorrectly.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Renaming the file to something like <code>NoolApp.java</code> without renaming the class inside</div>
+        <div class="good">In Java, a public top-level class's name MUST match the filename. If you rename one, rename both. Compiler will catch this immediately, but the error message is sometimes confusing.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about the entry point</h5>
+
+      <div class="qa">
+        <div class="q">What does <code>@SpringBootApplication</code> actually do?</div>
+        <div class="a">
+          It's a meta-annotation that bundles three others: <code>@Configuration</code> (this
+          class can define beans), <code>@EnableAutoConfiguration</code> (Spring Boot scans the
+          classpath and auto-wires beans based on what's there), and <code>@ComponentScan</code>
+          (finds and registers all annotated components in this package and below).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>SpringApplication.run()</code> and just <code>new SpringApplicationBuilder().run()</code>?</div>
+        <div class="a">
+          Functionally similar. <code>SpringApplication.run()</code> is the simplest one-line
+          form. <code>SpringApplicationBuilder</code> lets you customize the boot process —
+          set additional sources, banner mode, profiles, parent contexts. For NOOL we don't
+          need any of that, so the one-liner is fine.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does Spring need a "container" of beans?</div>
+        <div class="a">
+          Because we want loose coupling. Instead of <code>new EmployeeRepository()</code> inside
+          <code>EmployeeServiceImpl</code> (which would tie them tightly together), Spring
+          maintains a central registry of all singletons and injects them into each other.
+          This makes testing easier (inject mocks), configuration easier (swap implementations),
+          and lifecycle management possible (Spring knows when to close them).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, <code>@Controller</code>?</div>
+        <div class="a">
+          Functionally identical — all are caught by ComponentScan. The different names are
+          <em>conventions</em> that help readers understand each class's role.
+          <code>@Component</code> = generic. <code>@Service</code> = business logic.
+          <code>@Repository</code> = data access (also adds JPA exception translation).
+          <code>@Controller</code>/<code>@RestController</code> = web endpoints. Use the most
+          specific one that fits.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">If I put my entry-point class in <code>com.nool</code> instead of <code>com.nool.backend</code>, what happens?</div>
+        <div class="a">
+          ComponentScan starts at <code>com.nool</code>, which is wider — it would scan EVERY
+          package under <code>com.nool</code>, including <code>com.nool.backend</code>. So
+          NOOL would still find its components, but if you ever add a <code>com.nool.othermodule</code>
+          you didn't intend to scan, it would get pulled in too. Best practice: put the entry
+          point at the narrowest package that still covers everything.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How do you pass arguments to the app from the command line?</div>
+        <div class="a">
+          They flow through <code>String[] args</code> in <code>main()</code> into
+          <code>SpringApplication.run()</code>. Args of the form <code>--key=value</code> are
+          parsed as property overrides — so <code>java -jar app.jar --server.port=9090</code>
+          would override <code>server.port</code> from <code>application.properties</code>.
+          Plain args (without <code>--</code>) are passed to <code>CommandLineRunner</code>
+          implementations.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      We've now seen the project's "shell": dependencies (<code>pom.xml</code>), configuration
+      (<code>application.properties</code>), and entry point (<code>BackendApplication.java</code>).
+      The app can start. The container is ready.
+    </p>
+    <p>
+      Next we begin building up the actual business types — starting with the foundation that
+      everything else uses: <strong>enums</strong>. NOOL has six enums (Role, EmployeeStatus,
+      OwnerStatus, AttendanceStatus, PaymentMode, LedgerEntryType), and we'll cover all six in
+      one focused chapter.
+    </p>
+
+    <div class="chapnav">
+      <a href="06-application-properties.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 06 · application.properties</span>
+      </a>
+      <a href="08-enums.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 08 · The 6 Enums</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 07 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

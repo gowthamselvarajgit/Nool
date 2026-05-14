@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 05 · backend/pom.xml · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 05 · First Real Code</span>
+    <h1>
+      <span class="gradient">pom.xml</span> —<br/>
+      The Maven shopping list
+    </h1>
+    <p class="subtitle">
+      Every Java project starts with one file that says <em>"here's what libraries I need"</em>.
+      In Maven projects, that file is called <code>pom.xml</code>. Before we can compile a single
+      line of NOOL's backend, we have to understand what's in this file and why.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <!-- ──────── File header ──────── -->
+    <div class="filehdr">
+      <div class="ficon">📦</div>
+      <div class="fmeta">
+        <h3>pom.xml</h3>
+        <span class="fpath">backend/pom.xml</span>
+        <div class="ftags"><span>Maven</span><span>Dependencies</span><span>Build config</span><span>XML</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What is pom.xml ──────── -->
+    <h2><span class="h2-emoji">🤔</span> What is pom.xml?</h2>
+    <p>
+      "POM" stands for <strong>Project Object Model</strong>. It's an XML file that tells
+      the Maven build tool three things:
+    </p>
+    <ol>
+      <li><strong>Who I am</strong> — project name, version, Java version</li>
+      <li><strong>What I need</strong> — list of external libraries (called "dependencies")</li>
+      <li><strong>How to build me</strong> — compile settings, plugins, packaging instructions</li>
+    </ol>
+
+    <div class="callout brain">
+      <strong>Think of it like a recipe card:</strong> if you wanted to cook a dish, you'd
+      list the ingredients (dependencies), the kitchen tools (plugins), and the brand of
+      flour (versions). <code>pom.xml</code> is that recipe card for the Java compiler.
+    </div>
+
+    <!-- ──────── What happens when you run mvn ──────── -->
+    <h2><span class="h2-emoji">⚡</span> What Happens When You Run <code>mvn</code>?</h2>
+    <p>When my mom (just kidding, when I) type <code>./mvnw spring-boot:run</code> in the backend folder:</p>
+
+    <ol>
+      <li>Maven reads <code>pom.xml</code></li>
+      <li>It looks at every <code>&lt;dependency&gt;</code> entry</li>
+      <li>For each one, it downloads the JAR file from a central server (Maven Central) if you don't have it locally</li>
+      <li>It puts all those JARs on the Java classpath</li>
+      <li>It compiles your Java code together with those libraries</li>
+      <li>It runs the Spring Boot app</li>
+    </ol>
+
+    <p>
+      The first time, this can take a few minutes (downloading hundreds of MB). Every time
+      after that, it's instant because the JARs are cached in <code>~/.m2/repository/</code>.
+    </p>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+    <p>Here's NOOL's <code>pom.xml</code> in its entirety. I've annotated every meaningful part:</p>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">backend/pom.xml</span>
+        <span class="lang">XML</span>
+      </div>
+<pre><span class="ann">&lt;?xml</span> <span class="kw">version</span>=<span class="str">"1.0"</span> <span class="kw">encoding</span>=<span class="str">"UTF-8"</span><span class="ann">?&gt;</span>
+<span class="com">&lt;!-- The standard XML preamble. Always at the top of every XML file. --&gt;</span>
+
+<span class="ann">&lt;project</span> <span class="kw">xmlns</span>=<span class="str">"http://maven.apache.org/POM/4.0.0"</span>
+         <span class="kw">xmlns:xsi</span>=<span class="str">"http://www.w3.org/2001/XMLSchema-instance"</span>
+         <span class="kw">xsi:schemaLocation</span>=<span class="str">"http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd"</span><span class="ann">&gt;</span>
+    <span class="com">&lt;!-- Tells XML parsers "this file follows the Maven 4.0.0 schema." --&gt;</span>
+
+    <span class="ann">&lt;modelVersion&gt;</span>4.0.0<span class="ann">&lt;/modelVersion&gt;</span>
+    <span class="com">&lt;!-- Maven's own POM format version. Always 4.0.0 today. --&gt;</span>
+
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="com">&lt;!-- THE PARENT — inherit everything from Spring Boot's starter   --&gt;</span>
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="ann">&lt;parent&gt;</span>
+        <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+        <span class="ann">&lt;artifactId&gt;</span>spring-boot-starter-parent<span class="ann">&lt;/artifactId&gt;</span>
+        <span class="ann">&lt;version&gt;</span>4.0.6<span class="ann">&lt;/version&gt;</span>
+        <span class="ann">&lt;relativePath/&gt;</span>  <span class="com">&lt;!-- look up parent from repository, not a local folder --&gt;</span>
+    <span class="ann">&lt;/parent&gt;</span>
+    <span class="com">&lt;!--
+      ★ KEY IDEA: by extending Spring Boot's parent POM, NOOL inherits
+      sensible default versions for ~50 common libraries (Hibernate, Jackson,
+      SLF4J, Tomcat, etc.). I never have to pick versions for those — Spring
+      Boot guarantees they all work together. This is the whole point of
+      Spring Boot vs. plain Spring.
+    --&gt;</span>
+
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="com">&lt;!-- WHO THIS PROJECT IS                                          --&gt;</span>
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="ann">&lt;groupId&gt;</span>com.nool<span class="ann">&lt;/groupId&gt;</span>              <span class="com">&lt;!-- like a "company namespace" --&gt;</span>
+    <span class="ann">&lt;artifactId&gt;</span>backend<span class="ann">&lt;/artifactId&gt;</span>          <span class="com">&lt;!-- the project's short name --&gt;</span>
+    <span class="ann">&lt;version&gt;</span>0.0.1-SNAPSHOT<span class="ann">&lt;/version&gt;</span>      <span class="com">&lt;!-- "in-development" version --&gt;</span>
+    <span class="com">&lt;!--
+      Together these three coordinates uniquely identify this project anywhere
+      in the Maven world:  com.nool:backend:0.0.1-SNAPSHOT
+
+      SNAPSHOT means "this version is still changing." When NOOL is released
+      for production, this would change to a non-SNAPSHOT version like 1.0.0.
+    --&gt;</span>
+
+    <span class="ann">&lt;name/&gt;</span> <span class="ann">&lt;description/&gt;</span> <span class="ann">&lt;url/&gt;</span>     <span class="com">&lt;!-- left empty; not needed for internal projects --&gt;</span>
+
+    <span class="ann">&lt;licenses&gt;</span><span class="ann">&lt;license/&gt;</span><span class="ann">&lt;/licenses&gt;</span>
+    <span class="ann">&lt;developers&gt;</span><span class="ann">&lt;developer/&gt;</span><span class="ann">&lt;/developers&gt;</span>
+    <span class="ann">&lt;scm&gt;</span><span class="ann">&lt;connection/&gt;</span><span class="ann">&lt;developerConnection/&gt;</span><span class="ann">&lt;tag/&gt;</span><span class="ann">&lt;url/&gt;</span><span class="ann">&lt;/scm&gt;</span>
+
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="com">&lt;!-- PROPERTIES — variables used elsewhere in this file           --&gt;</span>
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="ann">&lt;properties&gt;</span>
+        <span class="ann">&lt;java.version&gt;</span>21<span class="ann">&lt;/java.version&gt;</span>
+        <span class="com">&lt;!-- ★ Java 21 — the latest LTS at the time. Means I get
+             modern Java features: records, sealed classes, virtual threads,
+             pattern matching, etc. --&gt;</span>
+    <span class="ann">&lt;/properties&gt;</span>
+
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="com">&lt;!-- DEPENDENCIES — the libraries this project needs              --&gt;</span>
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="ann">&lt;dependencies&gt;</span>
+
+        <span class="com">&lt;!-- ── 1. Spring Data JPA ─────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>spring-boot-starter-data-jpa<span class="ann">&lt;/artifactId&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The database superpower. Brings in:
+            • Hibernate (the ORM that turns Java classes into SQL tables)
+            • JPA API (the standard interface)
+            • Spring Data (the magical repository pattern)
+          This is what lets me write `userRepository.findByMobileNumber(...)`
+          and have Spring auto-generate the SQL behind the scenes.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ── 2. Spring Security ─────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>spring-boot-starter-security<span class="ann">&lt;/artifactId&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The lock on every door. Brings in:
+            • BCryptPasswordEncoder (hashing passwords)
+            • Filter chain machinery (where our JWT filter plugs in)
+            • Role/authority enforcement
+            • CSRF, CORS handling
+          We use this for login + role-based access. Without it, anyone
+          could call any endpoint.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ── 3. Bean Validation ─────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>spring-boot-starter-validation<span class="ann">&lt;/artifactId&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The input checker. Brings in Hibernate Validator, which implements
+          the @NotBlank, @Min, @Pattern, @Email, @Size annotations on DTO
+          fields. When a controller method has `@Valid @RequestBody Foo dto`,
+          this library auto-validates and rejects bad input before my code
+          even runs.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ── 4. Web MVC ─────────────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>spring-boot-starter-webmvc<span class="ann">&lt;/artifactId&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The actual web server + REST machinery. Brings in:
+            • Embedded Tomcat (the HTTP server that listens on port 8083)
+            • Spring MVC (the @RestController / @GetMapping framework)
+            • Jackson (the JSON ↔ Java converter)
+          Without this, NOOL would just be a Java program with no way to
+          talk to the React frontend.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ── 5. MySQL JDBC Driver ───────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>com.mysql<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>mysql-connector-j<span class="ann">&lt;/artifactId&gt;</span>
+            <span class="ann">&lt;scope&gt;</span>runtime<span class="ann">&lt;/scope&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The translator between Java and MySQL. Hibernate generates standard
+          SQL; this driver sends it over the wire to MySQL on port 3306.
+
+          scope=runtime means: "I don't need this when compiling, only when
+          actually running." Saves a bit of compile time and makes the API
+          surface cleaner.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ── 6. Lombok ──────────────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>org.projectlombok<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>lombok<span class="ann">&lt;/artifactId&gt;</span>
+            <span class="ann">&lt;optional&gt;</span>true<span class="ann">&lt;/optional&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The boilerplate-killer. Lombok lets me write @Getter, @Setter,
+          @Builder, @RequiredArgsConstructor — annotations that auto-generate
+          getter/setter methods, builder patterns, etc. at compile time.
+
+          Without Lombok, every entity class would be hundreds of lines of
+          mechanical getter/setter code. With it, the class is 20 lines.
+
+          optional=true means: "downstream projects depending on NOOL backend
+          don't need Lombok themselves." It's purely a build-time helper.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ── 7. Spring Boot Test ────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>spring-boot-starter-test<span class="ann">&lt;/artifactId&gt;</span>
+            <span class="ann">&lt;scope&gt;</span>test<span class="ann">&lt;/scope&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          The testing toolkit. Brings in JUnit 5, Mockito, AssertJ, MockMvc,
+          @SpringBootTest. Only on the test classpath (scope=test), so it
+          doesn't bloat production JAR.
+        --&gt;</span>
+
+        <span class="com">&lt;!-- ══════════════════════════════════════════════════════ --&gt;</span>
+        <span class="com">&lt;!-- JWT trio — manual versions because not in Spring Boot's --&gt;</span>
+        <span class="com">&lt;!-- managed dependencies                                    --&gt;</span>
+        <span class="com">&lt;!-- ══════════════════════════════════════════════════════ --&gt;</span>
+
+        <span class="com">&lt;!-- ── 8. JJWT API ────────────────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>io.jsonwebtoken<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>jjwt-api<span class="ann">&lt;/artifactId&gt;</span>
+            <span class="ann">&lt;version&gt;</span>0.11.5<span class="ann">&lt;/version&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+
+        <span class="com">&lt;!-- ── 9. JJWT Implementation ─────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>io.jsonwebtoken<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>jjwt-impl<span class="ann">&lt;/artifactId&gt;</span>
+            <span class="ann">&lt;version&gt;</span>0.11.5<span class="ann">&lt;/version&gt;</span>
+            <span class="ann">&lt;scope&gt;</span>runtime<span class="ann">&lt;/scope&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+
+        <span class="com">&lt;!-- ── 10. JJWT Jackson glue ──────────────────────────────── --&gt;</span>
+        <span class="ann">&lt;dependency&gt;</span>
+            <span class="ann">&lt;groupId&gt;</span>io.jsonwebtoken<span class="ann">&lt;/groupId&gt;</span>
+            <span class="ann">&lt;artifactId&gt;</span>jjwt-jackson<span class="ann">&lt;/artifactId&gt;</span>
+            <span class="ann">&lt;version&gt;</span>0.11.5<span class="ann">&lt;/version&gt;</span>
+            <span class="ann">&lt;scope&gt;</span>runtime<span class="ann">&lt;/scope&gt;</span>
+        <span class="ann">&lt;/dependency&gt;</span>
+        <span class="com">&lt;!--
+          jjwt is split into three artifacts intentionally:
+            • jjwt-api      → the public interface I write code against (compile)
+            • jjwt-impl     → the actual implementation (runtime only)
+            • jjwt-jackson  → JSON serializer plugin (runtime only)
+          This lets the library swap implementations cleanly. We don't
+          interact with -impl or -jackson directly in our code; they're
+          just loaded by the JVM when the API needs them.
+
+          version=0.11.5 is pinned because Spring Boot doesn't manage this
+          library — we own that decision.
+        --&gt;</span>
+
+    <span class="ann">&lt;/dependencies&gt;</span>
+
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="com">&lt;!-- BUILD — plugins that do the actual compiling and packaging   --&gt;</span>
+    <span class="com">&lt;!-- ═══════════════════════════════════════════════════════════ --&gt;</span>
+    <span class="ann">&lt;build&gt;</span>
+        <span class="ann">&lt;plugins&gt;</span>
+
+            <span class="com">&lt;!-- Plugin 1: Spring Boot Maven plugin --&gt;</span>
+            <span class="ann">&lt;plugin&gt;</span>
+                <span class="ann">&lt;groupId&gt;</span>org.springframework.boot<span class="ann">&lt;/groupId&gt;</span>
+                <span class="ann">&lt;artifactId&gt;</span>spring-boot-maven-plugin<span class="ann">&lt;/artifactId&gt;</span>
+                <span class="ann">&lt;configuration&gt;</span>
+                    <span class="ann">&lt;excludes&gt;</span>
+                        <span class="ann">&lt;exclude&gt;</span>
+                            <span class="ann">&lt;groupId&gt;</span>org.projectlombok<span class="ann">&lt;/groupId&gt;</span>
+                            <span class="ann">&lt;artifactId&gt;</span>lombok<span class="ann">&lt;/artifactId&gt;</span>
+                        <span class="ann">&lt;/exclude&gt;</span>
+                    <span class="ann">&lt;/excludes&gt;</span>
+                <span class="ann">&lt;/configuration&gt;</span>
+            <span class="ann">&lt;/plugin&gt;</span>
+            <span class="com">&lt;!--
+              Lets me run `./mvnw spring-boot:run`. It also produces a
+              "fat JAR" with all dependencies bundled in — for production,
+              you just `java -jar backend-0.0.1-SNAPSHOT.jar` and the
+              whole app starts.
+
+              The excludes=lombok bit says: "don't include the Lombok JAR
+              in the final fat JAR." Lombok is only needed at compile time.
+            --&gt;</span>
+
+            <span class="com">&lt;!-- Plugin 2: Maven Compiler — configures the Java compiler --&gt;</span>
+            <span class="ann">&lt;plugin&gt;</span>
+                <span class="ann">&lt;groupId&gt;</span>org.apache.maven.plugins<span class="ann">&lt;/groupId&gt;</span>
+                <span class="ann">&lt;artifactId&gt;</span>maven-compiler-plugin<span class="ann">&lt;/artifactId&gt;</span>
+                <span class="ann">&lt;executions&gt;</span>
+
+                    <span class="com">&lt;!-- Main compile step --&gt;</span>
+                    <span class="ann">&lt;execution&gt;</span>
+                        <span class="ann">&lt;id&gt;</span>default-compile<span class="ann">&lt;/id&gt;</span>
+                        <span class="ann">&lt;phase&gt;</span>compile<span class="ann">&lt;/phase&gt;</span>
+                        <span class="ann">&lt;goals&gt;&lt;goal&gt;</span>compile<span class="ann">&lt;/goal&gt;&lt;/goals&gt;</span>
+                        <span class="ann">&lt;configuration&gt;</span>
+                            <span class="ann">&lt;annotationProcessorPaths&gt;</span>
+                                <span class="ann">&lt;path&gt;</span>
+                                    <span class="ann">&lt;groupId&gt;</span>org.projectlombok<span class="ann">&lt;/groupId&gt;</span>
+                                    <span class="ann">&lt;artifactId&gt;</span>lombok<span class="ann">&lt;/artifactId&gt;</span>
+                                <span class="ann">&lt;/path&gt;</span>
+                            <span class="ann">&lt;/annotationProcessorPaths&gt;</span>
+                        <span class="ann">&lt;/configuration&gt;</span>
+                    <span class="ann">&lt;/execution&gt;</span>
+
+                    <span class="com">&lt;!-- Test compile step (same Lombok hookup) --&gt;</span>
+                    <span class="ann">&lt;execution&gt;</span>
+                        <span class="ann">&lt;id&gt;</span>default-testCompile<span class="ann">&lt;/id&gt;</span>
+                        <span class="ann">&lt;phase&gt;</span>test-compile<span class="ann">&lt;/phase&gt;</span>
+                        <span class="ann">&lt;goals&gt;&lt;goal&gt;</span>testCompile<span class="ann">&lt;/goal&gt;&lt;/goals&gt;</span>
+                        <span class="ann">&lt;configuration&gt;</span>
+                            <span class="ann">&lt;annotationProcessorPaths&gt;</span>
+                                <span class="ann">&lt;path&gt;</span>
+                                    <span class="ann">&lt;groupId&gt;</span>org.projectlombok<span class="ann">&lt;/groupId&gt;</span>
+                                    <span class="ann">&lt;artifactId&gt;</span>lombok<span class="ann">&lt;/artifactId&gt;</span>
+                                <span class="ann">&lt;/path&gt;</span>
+                            <span class="ann">&lt;/annotationProcessorPaths&gt;</span>
+                        <span class="ann">&lt;/configuration&gt;</span>
+                    <span class="ann">&lt;/execution&gt;</span>
+
+                <span class="ann">&lt;/executions&gt;</span>
+            <span class="ann">&lt;/plugin&gt;</span>
+            <span class="com">&lt;!--
+              ★ KEY IDEA: annotationProcessorPaths tells the Java compiler
+              to load Lombok as an annotation processor. This is how Lombok
+              works — at compile time it scans for @Getter, @Setter etc.
+              and INJECTS the generated methods directly into the .class
+              bytecode. The result: your source file stays clean, but the
+              compiled class has all the getter/setter methods.
+            --&gt;</span>
+
+        <span class="ann">&lt;/plugins&gt;</span>
+    <span class="ann">&lt;/build&gt;</span>
+
+<span class="ann">&lt;/project&gt;</span></pre>
+    </div>
+
+    <!-- ──────── Dependency summary table ──────── -->
+    <h2><span class="h2-emoji">📋</span> All 10 Dependencies at a Glance</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>#</th><th>Library</th><th>What it gives us</th><th>Scope</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td><code>spring-boot-starter-data-jpa</code></td><td>Hibernate, JPA, Spring Data repositories</td><td>compile</td></tr>
+        <tr><td>2</td><td><code>spring-boot-starter-security</code></td><td>Login, password hashing, filter chain, role-based access</td><td>compile</td></tr>
+        <tr><td>3</td><td><code>spring-boot-starter-validation</code></td><td>@NotBlank, @Min, @Email validators on DTOs</td><td>compile</td></tr>
+        <tr><td>4</td><td><code>spring-boot-starter-webmvc</code></td><td>Embedded Tomcat server, @RestController, JSON ↔ Java</td><td>compile</td></tr>
+        <tr><td>5</td><td><code>mysql-connector-j</code></td><td>JDBC driver — Java ↔ MySQL communication</td><td>runtime</td></tr>
+        <tr><td>6</td><td><code>lombok</code></td><td>@Getter, @Setter, @Builder etc. — saves boilerplate</td><td>compile (optional)</td></tr>
+        <tr><td>7</td><td><code>spring-boot-starter-test</code></td><td>JUnit 5, Mockito, MockMvc</td><td>test only</td></tr>
+        <tr><td>8</td><td><code>jjwt-api</code></td><td>Public JWT interface (for our code)</td><td>compile</td></tr>
+        <tr><td>9</td><td><code>jjwt-impl</code></td><td>JWT implementation</td><td>runtime</td></tr>
+        <tr><td>10</td><td><code>jjwt-jackson</code></td><td>JSON serializer for JWT payloads</td><td>runtime</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Scopes explained ──────── -->
+    <h2><span class="h2-emoji">🎯</span> What Do "Scopes" Mean?</h2>
+    <p>
+      A dependency's <code>&lt;scope&gt;</code> controls <strong>when</strong> the JAR is on the
+      classpath. Maven uses four common scopes:
+    </p>
+
+    <table class="t">
+      <thead>
+        <tr><th>Scope</th><th>Available at compile?</th><th>Available at runtime?</th><th>Bundled in final JAR?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>compile</code> (default)</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td><code>runtime</code></td><td>No</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td><code>test</code></td><td>Only in test sources</td><td>Only in tests</td><td>No</td></tr>
+        <tr><td><code>provided</code></td><td>Yes</td><td>No (assumed already there)</td><td>No</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <strong>Why mysql-connector is <code>runtime</code>:</strong> our code never imports
+      <code>com.mysql.cj.jdbc.Driver</code> directly — Hibernate finds it dynamically by
+      class name. So we don't need it on the compile classpath, only when the app actually
+      runs. Slightly faster compiles, slightly cleaner API.
+    </div>
+
+    <!-- ──────── Real-world scenario ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real Scenario — What Happens at Build Time</h2>
+
+    <div class="scenario">
+      <h5>First time someone clones NOOL and runs the backend</h5>
+      <ol>
+        <li>I clone the repo to a new computer.</li>
+        <li>I cd into <code>backend/</code> and run <code>./mvnw spring-boot:run</code>.</li>
+        <li>Maven reads <code>pom.xml</code>. Sees parent = <code>spring-boot-starter-parent:4.0.6</code>.</li>
+        <li>Maven downloads the parent POM from Maven Central (~2 KB).</li>
+        <li>Parent POM lists ~50 inherited library versions.</li>
+        <li>Maven then resolves each of our 10 dependencies, plus all their transitive dependencies (deps-of-deps). Total ends up ~250 JARs.</li>
+        <li>Maven downloads any JAR not already in <code>~/.m2/repository/</code>. First time: ~300 MB, ~3 minutes.</li>
+        <li>Maven invokes the Java compiler with Lombok as an annotation processor.</li>
+        <li>Compiler walks every <code>.java</code> file, generates Lombok methods, produces <code>.class</code> files into <code>target/classes/</code>.</li>
+        <li>Spring Boot Maven plugin launches the app — embedded Tomcat starts on port 8083.</li>
+        <li>Console shows the Spring banner, "Started BackendApplication in 4.2 seconds".</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Second time (and every time after)</h5>
+      <ol>
+        <li>All JARs are already cached locally.</li>
+        <li>Only <code>.java</code> files that changed since last build get recompiled.</li>
+        <li>App is up in 4-5 seconds total. Maven dependency phase is &lt; 1 second.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common pom.xml mistakes to avoid</h5>
+
+      <div class="item">
+        <div class="bad">Specifying versions for libraries that Spring Boot's parent already manages</div>
+        <div class="good">If the parent POM defines a version, leave the <code>&lt;version&gt;</code> tag off your dependency entry. Otherwise you might pin an old version that's incompatible with the rest of the Spring ecosystem.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>&lt;optional&gt;true&lt;/optional&gt;</code> on Lombok</div>
+        <div class="good">Without it, any project that depends on YOUR project would also have to add Lombok as a dependency — pointless friction. <code>optional=true</code> says "I use this internally; downstream doesn't need it."</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding a dependency without checking if it's already transitively pulled in</div>
+        <div class="good">Run <code>./mvnw dependency:tree</code> to see what's already on the classpath. Adding duplicates causes version conflicts.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Putting test libraries in <code>compile</code> scope</div>
+        <div class="good">Use <code>&lt;scope&gt;test&lt;/scope&gt;</code>. Otherwise JUnit, Mockito etc. end up in your production JAR — wasted ~5MB and a slightly bigger attack surface.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Removing the Lombok annotationProcessorPaths block to "clean up"</div>
+        <div class="good">If you remove it, Lombok stops working at compile time. Your code will reference auto-generated getter methods that don't exist, and the build will fail mysteriously. Keep both the dependency AND the processor path config.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview-style questions about pom.xml</h5>
+
+      <div class="qa">
+        <div class="q">Why does NOOL use the spring-boot-starter-parent as its parent POM?</div>
+        <div class="a">
+          The parent POM provides "managed dependencies" — it knows the right, mutually-compatible
+          versions of ~50 common libraries (Hibernate, Jackson, Tomcat, etc.). I just declare
+          which "starters" I need; Spring Boot handles the version harmony. Without it, I'd
+          spend days manually picking versions and fixing conflicts.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>spring-boot-starter-web</code> and <code>spring-boot-starter-webmvc</code>?</div>
+        <div class="a">
+          They're essentially the same in current Spring Boot versions —
+          <code>spring-boot-starter-webmvc</code> is the modern, more specific name (introduced
+          in Spring Boot 4) that makes it clear we're using the servlet-based MVC stack, not
+          the reactive WebFlux stack. Older code uses <code>spring-boot-starter-web</code>;
+          both work.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why are JWT versions pinned to 0.11.5 but other library versions aren't?</div>
+        <div class="a">
+          Because Spring Boot's parent POM doesn't manage JWT. I have to pick the version
+          myself. 0.11.5 is a known-stable jjwt release. For the libraries Spring Boot
+          DOES manage (JPA, Security, etc.), I omit the version and inherit the recommended one.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What is an "annotation processor" and why does Lombok need one?</div>
+        <div class="a">
+          Annotation processors are Java compiler plugins that read special annotations
+          (<code>@Getter</code>, <code>@Builder</code>, etc.) and generate additional code
+          before the regular compile step finishes. Lombok works this way: I write
+          <code>@Getter private String name;</code>, the processor injects a
+          <code>public String getName() { return this.name; }</code> method into the .class
+          file. The original .java source stays clean.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's a "fat JAR"?</div>
+        <div class="a">
+          A fat JAR (or "uber JAR") is a single .jar file containing your compiled code AND
+          all its dependencies' .jar contents bundled in. Spring Boot's Maven plugin builds
+          one when you run <code>./mvnw package</code>. You can then ship just that one file
+          to production and run it with <code>java -jar backend-0.0.1-SNAPSHOT.jar</code> —
+          no need for a separate dependency-management setup on the server.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does <code>SNAPSHOT</code> in the version mean?</div>
+        <div class="a">
+          It's Maven's convention for "in development, not a stable release". A SNAPSHOT version
+          can change at any time without bumping the number — useful while developing. When you
+          release, you drop the SNAPSHOT suffix (<code>0.0.1-SNAPSHOT</code> →
+          <code>1.0.0</code>) and that version becomes immutable in repositories.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Now that we have all the libraries, we need to <strong>configure</strong> them — what port
+      should we listen on? What database should we connect to? What's the JWT secret? All of that
+      goes into a file called <code>application.properties</code>. That's the next chapter.
+    </p>
+
+    <div class="chapnav">
+      <a href="04-database-model.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 04 · Database Model</span>
+      </a>
+      <a href="06-application-properties.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 06 · application.properties</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 05 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

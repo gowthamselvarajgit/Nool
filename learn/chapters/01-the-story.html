@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 01 · The Real Story · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- ──────── Chapter hero ──────── -->
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 01 · The Beginning</span>
+    <h1>
+      The Real Story —<br/>
+      Why <span class="gradient">NOOL</span> exists ❤️
+    </h1>
+    <p class="subtitle">
+      Before we touch a single line of code, you have to understand <em>why</em>
+      this project was built. Because it wasn't built for a class, or a portfolio,
+      or a paycheck. It was built for two people.
+    </p>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="content">
+
+    <!-- ──────── The story card ──────── -->
+    <div class="story" style="background: linear-gradient(135deg, #fff5f7, #fef3c7); border: 1px solid #fbcfe8;">
+      <div class="char">
+        <div class="avatar" style="background: linear-gradient(135deg, #ec4899, #f59e0b); font-size: 30px;">👨‍👩‍👦</div>
+        <div>
+          <h5>This isn't a hypothetical project.</h5>
+          <span class="role-tag">It's a love letter from a son to his parents.</span>
+        </div>
+      </div>
+      <p style="font-size: 16px; line-height: 1.85;">
+        My <strong>mom and dad</strong> have been running a small saree-polishing workshop
+        in India for <strong>many, many years</strong>. Every day, owners bring big batches of
+        sarees to be polished. My parents take them in, get them polished by their workers,
+        and return the finished sarees back to the owners. The owners pay them based on how
+        many sarees came back polished, and my parents in turn pay their workers based on
+        how many sarees each one polished.
+      </p>
+      <p style="font-size: 16px; line-height: 1.85;">
+        For all these years, I watched them write <strong>everything in paper notebooks</strong>.
+        One notebook for owners. One for workers. One for daily attendance. One for payments.
+        And every single evening I would see the same scene play out — pages flipped back and
+        forth, eyes squinting at faded entries, my mom asking my dad, <em>"How many sarees of
+        Rahul are still with us?"</em>, my dad asking my mom, <em>"Did we pay Prema for
+        last Friday or not?"</em> Numbers crossed out and rewritten. Confusion. Tiredness.
+        Sometimes arguments. Just to figure out things that <em>should</em> be simple.
+      </p>
+      <p style="font-size: 16px; line-height: 1.85;">
+        I couldn't watch them struggle like that anymore. So I built <strong>NOOL</strong>
+        — a complete digital system that does all the accounting, all the tracking, all the
+        calculations for them. No more notebooks. No more confusion. Just one clean app
+        that remembers <em>every single saree, every rupee, every working day</em> — so my
+        mom and dad can finally stop worrying about <em>who owes what</em> and focus on
+        what they're actually good at: running their workshop.
+      </p>
+      <p style="font-size: 16px; line-height: 1.85; font-weight: 600; color: #be185d; margin-top: 16px;">
+        This whole project exists for them. Everything you're about to learn — every table,
+        every screen, every line of code — was built so that my parents can finally rest easy
+        in the evenings. ❤️
+      </p>
+    </div>
+
+    <!-- ──────── The painful "before" ──────── -->
+    <h2><span class="h2-emoji">📓</span> The Painful "Before" — Life Without NOOL</h2>
+    <p>
+      Let me paint a picture of what evenings used to look like at our home before NOOL existed.
+      Imagine it's 9 PM, dinner is done, and my parents are sitting at the dining table
+      surrounded by four or five battered notebooks.
+    </p>
+
+    <div class="scenario">
+      <h5>🌙 A typical evening — March 2024</h5>
+      <p><strong>Mom:</strong> "Rahul called today. He wants to know how many sarees of his we still have."</p>
+      <p><strong>Dad:</strong> "Let me check…" <em>(flips through the receipt notebook)</em> "He brought 200 last Tuesday."</p>
+      <p><strong>Mom:</strong> "But we returned some. Check the return book."</p>
+      <p><strong>Dad:</strong> <em>(flips, squints, can't read his own writing from three weeks ago)</em> "I think we returned… 80? Or was that for Sharma Madam?"</p>
+      <p><strong>Mom:</strong> "No no, Sharma was the day before. Look at the date."</p>
+      <p><strong>Dad:</strong> <em>(20 minutes pass)</em> "OK so 200 received, 80 returned. 120 still with us."</p>
+      <p><strong>Mom:</strong> "Are you sure? Last week you said 130. Did we polish 10 more without recording?"</p>
+      <p><strong>Dad:</strong> "Hmm. Let me start over…"</p>
+    </div>
+
+    <p>
+      That conversation, or something exactly like it, happened almost <em>every single evening</em>.
+      And it wasn't because my parents are bad at their job — they're <em>excellent</em> at it.
+      It was because paper notebooks fundamentally cannot answer questions like "how many of
+      Rahul's sarees are still with us?" without a human flipping pages and doing mental math.
+      And humans get tired. And lose pages. And forget to write things down when they're busy.
+    </p>
+
+    <!-- ──────── What was breaking ──────── -->
+    <h2><span class="h2-emoji">💔</span> What Was Breaking</h2>
+    <p>The notebook system was failing in five specific ways:</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="icon">⏰</div>
+        <h4>Slow lookups</h4>
+        <p>"How many of X's sarees are with us?" took 15-20 minutes of page flipping every single time.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔢</div>
+        <h4>Math errors</h4>
+        <p>Adding columns of numbers by hand at 10 PM after a 12-hour day = mistakes.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📄</div>
+        <h4>Lost pages</h4>
+        <p>Books got water on them. Pages tore. Some entries faded so badly nobody could read them.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🤔</div>
+        <h4>No history search</h4>
+        <p>"What did we deliver to Mr. Khan last Diwali?" Almost impossible to find in 6 months of pages.</p>
+      </div>
+      <div class="card">
+        <div class="icon">💸</div>
+        <h4>Money lost</h4>
+        <p>Sometimes a worker would say "you didn't pay me for last Tuesday" — and Dad had no way to prove they did.</p>
+      </div>
+      <div class="card">
+        <div class="icon">😴</div>
+        <h4>Tiredness</h4>
+        <p>The worst one. Every evening, an hour of accounting that should have been family time.</p>
+      </div>
+    </div>
+
+    <!-- ──────── The decision ──────── -->
+    <h2><span class="h2-emoji">💡</span> The Decision to Build NOOL</h2>
+    <p>
+      One night in 2025, I sat with my parents after dinner and watched them spend almost
+      an hour trying to figure out whether they had paid a worker for the previous week.
+      The records simply weren't clear, and they couldn't be sure either way. That was the moment.
+      I decided that night that I would build them a real, professional, secure ERP system —
+      so this kind of confusion would never happen to them again.
+    </p>
+
+    <p>
+      I had three rules for myself:
+    </p>
+    <ol>
+      <li><strong>It must be simple enough that my mom (who's never used a computer for work) can use it confidently.</strong> If the buttons are confusing or the screens are crowded, I've failed.</li>
+      <li><strong>It must be safe — no data should ever be lost, miscounted, or unrecoverable.</strong> Money and trust are at stake.</li>
+      <li><strong>It must work even when there are mistakes.</strong> If Dad accidentally types 500 instead of 50, the system should catch it and ask "are you sure?".</li>
+    </ol>
+
+    <p>
+      The name <strong>"NOOL"</strong> comes from the Tamil word "நூல்" which means "thread" — fitting,
+      because everything in our business revolves around the threads of a saree being polished.
+    </p>
+
+    <!-- ──────── What NOOL replaces ──────── -->
+    <h2><span class="h2-emoji">🔄</span> What NOOL Replaces (Notebook → Digital)</h2>
+    <p>Here's the direct mapping from the old paper world to the new digital one:</p>
+
+    <table class="t">
+      <thead>
+        <tr><th>Old (paper notebook)</th><th>New (NOOL screen)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>📖 <strong>Receive book</strong> — when Rahul brought 100 sarees, Dad scribbled "Rahul 100 Mon" in red pen</td>
+          <td>📦 <strong>Inventory → Add Receipt</strong> — picks Rahul from a dropdown, types 100, picks the date. Done in 10 seconds.</td>
+        </tr>
+        <tr>
+          <td>📖 <strong>Return book</strong> — when sarees were returned, Mom wrote in green pen</td>
+          <td>📦 <strong>Inventory → Add Return</strong> — same dropdown. <em>Plus:</em> the system refuses to let you return more than the owner gave!</td>
+        </tr>
+        <tr>
+          <td>📖 <strong>Worker daily diary</strong> — each worker's daily count, often in pencil</td>
+          <td>📝 <strong>Daily Work</strong> — fresh count + re-polish count per worker per day, saved forever</td>
+        </tr>
+        <tr>
+          <td>📖 <strong>Attendance register</strong> — ticks and crosses, hard to count at month-end</td>
+          <td>📍 <strong>Attendance</strong> — colored calendar view. Mom can see "Prema was here 22 days this month" instantly.</td>
+        </tr>
+        <tr>
+          <td>📖 <strong>Salary book</strong> — every payment to a worker, in a separate spiral notebook</td>
+          <td>💰 <strong>Salary</strong> — automatic earnings calculation, payment history, pending amount per worker</td>
+        </tr>
+        <tr>
+          <td>📖 <strong>Customer payment book</strong> — incoming money</td>
+          <td>💳 <strong>Owner Payments</strong> — per-client running totals, pending amounts</td>
+        </tr>
+        <tr>
+          <td>🤷 <strong>"How is the business doing?"</strong> — no answer, ever</td>
+          <td>📊 <strong>Analytics Dashboard</strong> — revenue trends, top clients, workforce productivity</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── The first day of using NOOL ──────── -->
+    <h2><span class="h2-emoji">🎉</span> The First Day My Parents Used NOOL</h2>
+
+    <div class="callout brain">
+      <p style="margin-bottom: 8px;">
+        I'll never forget the day I sat them down and showed them. Dad logged in.
+        Saw the dashboard. Saw the big number — <em>"Sarees still with us: 340"</em> — that
+        used to take 20 minutes to compute, now updated instantly. He looked at me, looked at
+        Mom, and said:
+      </p>
+      <p style="font-size: 18px; font-weight: 700; color: var(--primary); text-align: center; margin: 14px 0 6px;">
+        <em>"Maganey, idhu nalla irukku. Ippo enakku tension illa."</em>
+      </p>
+      <p style="text-align: center; font-size: 13px; color: var(--muted);">
+        "Son, this is good. Now I don't feel stressed."
+      </p>
+      <p style="margin-top: 14px; margin-bottom: 0;">
+        That's the whole reason I'm writing this guide. So you — and anyone else who reads
+        this — can learn how to build something like NOOL for the people you love too.
+      </p>
+    </div>
+
+    <!-- ──────── What you'll learn ──────── -->
+    <h2><span class="h2-emoji">🗺️</span> What You'll Learn in This Tutorial</h2>
+    <p>
+      Across the next 84 chapters, we'll walk through <strong>every single file</strong> in NOOL —
+      backend and frontend — in the right order. By the end you'll know:
+    </p>
+    <ul>
+      <li>How a real Spring Boot + React + MySQL ERP is structured end to end</li>
+      <li>How to design a database that won't drift or lose data</li>
+      <li>How JWT authentication works, line by line</li>
+      <li>How to safely handle concurrent operations (the pessimistic locking pattern)</li>
+      <li>How to build role-based access control that actually works</li>
+      <li>How a React SPA talks to a REST backend and stays in sync</li>
+      <li>And — most importantly — how every technical choice serves a real human need</li>
+    </ul>
+
+    <p>
+      In the next chapter, we'll meet the <strong>three kinds of people</strong> who use NOOL,
+      and walk through what each of them does on a typical day.
+    </p>
+
+    <!-- ──────── Chapter navigation ──────── -->
+    <div class="chapnav">
+      <a class="dim">
+        <span class="arrow">← Previous</span>
+        <span class="title">(This is the first chapter)</span>
+      </a>
+      <a href="02-what-nool-does.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 02 · What NOOL Does</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 01 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

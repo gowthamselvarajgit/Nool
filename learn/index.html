@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NOOL · Learn — A Full Walk-Through of the Project</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <span style="font-size:13px; color: var(--muted);">A complete tour of the project</span>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- ──────── Hero ──────── -->
+  <section class="chapter-hero">
+    <span class="num-badge">❤️ Built for Mom and Dad</span>
+    <h1>
+      Welcome to <span class="gradient">NOOL · Learn</span>
+    </h1>
+    <p class="subtitle">
+      A complete, file-by-file walk-through of the saree-workshop ERP I built
+      for my parents. Click any chapter below — each one is its own focused page,
+      so the explanations stay clear and nothing gets cut off.
+    </p>
+    <div class="hero-stats">
+      <div class="stat"><span class="n">8 / 85</span><span class="l">Chapters Ready</span></div>
+      <div class="stat"><span class="n">3</span><span class="l">User Roles</span></div>
+      <div class="stat"><span class="n">~60</span><span class="l">Backend Files</span></div>
+      <div class="stat"><span class="n">~30</span><span class="l">Frontend Files</span></div>
+    </div>
+  </section>
+
+  <!-- ──────── How to use ──────── -->
+  <div class="callout brain">
+    <strong>📖 How to use this guide:</strong> Start with <a href="chapters/01-the-story.html">Chapter 01</a>
+    and go in order. Each chapter explains one piece of NOOL clearly and completely —
+    no rushing, no jumping around. ✅ means the chapter is ready to read.
+    ⏳ means I haven't written it yet — say "next" and I'll add the next ones.
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       MASTER TABLE OF CONTENTS
+       ══════════════════════════════════════════════════════ -->
+  <div class="toc">
+
+    <!-- ──── PHASE 1: Context ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">1</span> Context — The Story &amp; The Big Picture</h3>
+      <ul class="toc-list">
+        <li><a class="done" href="chapters/01-the-story.html">
+          <span class="ch-num">Ch 01</span><span class="ch-title">The Real Story — Why I built NOOL for my parents</span><span class="ch-status">✅</span>
+        </a></li>
+        <li><a class="done" href="chapters/02-what-nool-does.html">
+          <span class="ch-num">Ch 02</span><span class="ch-title">What NOOL Does — The three roles &amp; the daily workflow</span><span class="ch-status">✅</span>
+        </a></li>
+        <li><a class="done" href="chapters/03-architecture.html">
+          <span class="ch-num">Ch 03</span><span class="ch-title">Architecture &amp; Tech Stack — How the pieces fit together</span><span class="ch-status">✅</span>
+        </a></li>
+        <li><a class="done" href="chapters/04-database-model.html">
+          <span class="ch-num">Ch 04</span><span class="ch-title">Database Model — Every table, every relationship</span><span class="ch-status">✅</span>
+        </a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 2: Backend setup ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">2</span> Backend Setup — The Project Skeleton</h3>
+      <ul class="toc-list">
+        <li><a class="done" href="chapters/05-pom-xml.html"><span class="ch-num">Ch 05</span><span class="ch-title">backend/pom.xml — Maven dependencies explained</span><span class="ch-status">✅</span></a></li>
+        <li><a class="done" href="chapters/06-application-properties.html"><span class="ch-num">Ch 06</span><span class="ch-title">application.properties — Every setting explained</span><span class="ch-status">✅</span></a></li>
+        <li><a class="done" href="chapters/07-backend-application.html"><span class="ch-num">Ch 07</span><span class="ch-title">BackendApplication.java — The entry point</span><span class="ch-status">✅</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 3: Foundational types ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">3</span> Foundational Types — Enums, Exceptions, Common DTOs</h3>
+      <ul class="toc-list">
+        <li><a class="done" href="chapters/08-enums.html"><span class="ch-num">Ch 08</span><span class="ch-title">All 6 enums (Role, EmployeeStatus, OwnerStatus, AttendanceStatus, PaymentMode, LedgerEntryType)</span><span class="ch-status">✅</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 09</span><span class="ch-title">Custom exceptions + GlobalExceptionHandler</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 10</span><span class="ch-title">Common DTOs (ApiResponseDto, PaginationRequestDto, DateRangeDto, etc.)</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 4: Entities ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">4</span> Entities — The Data Model in Java</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 11</span><span class="ch-title">User.java — Login credentials</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 12</span><span class="ch-title">UserProfile.java — The bridge to Employee/Owner</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 13</span><span class="ch-title">Employee.java — Worker profile + polish rate</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 14</span><span class="ch-title">SareeOwner.java — Client profile + per-owner rate</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 15</span><span class="ch-title">SareeLedgerEntry.java — The append-only inventory ledger ⭐</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 16</span><span class="ch-title">Attendance.java — Daily roll call</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 17</span><span class="ch-title">EmployeeDailyWork.java — Daily polishing log</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 18</span><span class="ch-title">SalaryPayment.java — Money paid to workers</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 19</span><span class="ch-title">OwnerPayment.java — Money received from owners</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 5: Security ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">5</span> Security — JWT, BCrypt, Role-Based Access</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 20</span><span class="ch-title">JwtUtil.java — Token factory</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 21</span><span class="ch-title">JwtAuthenticationFilter.java — Guard at the door</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 22</span><span class="ch-title">SecurityConfig.java — Master rules book</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 23</span><span class="ch-title">CurrentUserUtil.java — Reading the caller's identity</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 6: Auth module ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">6</span> Auth Module — Login Flow End-to-End</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 24</span><span class="ch-title">Auth DTOs &amp; UserRepository / UserProfileRepository</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 25</span><span class="ch-title">AuthService + AuthServiceImpl — The login logic</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 26</span><span class="ch-title">AdminUserService — Provisioning login accounts</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 27</span><span class="ch-title">AdminBootstrapRunner — Seed-admin on first boot</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 28</span><span class="ch-title">AuthController — POST /auth/login endpoint</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 7: Employee module ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">7</span> Employee Module — Managing Workers</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 29</span><span class="ch-title">EmployeeRepository + all employee DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 30</span><span class="ch-title">EmployeeService + Impl — Business logic</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 31</span><span class="ch-title">EmployeeController — REST endpoints</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 8: Attendance ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">8</span> Attendance Module</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 32</span><span class="ch-title">AttendanceRepository + DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 33</span><span class="ch-title">AttendanceService + Impl</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 34</span><span class="ch-title">AttendanceController</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 9: Daily Work ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">9</span> Daily Work Module</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 35</span><span class="ch-title">EmployeeDailyWorkRepository + DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 36</span><span class="ch-title">EmployeeDailyWorkService + Impl</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 37</span><span class="ch-title">EmployeeDailyWorkController</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 10: Salary ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">10</span> Salary Module — Paying Workers</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 38</span><span class="ch-title">SalaryPaymentRepository + DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 39</span><span class="ch-title">SalaryService + Impl — The earnings formula</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 40</span><span class="ch-title">SalaryPaymentController</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 11: Owner ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">11</span> Owner Module — Managing Clients</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 41</span><span class="ch-title">SareeOwnerRepository + DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 42</span><span class="ch-title">SareeOwnerService + Impl</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 43</span><span class="ch-title">SareeOwnerController</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 12: Inventory ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">12</span> Inventory Module — The Heart of NOOL ⭐</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 44</span><span class="ch-title">SareeLedgerRepository + Inventory DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 45</span><span class="ch-title">SareeInventoryService + Impl — Pessimistic locking 🔒</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 46</span><span class="ch-title">SareeInventoryController</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 13: Owner payments ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">13</span> Owner Payment Module</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 47</span><span class="ch-title">OwnerPaymentRepository + DTOs</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 48</span><span class="ch-title">OwnerPaymentService + Impl</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 49</span><span class="ch-title">OwnerPaymentController</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 14: Dashboard ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">14</span> Admin Dashboard Module</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 50</span><span class="ch-title">Dashboard DTOs (revenue, workforce analytics)</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 51</span><span class="ch-title">AdminDashboardService + Impl</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 52</span><span class="ch-title">AdminLeaveProductivityService</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 53</span><span class="ch-title">Dashboard controllers</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 15: Frontend setup ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">15</span> Frontend Setup — Vite, Tailwind, React</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 54</span><span class="ch-title">package.json — Frontend dependencies</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 55</span><span class="ch-title">vite.config.js + tailwind.config.js + postcss.config.js</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 56</span><span class="ch-title">index.html + main.jsx + index.css — The bootstrap</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 16: Frontend routing ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">16</span> Frontend Routing &amp; Auth</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 57</span><span class="ch-title">App.jsx — The route table</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 58</span><span class="ch-title">AuthContext.jsx + useAuth.js — Login state</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 59</span><span class="ch-title">ProtectedRoutes.jsx — Route guards</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 17: Frontend services & utils ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">17</span> Frontend Services &amp; Utilities</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 60</span><span class="ch-title">services/api.js — The backend bridge (every endpoint)</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 61</span><span class="ch-title">utils/formatters.js — Date, currency, status helpers</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 62</span><span class="ch-title">utils/validators.js + excelExporter.js</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 18: Common components ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">18</span> Shared UI Components</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 63</span><span class="ch-title">Layout.jsx (Sidebar) — Per-role menu</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 64</span><span class="ch-title">Common.jsx — Button, Input, Loading, ErrorMessage</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 65</span><span class="ch-title">Table.jsx — Sortable, paginated, exportable</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 66</span><span class="ch-title">AttendanceCalendar.jsx + PaymentCalendar.jsx + InventoryActivityCalendar.jsx</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 19: Public pages ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">19</span> Public Pages</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 67</span><span class="ch-title">LandingPage.jsx — The marketing page</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 68</span><span class="ch-title">LoginPage.jsx — The front door</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 20: Admin pages ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">20</span> Admin Pages — My Parents' Cockpit</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 69</span><span class="ch-title">AdminDashboard.jsx — The big-picture screen</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 70</span><span class="ch-title">EmployeesPage.jsx — Manage workers</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 71</span><span class="ch-title">OwnersPage.jsx — Manage clients</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 72</span><span class="ch-title">DailyWorkManagementPage.jsx — Log polishing</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 73</span><span class="ch-title">AttendancePage.jsx — Mark attendance</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 74</span><span class="ch-title">SalaryPage.jsx — Pay workers</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 75</span><span class="ch-title">PaymentsManagementPage.jsx — Collect from owners</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 76</span><span class="ch-title">InventoryManagementPage.jsx — Receive &amp; return sarees</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 77</span><span class="ch-title">AnalyticsPage.jsx — Charts &amp; trends</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 21: Worker pages ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">21</span> Worker Pages</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 78</span><span class="ch-title">EmployeeDashboard.jsx — Worker's home</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 79</span><span class="ch-title">EmployeeProfile.jsx</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 80</span><span class="ch-title">DailyWorkPage.jsx — Log my own work</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 81</span><span class="ch-title">PerformancePage.jsx — My productivity</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 22: Owner pages ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">22</span> Owner Pages</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 82</span><span class="ch-title">OwnerDashboard.jsx — Owner's home</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 83</span><span class="ch-title">OwnerProfile.jsx + InventoryPage.jsx + TransactionsPage.jsx</span><span class="ch-status">⏳</span></a></li>
+        <li><a class="todo"><span class="ch-num">Ch 84</span><span class="ch-title">OwnerPaymentsPage.jsx + InventoryReportPage.jsx</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+    <!-- ──── PHASE 23: Wrap-up ──── -->
+    <div class="toc-phase">
+      <h3><span class="phase-num">23</span> Wrap-Up</h3>
+      <ul class="toc-list">
+        <li><a class="todo"><span class="ch-num">Ch 85</span><span class="ch-title">Quick Start &amp; Interview Prep — Everything you need to talk about NOOL</span><span class="ch-status">⏳</span></a></li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ──────── First chapter call to action ──────── -->
+  <div style="margin-top: 40px; text-align: center;">
+    <a href="chapters/01-the-story.html" style="
+        display: inline-block; padding: 16px 40px;
+        background: linear-gradient(135deg, var(--primary), var(--indigo));
+        color: white; text-decoration: none; border-radius: 999px;
+        font-weight: 700; font-size: 15px;
+        box-shadow: 0 12px 30px rgba(109, 74, 254, 0.35);
+        transition: transform 0.2s;
+      "
+      onmouseover="this.style.transform='translateY(-2px)'"
+      onmouseout="this.style.transform='translateY(0)'">
+      Start with Chapter 01 →
+    </a>
+  </div>
+
+</main>
+
+<footer class="foot">
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+  <p>Open any file in any browser — no internet needed.</p>
+</footer>
+
+</body>
+</html>

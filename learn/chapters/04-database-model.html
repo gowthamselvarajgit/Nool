@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 04 · The Database Model · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 04 · The Foundation</span>
+    <h1>
+      The <span class="gradient">Database Model</span> —<br/>
+      Every table, every relationship
+    </h1>
+    <p class="subtitle">
+      The database is the foundation. If the data model is wrong, no amount of clever
+      code can fix it. In this chapter we'll see every table in NOOL, what each one stores,
+      and how they connect.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <!-- ──────── Why this comes first ──────── -->
+    <h2><span class="h2-emoji">🧠</span> Why I Designed the Database First</h2>
+    <p>
+      Before writing a single line of Java code, I drew the database tables on paper. Why?
+      Because <strong>everything else in the app is downstream of the data model</strong>.
+      The Java entities mirror the tables. The DTOs are reshapes of entity data. The REST
+      endpoints expose entities. The React forms collect data that ends up in entities.
+      Get the tables right, and everything else falls into place.
+    </p>
+
+    <div class="callout brain">
+      <strong>The rule I followed:</strong> Every table answers ONE clear question.
+      <code>users</code> answers "who can log in?". <code>saree_ledger</code> answers "which
+      sarees came in and went out, when, for whom?". If a table has unclear purpose, it
+      probably needs to be split into two.
+    </div>
+
+    <!-- ──────── The 9 tables ──────── -->
+    <h2><span class="h2-emoji">📋</span> The 9 Tables in NOOL</h2>
+    <p>The whole database has exactly nine tables. Here they are at a glance:</p>
+
+    <table class="t">
+      <thead>
+        <tr><th>Table</th><th>What it stores</th><th>One row per</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>users</code></td><td>Login credentials. Mobile + hashed password + role.</td><td>person who can log in</td></tr>
+        <tr><td><code>user_profile</code></td><td>Links a User to either an Employee or an Owner.</td><td>logged-in person, one-to-one with users</td></tr>
+        <tr><td><code>employees</code></td><td>Worker business info: name, joining date, polish rate.</td><td>worker at the workshop</td></tr>
+        <tr><td><code>attendance</code></td><td>Daily attendance — present/absent/leave/half-day.</td><td><strong>(employee, date)</strong> pair</td></tr>
+        <tr><td><code>employee_daily_work</code></td><td>How many fresh + re-polish sarees done.</td><td><strong>(employee, date)</strong> pair</td></tr>
+        <tr><td><code>salary_payment</code></td><td>Money paid to a worker for a date range.</td><td>salary disbursement event</td></tr>
+        <tr><td><code>saree_owner</code></td><td>Client info: name, mobile, per-owner rate.</td><td>client / saree owner</td></tr>
+        <tr><td><code>saree_ledger</code></td><td>Inventory events. RECEIPT or RETURN.</td><td>one saree transaction</td></tr>
+        <tr><td><code>owner_payment</code></td><td>Money received from an owner.</td><td>payment receipt event</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── ERD ──────── -->
+    <h2><span class="h2-emoji">🔗</span> The Relationship Diagram</h2>
+    <p>Here's how the tables connect to each other (simplified ER diagram):</p>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">NOOL database — entity relationships</span>
+        <span class="lang">ERD</span>
+      </div>
+<pre>
+                       ┌──────────────┐
+                       │    users     │   <span class="com">← every login</span>
+                       │──────────────│
+                       │ user_id (PK) │
+                       │ mobile       │
+                       │ password     │
+                       │ role (enum)  │
+                       │ active       │
+                       └──────┬───────┘
+                              │ 1:1
+                       ┌──────▼───────┐
+                       │ user_profile │   <span class="com">← bridge to business entity</span>
+                       │──────────────│
+                       │ profile_id   │
+                       │ user_id (FK) │
+                       │ employee_id  │ (FK or null)
+                       │ owner_id     │ (FK or null)
+                       └──────┬───────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+   ┌────────────────────┐         ┌────────────────────┐
+   │    employees       │         │   saree_owner      │
+   │────────────────────│         │────────────────────│
+   │ employee_id (PK)   │         │ owner_id (PK)      │
+   │ employee_name      │         │ owner_name         │
+   │ mobile_number      │         │ mobile_number      │
+   │ joining_date       │         │ status             │
+   │ status             │         │ polish_rate_per_sa │
+   │ polishing_rate     │         │ user_id (FK)       │
+   │ user_id (FK)       │         └────────┬───────────┘
+   └────┬─────┬─────────┘                  │ 1:N
+        │     │                            ▼
+   1:N  │     │  1:N                ┌────────────────────┐
+        ▼     ▼                     │   saree_ledger     │
+   ┌────────┐ ┌────────────────┐    │────────────────────│
+   │attendance│employee_daily  │    │ entry_id (PK)      │
+   │  PK     ││  _work         │    │ owner_id (FK)      │
+   │employee ││  PK            │    │ entry_type         │
+   │  _id(FK)││  employee_id(FK│    │   (RECEIPT/RETURN) │
+   │date     ││  work_date     │    │ entry_date         │
+   │status   ││  freshCount    │    │ quantity           │
+   │UNIQUE   ││  rePolishCount │    │ remarks            │
+   │(emp,    ││  UNIQUE        │    └────────────────────┘
+   │ date)   ││  (emp, date)   │
+   └─────────┘└────────────────┘    ┌────────────────────┐
+                                    │  owner_payment     │
+   ┌────────────────────┐           │────────────────────│
+   │  salary_payment    │           │ payment_id (PK)    │
+   │────────────────────│           │ owner_id (FK)      │
+   │ payment_id (PK)    │           │ amount_paid        │
+   │ employee_id (FK)   │           │ payment_date       │
+   │ from_date          │           │ payment_mode       │
+   │ to_date            │           │ remarks            │
+   │ amount_paid        │           └────────────────────┘
+   │ payment_date       │
+   │ payment_mode       │
+   │ remarks            │
+   └────────────────────┘</pre>
+    </div>
+
+    <!-- ──────── Table-by-table walk-through ──────── -->
+    <h2><span class="h2-emoji">📚</span> Each Table, Explained</h2>
+    <p>Now let's go through each table in detail. We'll deep-dive each one in its own
+    chapter later, but here's the summary you need first.</p>
+
+    <!-- ─── users ─── -->
+    <h3>1. <code>users</code> — who can log in?</h3>
+    <p>The foundational table. Every person who logs into NOOL (admin, worker, or owner) has a row here.</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>user_id</code></td><td>BIGINT PK</td><td>Auto-generated unique ID</td></tr>
+        <tr><td><code>mobile_number</code></td><td>VARCHAR(15) UNIQUE</td><td>10-digit Indian mobile, used as login username</td></tr>
+        <tr><td><code>password</code></td><td>VARCHAR(100)</td><td>BCrypt hash of the password (never plain text!)</td></tr>
+        <tr><td><code>role</code></td><td>ENUM</td><td>ADMIN / WORKER / SAREE_OWNER</td></tr>
+        <tr><td><code>active_status</code></td><td>BOOLEAN</td><td>If false, login is blocked (soft-disable)</td></tr>
+        <tr><td><code>created_at, updated_at</code></td><td>DATETIME</td><td>Audit timestamps</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── user_profile ─── -->
+    <h3>2. <code>user_profile</code> — the bridge to business entities</h3>
+    <p>
+      A User has login credentials only. To find out what business entity they represent
+      (Employee? Owner?), we look up their UserProfile row. It points to either an Employee
+      OR a SareeOwner — never both.
+    </p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>profile_id</code></td><td>BIGINT PK</td><td>Auto-generated ID</td></tr>
+        <tr><td><code>user_id</code></td><td>BIGINT FK UNIQUE</td><td>Links to users(user_id)</td></tr>
+        <tr><td><code>employee_id</code></td><td>BIGINT FK nullable</td><td>If this user is a worker, points to their employees row</td></tr>
+        <tr><td><code>owner_id</code></td><td>BIGINT FK nullable</td><td>If this user is a saree owner, points to their saree_owner row</td></tr>
+      </tbody>
+    </table>
+    <div class="callout info">
+      <strong>Admin users have NULL for both</strong> employee_id and owner_id, because they aren't a worker or an owner — they're the business owner (my mom and dad).
+    </div>
+
+    <!-- ─── employees ─── -->
+    <h3>3. <code>employees</code> — workers / polishers</h3>
+    <p>One row per worker at the workshop (Prema, Ravi, etc.). Holds business-specific info, not login data.</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>employee_id</code></td><td>BIGINT PK</td><td>Auto-generated</td></tr>
+        <tr><td><code>employee_name</code></td><td>VARCHAR(255)</td><td>"Prema", "Ravi"</td></tr>
+        <tr><td><code>mobile_number</code></td><td>VARCHAR UNIQUE</td><td>Same as their User row's mobile</td></tr>
+        <tr><td><code>joining_date</code></td><td>DATE</td><td>First day on the job</td></tr>
+        <tr><td><code>status</code></td><td>ENUM</td><td>ACTIVE / LEFT</td></tr>
+        <tr><td><code>polishing_rate</code></td><td>DOUBLE</td><td>₹ per saree this worker earns</td></tr>
+        <tr><td><code>user_id</code></td><td>BIGINT FK</td><td>Their login row (can be NULL temporarily)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── attendance ─── -->
+    <h3>4. <code>attendance</code> — daily roll call</h3>
+    <p>One row per (employee, date) pair, recording whether they showed up.</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>attendance_id</code></td><td>BIGINT PK</td><td>Auto-generated</td></tr>
+        <tr><td><code>employee_id</code></td><td>BIGINT FK</td><td>Which worker</td></tr>
+        <tr><td><code>attendance_date</code></td><td>DATE</td><td>The day</td></tr>
+        <tr><td><code>attendance_status</code></td><td>ENUM</td><td>PRESENT / ABSENT</td></tr>
+        <tr><td><code>remarks</code></td><td>VARCHAR</td><td>Optional note</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warn">
+      <strong>UNIQUE constraint:</strong> (employee_id, attendance_date) — you cannot mark Prema
+      present twice for the same day. The database itself refuses. This prevents accidental
+      double-counting.
+    </div>
+
+    <!-- ─── daily work ─── -->
+    <h3>5. <code>employee_daily_work</code> — daily polishing output</h3>
+    <p>One row per (employee, date) — what each worker produced that day.</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>work_id</code></td><td>BIGINT PK</td><td>Auto-generated</td></tr>
+        <tr><td><code>employee_id</code></td><td>BIGINT FK</td><td>Which worker</td></tr>
+        <tr><td><code>work_date</code></td><td>DATE</td><td>The day</td></tr>
+        <tr><td><code>fresh_saree_count</code></td><td>INT</td><td>Brand-new sarees polished</td></tr>
+        <tr><td><code>repolish_saree_count</code></td><td>INT</td><td>Touch-up polishes</td></tr>
+        <tr><td><code>remarks</code></td><td>VARCHAR</td><td>Optional</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Total earnings for the day = <code>(fresh + rePolish) × employee.polishing_rate</code>.
+      Also has UNIQUE on (employee_id, work_date).
+    </p>
+
+    <!-- ─── salary_payment ─── -->
+    <h3>6. <code>salary_payment</code> — money paid to workers</h3>
+    <p>One row per payment event. NOT one per day worked — one per <em>payment</em>.</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>payment_id</code></td><td>BIGINT PK</td><td>Auto-generated</td></tr>
+        <tr><td><code>employee_id</code></td><td>BIGINT FK</td><td>Whom we paid</td></tr>
+        <tr><td><code>from_date / to_date</code></td><td>DATE</td><td>The work period being paid for</td></tr>
+        <tr><td><code>amount_paid</code></td><td>DECIMAL</td><td>How much</td></tr>
+        <tr><td><code>payment_date</code></td><td>DATE</td><td>When the payment was made</td></tr>
+        <tr><td><code>payment_mode</code></td><td>ENUM</td><td>CASH / UPI / BANK_TRANSFER</td></tr>
+        <tr><td><code>remarks</code></td><td>VARCHAR</td><td>Optional</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Pending salary for a worker = Sum(earnings from daily_work in range) − Sum(payments in range).
+    </p>
+
+    <!-- ─── saree_owner ─── -->
+    <h3>7. <code>saree_owner</code> — clients</h3>
+    <p>One row per client (Rahul, Sharma Madam, etc.).</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>owner_id</code></td><td>BIGINT PK</td><td>Auto-generated</td></tr>
+        <tr><td><code>owner_name</code></td><td>VARCHAR</td><td>"Rahul Textiles", "Sharma Sarees"</td></tr>
+        <tr><td><code>mobile_number</code></td><td>VARCHAR UNIQUE</td><td>Same as their User row</td></tr>
+        <tr><td><code>status</code></td><td>ENUM</td><td>ACTIVE / INACTIVE</td></tr>
+        <tr><td><code>polish_rate_per_saree</code></td><td>DOUBLE</td><td>₹ this owner pays per returned saree</td></tr>
+        <tr><td><code>user_id</code></td><td>BIGINT FK</td><td>Their login row</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── saree_ledger ─── -->
+    <h3>8. <code>saree_ledger</code> ⭐ — the inventory ledger (THE most important table)</h3>
+    <p>
+      This is the heart of NOOL. Every saree that enters or leaves the workshop becomes one
+      row in this table. Like a bank passbook.
+    </p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>entry_id</code></td><td>BIGINT PK</td><td>Auto-generated row ID</td></tr>
+        <tr><td><code>owner_id</code></td><td>BIGINT FK</td><td>Whose sarees</td></tr>
+        <tr><td><code>entry_type</code></td><td>ENUM</td><td>RECEIPT (in) or RETURN (out)</td></tr>
+        <tr><td><code>entry_date</code></td><td>DATE</td><td>The business date</td></tr>
+        <tr><td><code>quantity</code></td><td>INT</td><td>How many sarees (always positive)</td></tr>
+        <tr><td><code>remarks</code></td><td>VARCHAR</td><td>Optional note ("Diwali batch")</td></tr>
+        <tr><td><code>created_at</code></td><td>DATETIME</td><td>When the row was inserted (audit)</td></tr>
+      </tbody>
+    </table>
+
+    <p>This table is <strong>append-only</strong> — we never UPDATE or DELETE rows. To correct
+    a mistake, we insert a compensating row. The "in-hand" balance is always derived:</p>
+
+    <div class="formula">
+      <div class="label">Sarees still with the workshop (for one owner)</div>
+      <div class="eq">
+        <span class="var">inHand</span> <span class="op">=</span> SUM(RECEIPT.quantity) <span class="op">−</span> SUM(RETURN.quantity)
+      </div>
+    </div>
+
+    <!-- ─── owner_payment ─── -->
+    <h3>9. <code>owner_payment</code> — money received from clients</h3>
+    <p>One row per payment received. Same shape as salary_payment but the direction is reversed.</p>
+    <table class="ftable">
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>payment_id</code></td><td>BIGINT PK</td><td>Auto-generated</td></tr>
+        <tr><td><code>owner_id</code></td><td>BIGINT FK</td><td>Who paid</td></tr>
+        <tr><td><code>amount_paid</code></td><td>DECIMAL</td><td>How much</td></tr>
+        <tr><td><code>payment_date</code></td><td>DATE</td><td>When</td></tr>
+        <tr><td><code>payment_mode</code></td><td>ENUM</td><td>CASH / UPI / BANK_TRANSFER</td></tr>
+        <tr><td><code>remarks</code></td><td>VARCHAR</td><td>Optional</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── A real database snapshot ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> A Real Database Snapshot</h2>
+    <p>To make this concrete, here's what a real NOOL database might look like at the end of one week:</p>
+
+    <div class="sqlbox">
+<pre><span class="sc">-- users table (4 rows):</span>
+user_id | mobile_number | role        | active
+   1    | 9876543210    | ADMIN       | true     <span class="sc">(my dad)</span>
+   2    | 9000000001    | SAREE_OWNER | true     <span class="sc">(Rahul)</span>
+   3    | 9000000002    | WORKER      | true     <span class="sc">(Prema)</span>
+   4    | 9000000003    | WORKER      | true     <span class="sc">(Ravi)</span>
+
+<span class="sc">-- saree_owner table (1 row):</span>
+owner_id | owner_name      | polish_rate_per_saree | status | user_id
+   1     | Rahul Textiles  | 65.0                  | ACTIVE | 2
+
+<span class="sc">-- employees table (2 rows):</span>
+employee_id | employee_name | polishing_rate | status | user_id
+   1        | Prema  | 30.0           | ACTIVE | 3
+   2        | Ravi    | 25.0           | ACTIVE | 4
+
+<span class="sc">-- saree_ledger table (3 rows from this week):</span>
+entry_id | owner_id | entry_type | entry_date  | quantity | remarks
+   1     | 1        | RECEIPT    | 2026-05-11  | 100      | Diwali batch
+   2     | 1        | RETURN     | 2026-05-15  | 50       | First batch back
+   3     | 1        | RETURN     | 2026-05-17  | 20       | Second batch
+
+<span class="sc">-- Rahul's in-hand: 100 - (50 + 20) = 30 sarees still being polished</span>
+
+<span class="sc">-- employee_daily_work table (sample rows):</span>
+work_id | employee_id | work_date  | fresh_count | repolish_count
+   1    | 1           | 2026-05-12 | 8           | 2
+   2    | 1           | 2026-05-13 | 9           | 1
+   3    | 2           | 2026-05-12 | 6           | 3
+
+<span class="sc">-- Prema's earnings on May 12 = (8 + 2) × ₹30 = ₹300</span>
+
+<span class="sc">-- owner_payment table:</span>
+payment_id | owner_id | amount_paid | payment_date | payment_mode
+   1       | 1        | 3000.00     | 2026-05-17   | UPI
+
+<span class="sc">-- Rahul owes: (50+20 returned) × ₹65 = ₹4,550. Paid ₹3,000. Pending ₹1,550.</span></pre>
+    </div>
+
+    <!-- ──────── Schema patterns ──────── -->
+    <h2><span class="h2-emoji">🎨</span> Schema Patterns Used Throughout NOOL</h2>
+
+    <h3>Pattern 1 — Append-only ledger</h3>
+    <p>
+      Used for <code>saree_ledger</code>. Never UPDATE, never DELETE. Each row is one immutable
+      event. Balance is always derived from SUM. Why? Complete audit trail + no risk of drift.
+    </p>
+
+    <h3>Pattern 2 — Soft delete via status flag</h3>
+    <p>
+      Used for <code>users.active_status</code>, <code>employees.status</code>,
+      <code>saree_owner.status</code>. To "delete" a worker, flip status to LEFT or INACTIVE.
+      The row stays in the DB so foreign-key relationships (attendance, daily work, salary)
+      stay intact. Hard-delete would orphan or cascade-destroy years of history.
+    </p>
+
+    <h3>Pattern 3 — Unique constraint to prevent duplicates</h3>
+    <p>
+      Used on <code>(employee_id, attendance_date)</code> and <code>(employee_id, work_date)</code>.
+      The database itself refuses double-entries. Catches bugs the application code might miss.
+    </p>
+
+    <h3>Pattern 4 — Auto-timestamps via @PrePersist / @PreUpdate</h3>
+    <p>
+      Every table has <code>created_at</code> (set once on insert) and most have <code>updated_at</code>
+      (updated on every edit). These are filled automatically by JPA lifecycle callbacks —
+      I never have to remember to set them.
+    </p>
+
+    <h3>Pattern 5 — Enums stored as STRING</h3>
+    <p>
+      Every enum (Role, EmployeeStatus, etc.) is stored as its NAME in the DB ("ADMIN"),
+      not as a number (0). Why? Readability in SQL queries, and resilience — if I reorder
+      the enum in Java, the DB doesn't silently break.
+    </p>
+
+    <h3>Pattern 6 — Per-entity rates (no global price)</h3>
+    <p>
+      Each owner has their own <code>polish_rate_per_saree</code>. Each worker has their own
+      <code>polishing_rate</code>. Rates are NOT global settings, because real businesses
+      negotiate per-person. This unlocks loyalty discounts, performance raises, etc.
+    </p>
+
+    <!-- ──────── How JPA auto-creates this ──────── -->
+    <h2><span class="h2-emoji">🪄</span> How These Tables Get Created Automatically</h2>
+    <p>
+      I never typed out any of those CREATE TABLE statements manually. JPA + Hibernate did it
+      for me. In <code>application.properties</code> we set:
+    </p>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">backend/src/main/resources/application.properties</span>
+        <span class="lang">properties</span>
+      </div>
+<pre><span class="kw">spring.jpa.hibernate.ddl-auto</span>=update</pre>
+    </div>
+
+    <p>
+      This setting tells Hibernate: <em>"When the app starts, look at all my @Entity classes,
+      compare them to the actual MySQL schema, and ALTER the schema to match."</em> So when I add
+      a new field to the Employee Java class, Hibernate runs an <code>ALTER TABLE</code>
+      automatically on next startup. No manual migrations needed.
+    </p>
+
+    <div class="callout warn">
+      <strong>For production this would change!</strong> <code>ddl-auto=update</code> is great
+      for development but risky in production (Hibernate can drop columns or make destructive
+      changes if your entities are wrong). For production, you'd switch to <code>validate</code>
+      (or <code>none</code>) and use a migration tool like Flyway or Liquibase. NOOL hasn't
+      reached production scale yet, so <code>update</code> is fine.
+    </div>
+
+    <!-- ──────── What you should remember ──────── -->
+    <h2><span class="h2-emoji">🎯</span> Key Things to Remember</h2>
+    <ol>
+      <li><strong>Users are separate from Employees and Owners.</strong> Login info ≠ business info.</li>
+      <li><strong>The ledger is append-only.</strong> Balance is always SUM(RECEIPT) − SUM(RETURN).</li>
+      <li><strong>Soft delete only.</strong> Disable via status flag, never DROP rows.</li>
+      <li><strong>Unique constraints on (employee, date)</strong> for attendance and daily work prevent duplicates.</li>
+      <li><strong>Rates live on individual entities</strong> — not global settings.</li>
+      <li><strong>Hibernate creates the schema for you</strong> from @Entity classes (in dev mode).</li>
+      <li><strong>Every table has audit timestamps</strong> (created_at, updated_at) filled automatically.</li>
+    </ol>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      That wraps up the "context" phase of this tutorial — you now know <em>why</em> NOOL exists,
+      <em>what</em> it does, <em>how</em> it's built, and <em>what</em> the data model looks like.
+    </p>
+    <p>
+      Starting with Chapter 05, we'll begin actually reading the code — file by file, line by
+      line, in the order I built them. The very first file is <code>backend/pom.xml</code> —
+      the Maven "shopping list" that tells the build tool which Java libraries we need.
+    </p>
+
+    <div class="chapnav">
+      <a href="03-architecture.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 03 · Architecture &amp; Tech Stack</span>
+      </a>
+      <a class="dim next">
+        <span class="arrow next">Coming soon →</span>
+        <span class="title">Ch 05 · backend/pom.xml</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 04 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

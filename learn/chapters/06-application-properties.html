@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 06 · application.properties · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 06 · Configuration</span>
+    <h1>
+      <span class="gradient">application.properties</span> —<br/>
+      The settings panel
+    </h1>
+    <p class="subtitle">
+      Every Spring Boot app has one file where you put all the "knobs and dials" — port
+      number, database connection, JWT secret, timezone. Change a value here, and the
+      whole app behaves differently. Let's understand every line.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">⚙️</div>
+      <div class="fmeta">
+        <h3>application.properties</h3>
+        <span class="fpath">backend/src/main/resources/application.properties</span>
+        <div class="ftags"><span>Spring Boot config</span><span>DB connection</span><span>JWT</span><span>Properties</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What it does ──────── -->
+    <h2><span class="h2-emoji">🤔</span> What This File Does</h2>
+    <p>
+      <code>application.properties</code> is Spring Boot's <strong>configuration file</strong>.
+      Spring Boot looks for this file in <code>src/main/resources/</code> automatically when
+      the app starts. Every property in here is read once at startup and made available to
+      every class in the project.
+    </p>
+    <p>
+      The format is dead simple: <code>key=value</code>, one per line. Lines starting with
+      <code>#</code> are comments.
+    </p>
+
+    <div class="callout brain">
+      <strong>Why this file matters:</strong> moving sensitive values (database passwords,
+      JWT secrets, ports) out of <em>code</em> and into <em>config</em> means I can run NOOL
+      in different environments (my laptop vs. my parents' workshop computer vs. a cloud
+      server) just by changing this one file. The code stays untouched.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">backend/src/main/resources/application.properties</span>
+        <span class="lang">properties</span>
+      </div>
+<pre><span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># APPLICATION IDENTITY</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">spring.application.name</span>=backend
+<span class="com"># Internal name for this app. Shows up in logs, metrics, etc.
+# Not critical, just helpful when running multiple Spring apps side-by-side.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># HTTP SERVER</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">server.port</span> = 8083
+<span class="com"># The port Tomcat listens on. So http://localhost:8083 is where the API lives.
+# I picked 8083 instead of the default 8080 because port 8080 is too commonly
+# used (Jenkins, Tomcat, dev tools — collisions everywhere). 8083 is rare enough
+# to avoid clashes on my parents' computer.</span>
+
+<span class="kw">server.servlet.context-path</span>=/api
+<span class="com"># Prefix every URL with /api. So:
+#   - Login   = POST http://localhost:8083/api/auth/login
+#   - Inventory = POST http://localhost:8083/api/inventory/receipt
+# Why? When the backend and a static frontend share the same domain in production,
+# /api/* gets routed to the backend and everything else to the frontend.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># JWT (JSON Web Token) SETTINGS</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">jwt.secret</span>=NOOL_BACKEND_AUTH_SECRET_KEY_FOR_LOCAL_DEVELOPMENT_USE_ONLY_2026
+<span class="com"># ★ The cryptographic secret used to sign every JWT.
+#
+# IMPORTANT THINGS ABOUT THIS:
+#   1. Must be at least 256 bits (32 chars) for HS256 algorithm — it is.
+#   2. If anyone gets this string, they can forge valid tokens. Treat it like
+#      a password.
+#   3. For local development this hard-coded value is fine. For production,
+#      override via environment variable or a secrets manager (NEVER commit
+#      a production secret to git).
+#   4. If you change this string, EVERY existing JWT becomes invalid instantly.
+#      All logged-in users get kicked out — they have to log in again.
+#      That's actually a useful emergency lever if you ever suspect a leak.</span>
+
+<span class="kw">jwt.expiration</span>=86400000
+<span class="com"># Token lifetime in milliseconds.
+#   86,400,000 ms = 86,400 seconds = 1,440 minutes = 24 hours
+#
+# So once you log in, you stay logged in for 24 hours. After that, you have
+# to log in again. This is a trade-off:
+#   - Shorter (e.g. 15 min)  → more secure, more annoying
+#   - Longer  (e.g. 30 days) → less secure if a token leaks, less annoying
+# 24 hours is a comfortable middle ground for an internal business app.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># SEED ADMIN — auto-created on first startup</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">admin.mobile</span>=9876543210
+<span class="kw">admin.password</span>=Admin@123
+<span class="com"># When NOOL boots for the very first time and the database is empty,
+# AdminBootstrapRunner.java reads these two values and inserts an ADMIN
+# user with this mobile + password. Otherwise nobody could log in.
+#
+# IMPORTANT: change the password in production! The seed admin password
+# is intentionally simple and well-known so I can quickly log in during
+# development. A real deployment must override admin.password before
+# the first run.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># BUSINESS DEFAULTS</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="com"># Rate charged to saree owners per returned saree (in INR).
+# Used by owner payment summary to compute total payable amount.</span>
+<span class="kw">nool.rate-per-saree</span>=70.0
+<span class="com"># ★ FALLBACK rate per saree. Used only when an owner has NO custom rate set.
+#
+# Most owners (like Rahul) have their own negotiated rate stored in the
+# saree_owner table. For new owners or test data without a rate, this ₹70
+# acts as the default.
+#
+# It's also a knob to centrally bump prices across all "rate-less" owners
+# without touching code.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># DATABASE CONNECTION</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">spring.datasource.url</span>=jdbc:mysql://localhost:3306/nool_db?createDatabaseIfNotExist=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=Asia/Kolkata
+<span class="com"># ★ The MySQL connection string. Let's break it down piece by piece:
+#
+#   jdbc:mysql://          → use the MySQL JDBC driver
+#   localhost:3306         → MySQL is running on this same machine, port 3306
+#   /nool_db               → connect to a database named "nool_db"
+#
+# Query parameters:
+#   createDatabaseIfNotExist=true → if nool_db doesn't exist yet, MySQL creates
+#                                    it automatically. Means I don't have to
+#                                    pre-create the schema on a new computer.
+#   useSSL=false                  → for local dev only — no encrypted connection.
+#                                    For production, this MUST be true with proper
+#                                    cert setup.
+#   allowPublicKeyRetrieval=true  → needed by MySQL 8's default auth plugin to
+#                                    let JDBC fetch the server's public key.
+#   serverTimezone=Asia/Kolkata   → makes MySQL interpret DATETIME values in IST.
+#                                    Critical to avoid the "off-by-one-day" bug
+#                                    you'll see again later (Chapter 61).</span>
+
+<span class="kw">spring.datasource.username</span>=root
+<span class="kw">spring.datasource.password</span>=root
+<span class="com"># MySQL credentials. "root/root" is the universal local-dev convention.
+# In production these become a dedicated user with limited privileges and
+# a strong password — definitely not "root".</span>
+
+<span class="kw">spring.datasource.driver-class-name</span>=com.mysql.cj.jdbc.Driver
+<span class="com"># Tells Spring which JDBC driver class to load. com.mysql.cj.* is MySQL 8's
+# new driver namespace (vs. com.mysql.jdbc.* for MySQL 5.x).
+# Strictly speaking, Spring Boot can auto-detect this from the URL, but
+# specifying it explicitly avoids confusion if multiple drivers are on
+# the classpath.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># JPA / HIBERNATE BEHAVIOR</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">spring.jpa.hibernate.ddl-auto</span>=update
+<span class="com"># ★ CRITICAL SETTING. Controls how Hibernate manages the database schema.
+#
+# Possible values:
+#   create     → DROP all tables and CREATE fresh ones every startup. Loses data.
+#   create-drop → CREATE on startup, DROP on shutdown. For tests only.
+#   update     → Compare entities to current schema, ALTER TABLE to match. Keeps data.
+#   validate   → Just check entities match schema, don't change anything.
+#   none       → Hibernate doesn't touch the schema at all.
+#
+# We use "update" because:
+#   - On a fresh DB: Hibernate creates all tables for us — no manual CREATE TABLE
+#   - When I add a new field to an entity: Hibernate ALTERs the table on next startup
+#   - Existing data is preserved
+#
+# WARNING: "update" is convenient for development but RISKY in production.
+# It can sometimes generate destructive ALTERs (drop a column you renamed).
+# For production, switch to "validate" or "none" and manage schema changes
+# explicitly with Flyway or Liquibase.</span>
+
+<span class="kw">spring.jpa.show-sql</span>=true
+<span class="com"># Print every SQL statement Hibernate generates to the console.
+# Insanely useful for debugging: you can see EXACTLY what SQL runs for each
+# repository call. In production, turn this off — it floods the logs.</span>
+
+<span class="kw">spring.jpa.properties.hibernate.format_sql</span>=true
+<span class="com"># Pretty-print those SQL statements with line breaks and indentation.
+# Without this, you'd see one huge unreadable single-line query.</span>
+
+<span class="kw">spring.jpa.properties.hibernate.dialect</span>=org.hibernate.dialect.MySQLDialect
+<span class="com"># Tell Hibernate which "flavor" of SQL to generate. MySQLDialect knows
+# MySQL-specific quirks (LIMIT syntax, AUTO_INCREMENT, etc.). Hibernate
+# can usually auto-detect from the URL, but pinning it is safer.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># TIMEZONE — Indian Standard Time, EVERYWHERE</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">spring.jpa.properties.hibernate.jdbc.time_zone</span>=Asia/Kolkata
+<span class="com"># When Hibernate writes/reads DATETIME values to/from MySQL, treat them
+# as Asia/Kolkata (IST, UTC+5:30) — not the server's default timezone.
+# Without this, if the server happens to run in UTC, your "May 1 at midnight
+# IST" gets stored as "April 30 at 18:30 UTC" — off-by-one-day chaos.</span>
+
+<span class="kw">spring.jackson.time-zone</span>=Asia/Kolkata
+<span class="com"># When Jackson (the JSON library) serializes LocalDateTime to JSON for the
+# frontend, format it in IST too. Together with the previous line, this means
+# IST is the ONE timezone throughout the system — no conversions ever.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># LOGGING</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">logging.level.org.hibernate.SQL</span>=debug
+<span class="com"># Log every SQL statement at DEBUG level (in addition to show-sql above).
+# These two settings overlap slightly; together they give the cleanest output.</span>
+
+<span class="kw">logging.level.org.hibernate.type.descriptor.sql.BasicBinder</span>=trace
+<span class="com"># Log the actual VALUES being bound to SQL parameters. With this on, you
+# see not just "SELECT * FROM users WHERE mobile = ?" but also "binding
+# parameter [1] as [VARCHAR] - [9876543210]". Hugely useful for debugging.</span>
+
+
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+<span class="com"># 404 HANDLING</span>
+<span class="com"># ════════════════════════════════════════════════════════════════</span>
+
+<span class="kw">spring.mvc.throw-exception-if-no-handler-found</span>=true
+<span class="kw">spring.web.resources.add-mappings</span>=false
+<span class="com"># Together these two settings make Spring Boot throw a NoHandlerFoundException
+# when someone requests a URL that doesn't map to any controller. Why this matters:
+#
+# By default, Spring Boot's catch-all would return a generic HTML error page —
+# but our API is JSON-only. We want unknown paths to return JSON like
+# { "message": "Not Found", "path": "/api/foo" }, which our GlobalExceptionHandler
+# does by catching that NoHandlerFoundException.
+#
+# add-mappings=false tells Spring Boot to NOT auto-serve static files from
+# the classpath. We don't have any (the frontend is in a separate folder).</span></pre>
+    </div>
+
+    <!-- ──────── Settings reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Setting at a Glance</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Property</th><th>Value</th><th>Why it's set this way</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>server.port</code></td><td>8083</td><td>Avoids common-port conflicts</td></tr>
+        <tr><td><code>server.servlet.context-path</code></td><td>/api</td><td>Every URL prefixed for easy frontend proxy routing</td></tr>
+        <tr><td><code>jwt.secret</code></td><td>NOOL_BACKEND_AUTH_…</td><td>Signs every token. Must be ≥256 bits. Change in production.</td></tr>
+        <tr><td><code>jwt.expiration</code></td><td>86,400,000 ms</td><td>24-hour token lifetime</td></tr>
+        <tr><td><code>admin.mobile</code></td><td>9876543210</td><td>Seeded into the DB on first boot</td></tr>
+        <tr><td><code>admin.password</code></td><td>Admin@123</td><td>Seeded plain-text → hashed to BCrypt before insert</td></tr>
+        <tr><td><code>nool.rate-per-saree</code></td><td>70.0</td><td>Fallback ₹/saree if owner has no rate</td></tr>
+        <tr><td><code>spring.datasource.url</code></td><td>jdbc:mysql://localhost:3306/nool_db?…</td><td>Auto-creates DB, IST timezone</td></tr>
+        <tr><td><code>spring.datasource.username</code></td><td>root</td><td>Local-dev convention</td></tr>
+        <tr><td><code>spring.datasource.password</code></td><td>root</td><td>Local-dev convention</td></tr>
+        <tr><td><code>spring.jpa.hibernate.ddl-auto</code></td><td>update</td><td>Auto-evolves schema in dev. Switch to validate/none in production.</td></tr>
+        <tr><td><code>spring.jpa.show-sql</code></td><td>true</td><td>Console logs every SQL query (debug helper)</td></tr>
+        <tr><td><code>spring.jpa.properties.hibernate.format_sql</code></td><td>true</td><td>Pretty-print SQL with line breaks</td></tr>
+        <tr><td><code>spring.jpa.properties.hibernate.jdbc.time_zone</code></td><td>Asia/Kolkata</td><td>Stop UTC drift in DATETIME values</td></tr>
+        <tr><td><code>spring.jackson.time-zone</code></td><td>Asia/Kolkata</td><td>Stop UTC drift in JSON output</td></tr>
+        <tr><td><code>logging.level.org.hibernate.SQL</code></td><td>debug</td><td>Console-friendly SQL trace</td></tr>
+        <tr><td><code>logging.level.org.hibernate…BasicBinder</code></td><td>trace</td><td>Logs SQL parameter values too</td></tr>
+        <tr><td><code>spring.mvc.throw-exception-if-no-handler-found</code></td><td>true</td><td>Unknown URLs → JSON 404</td></tr>
+        <tr><td><code>spring.web.resources.add-mappings</code></td><td>false</td><td>Don't auto-serve classpath static files</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── How values reach the code ──────── -->
+    <h2><span class="h2-emoji">🔌</span> How These Settings Reach the Code</h2>
+    <p>
+      Java classes don't read this file directly. Spring Boot reads it at startup and exposes
+      values through two mechanisms:
+    </p>
+
+    <h3>Mechanism 1: Spring Boot auto-configures itself</h3>
+    <p>
+      All <code>spring.*</code> properties are read by Spring Boot's auto-configuration. They
+      affect how Spring builds the app:
+    </p>
+    <ul>
+      <li><code>server.port</code> → tells Tomcat what port to bind</li>
+      <li><code>spring.datasource.url/username/password</code> → tells Spring how to make a connection pool</li>
+      <li><code>spring.jpa.*</code> → configures Hibernate</li>
+    </ul>
+    <p>We don't write code to consume these — they "just work".</p>
+
+    <h3>Mechanism 2: <code>@Value</code> for our custom properties</h3>
+    <p>
+      For NOOL-specific properties (<code>jwt.secret</code>, <code>admin.mobile</code>,
+      <code>nool.rate-per-saree</code>), we explicitly inject them into Java classes using
+      the <code>@Value</code> annotation:
+    </p>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">Inside JwtUtil.java — reading jwt.secret and jwt.expiration</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="ann">@Component</span>
+<span class="kw">public class</span> JwtUtil {
+
+    <span class="ann">@Value</span>(<span class="str">"${jwt.secret}"</span>)         <span class="com">// reads from application.properties</span>
+    <span class="kw">private</span> String secret;
+
+    <span class="ann">@Value</span>(<span class="str">"${jwt.expiration}"</span>)
+    <span class="kw">private long</span> expiration;
+
+    <span class="com">// ... uses `secret` and `expiration` to sign / verify tokens</span>
+}</pre>
+    </div>
+
+    <p>
+      At startup, Spring sees <code>@Value("${jwt.secret}")</code> and substitutes in the actual
+      string from the properties file. By the time any controller method runs, those fields
+      are already populated. No file I/O in business logic.
+    </p>
+
+    <!-- ──────── Real-world scenario ──────── -->
+    <div class="scenario">
+      <h5>Scenario — what console output looks like with these settings</h5>
+      <p>With <code>show-sql=true</code> and <code>BasicBinder=trace</code>, when Rahul logs in,
+      the backend console looks like this:</p>
+<pre style="background:#1a1530; color:#e8e3ff; padding:14px; border-radius:8px; font-family:'Menlo',monospace; font-size:12px; overflow-x:auto;">
+2026-05-14 10:32:11.234  INFO  --- BackendApplication       : Started in 4.2 seconds
+2026-05-14 10:32:11.567  DEBUG --- org.hibernate.SQL        :
+    select
+        u.user_id, u.mobile_number, u.password, u.role, u.active_status
+    from users u
+    where u.mobile_number = ?
+2026-05-14 10:32:11.568  TRACE --- ...BasicBinder            : binding parameter [1] as [VARCHAR] - [9000000001]
+2026-05-14 10:32:11.598  DEBUG --- org.hibernate.SQL        :
+    select up.* from user_profile up where up.user_id = ?
+2026-05-14 10:32:11.598  TRACE --- ...BasicBinder            : binding parameter [1] as [BIGINT] - [2]
+</pre>
+      <p>That's the actual SQL Hibernate fires when looking up Rahul's user row + profile. Without these debug flags, I'd be guessing what queries run. With them, debugging is straightforward.</p>
+    </div>
+
+    <!-- ──────── Production overrides ──────── -->
+    <h2><span class="h2-emoji">🏭</span> What Changes for Production?</h2>
+    <p>
+      The values in this file are tuned for <strong>local development</strong>. For a production
+      deployment, you'd override several of them. Standard practice in Spring Boot is to use
+      environment variables that take precedence over the file:
+    </p>
+
+    <table class="t">
+      <thead><tr><th>Setting</th><th>Local-dev value</th><th>Production override</th></tr></thead>
+      <tbody>
+        <tr><td><code>jwt.secret</code></td><td>Hard-coded string</td><td><code>$JWT_SECRET</code> env var, set via secrets manager. Long random string.</td></tr>
+        <tr><td><code>admin.password</code></td><td>Admin@123</td><td><code>$ADMIN_PASSWORD</code> — strong unique password</td></tr>
+        <tr><td><code>spring.datasource.url</code></td><td>localhost:3306</td><td>Managed MySQL host (RDS, etc.) over SSL</td></tr>
+        <tr><td><code>spring.datasource.password</code></td><td>root</td><td>Generated strong password in secrets vault</td></tr>
+        <tr><td><code>spring.jpa.hibernate.ddl-auto</code></td><td>update</td><td><code>validate</code> or <code>none</code> + Flyway/Liquibase migrations</td></tr>
+        <tr><td><code>spring.jpa.show-sql</code></td><td>true</td><td>false (saves logs from drowning)</td></tr>
+        <tr><td><code>logging.level.*</code></td><td>debug/trace</td><td>info (or warn) for less noise</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      You don't need to maintain two files. Spring Boot supports environment-specific overrides
+      via <code>application-prod.properties</code> alongside the base file, activated with
+      <code>--spring.profiles.active=prod</code>. NOOL doesn't use profiles yet because there's
+      only one deployment (my parents' computer), but it's a natural next step.
+    </p>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common application.properties mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Committing a production JWT secret to git</div>
+        <div class="good">Use a placeholder in the file and override via environment variable in production. NEVER let a real secret end up in git history — even if you "remove it later", it's still in the commits.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Leaving <code>ddl-auto=update</code> in production</div>
+        <div class="good">A small entity change (renaming a field) can cause Hibernate to DROP + CREATE the column, wiping data. Production must use <code>validate</code> with explicit migrations.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>serverTimezone=Asia/Kolkata</code> in the JDBC URL</div>
+        <div class="good">If the MySQL server's default timezone differs from your app's, dates drift by hours. Always pin both the JDBC URL's <code>serverTimezone</code> AND the JPA property <code>hibernate.jdbc.time_zone</code>.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Putting comments inline on the same line as a value</div>
+        <div class="good"><code>jwt.expiration=86400000 # 24 hours</code> doesn't work — the comment becomes part of the value, causing parse errors. Use a separate line starting with <code>#</code>.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-coding values that should be configurable (like the saree rate) directly in service code</div>
+        <div class="good">If a value might change between environments, put it in <code>application.properties</code> and inject with <code>@Value</code>. Code changes need redeploys; properties changes just need a restart.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about Spring Boot configuration</h5>
+
+      <div class="qa">
+        <div class="q">Where does Spring Boot look for application.properties?</div>
+        <div class="a">
+          By default, in <code>src/main/resources/application.properties</code> (inside the JAR
+          at runtime). It also checks the current directory, <code>./config/</code>, and a few
+          other classpath locations. Profile-specific files like
+          <code>application-prod.properties</code> are layered on top when the matching profile
+          is active.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How do you override these values without editing the file?</div>
+        <div class="a">
+          Three common ways: (1) environment variables — Spring Boot maps
+          <code>JWT_SECRET</code> env var to <code>jwt.secret</code> property automatically;
+          (2) command-line args — <code>java -jar app.jar --server.port=9090</code>;
+          (3) external <code>application.properties</code> placed next to the JAR.
+          Precedence order: command-line &gt; env vars &gt; external file &gt; bundled file.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>application.properties</code> and <code>application.yml</code>?</div>
+        <div class="a">
+          Same purpose, different syntax. YAML is more compact for nested settings
+          (<code>spring: jpa: show-sql: true</code> instead of three dotted lines). Both are
+          supported. NOOL uses .properties because it's simpler and the project is small.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>ddl-auto=update</code> dangerous in production?</div>
+        <div class="a">
+          Hibernate compares your entities against the live schema and tries to ALTER it to
+          match. If you rename a field in Java, Hibernate doesn't know it's a rename — it just
+          sees "old column gone, new column appeared". Depending on version, it might DROP the
+          old column (and its data) before adding the new one. Schema changes should be
+          deliberate; use a real migration tool (Flyway/Liquibase) instead.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could the JWT secret be loaded from a file at runtime instead?</div>
+        <div class="a">
+          Yes. Spring Boot supports <code>spring.config.import=file:/etc/nool/secrets.properties</code>,
+          which loads a second properties file from disk and merges it. Or use a secrets-manager
+          client (AWS Secrets Manager, HashiCorp Vault) that exposes values as environment
+          variables. The simplest production pattern is env vars set by the orchestrator (k8s,
+          systemd, docker-compose).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does <code>spring.jpa.show-sql=true</code> actually do at the JVM level?</div>
+        <div class="a">
+          It enables a Hibernate log appender that prints generated SQL to stdout. It's a
+          convenience wrapper around configuring SLF4J. The slight subtlety is that <code>show-sql</code>
+          uses a simpler formatter than <code>logging.level.org.hibernate.SQL=debug</code> —
+          using both gives you nicely formatted output PLUS structured log entries. For
+          parameter values, you separately need <code>BasicBinder=trace</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With libraries declared (pom.xml) and settings configured (application.properties), the
+      Spring Boot app is ready to start. The actual <em>entry point</em> — the file that contains
+      <code>public static void main</code> — is the very next chapter, and it's the shortest
+      Java file in the whole project.
+    </p>
+
+    <div class="chapnav">
+      <a href="05-pom-xml.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 05 · backend/pom.xml</span>
+      </a>
+      <a href="07-backend-application.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 07 · BackendApplication.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 06 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>
