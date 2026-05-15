@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 30 · EmployeeService + Impl · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 30 · The Employee Business Logic</span>
+    <h1>
+      <span class="gradient">EmployeeService</span> &amp; Impl
+    </h1>
+    <p class="subtitle">
+      The brain of the worker module. Adds new workers, edits their info, marks them as left,
+      lists them, lets workers view their own profile, and handles the deletion-with-cascade
+      flow. ~240 lines of careful business logic.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">👷</div>
+      <div class="fmeta">
+        <h3>EmployeeService.java + EmployeeServiceImpl.java</h3>
+        <span class="fpath">backend/.../service/employee/ + service/impl/employee/</span>
+        <div class="ftags"><span>@Service</span><span>7 methods</span><span>@Transactional</span><span>Self-or-admin checks</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> What This Service Does — Seven Methods</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>What it does</th><th>Who can call it</th></tr></thead>
+      <tbody>
+        <tr><td><code>createEmployee(dto)</code></td><td>Add a new worker + create their User account</td><td>ADMIN only (via SecurityConfig)</td></tr>
+        <tr><td><code>updateEmployee(dto)</code></td><td>Edit name, mobile, polish rate</td><td>ADMIN only</td></tr>
+        <tr><td><code>updateEmployeeStatus(dto)</code></td><td>Mark as LEFT or reactivate</td><td>ADMIN only</td></tr>
+        <tr><td><code>getEmployeeById(id)</code></td><td>Fetch one employee's details</td><td>ADMIN sees anyone; WORKER only their own</td></tr>
+        <tr><td><code>getEmployeeList(pagination)</code></td><td>Paginated, searchable list</td><td>ADMIN only</td></tr>
+        <tr><td><code>getMyProfile()</code></td><td>Worker fetches their own profile</td><td>WORKER (reads JWT for ID)</td></tr>
+        <tr><td><code>deleteEmployee(id)</code></td><td>Hard-delete (rare, admin only)</td><td>ADMIN only</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── Interface ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> The Interface — <code>EmployeeService.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">service/employee/EmployeeService.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.service.employee;
+
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationResponseDto;
+<span class="kw">import</span> com.nool.backend.dto.employee.*;
+
+<span class="kw">public interface</span> EmployeeService {
+    EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto);
+    <span class="kw">void</span>                updateEmployee(UpdateEmployeeRequestDto requestDto);
+    <span class="kw">void</span>                updateEmployeeStatus(EmployeeStatusUpdateDto requestDto);
+    EmployeeResponseDto getEmployeeById(Long employeeId);
+    PaginationResponseDto&lt;EmployeeListResponse&gt; getEmployeeList(PaginationRequestDto paginationRequestDto);
+    EmployeeResponseDto getMyProfile();
+    <span class="kw">void</span>                deleteEmployee(Long employeeId);
+}</pre>
+    </div>
+
+    <p>Clean contract. Implementation comes next.</p>
+
+    <!-- ─── createEmployee ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>createEmployee()</code> — Adding a New Worker</h2>
+
+    <p>This is the most interesting method. It does four things:</p>
+    <ol>
+      <li>Validates the mobile is unique among employees</li>
+      <li>Handles "stale user" cleanup (the orphan-cleanup trick)</li>
+      <li>Inserts the Employee row</li>
+      <li>Calls AdminUserService to create the linked login account</li>
+    </ol>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.createEmployee()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="ann">@Transactional</span>                                  <span class="com">// all-or-nothing</span>
+<span class="kw">public</span> EmployeeResponseDto createEmployee(CreateEmployeeRequestDto requestDto) {
+    String mobile = requestDto.getMobileNumber();
+
+    <span class="com">// ── STEP 1: Reject if another Employee has this mobile ──────</span>
+    <span class="kw">if</span> (employeeRepository.existsByMobileNumber(mobile)) {
+        <span class="kw">throw new</span> DuplicateResourceException(
+            <span class="str">"Employee with this mobile number already exists"</span>);
+    }
+
+    <span class="com">// ── STEP 2: Stale-User cleanup (advanced) ───────────────────</span>
+    <span class="com">// If a login User exists for this mobile, decide whether it's a legitimate
+    // conflict (admin, owner, or another linked employee) or a stale orphan
+    // from a previously-failed create — orphans get cleaned up so the retry
+    // can succeed.</span>
+    userRepository.findByMobileNumber(mobile).ifPresent(existingUser -&gt; {
+        UserProfile profile = userProfileRepository
+                .findByUserId(existingUser.getId()).orElse(<span class="kw">null</span>);
+        <span class="kw">boolean</span> linkedToSomething = profile != <span class="kw">null</span>
+                &amp;&amp; (profile.getEmployeeId() != <span class="kw">null</span> || profile.getOwnerId() != <span class="kw">null</span>);
+        <span class="kw">boolean</span> isAdmin = existingUser.getRole() != <span class="kw">null</span>
+                &amp;&amp; existingUser.getRole().name().equals(<span class="str">"ADMIN"</span>);
+
+        <span class="kw">if</span> (linkedToSomething || isAdmin) {
+            <span class="kw">throw new</span> DuplicateResourceException(
+                <span class="str">"This mobile number is already in use by another account"</span>);
+        }
+        <span class="com">// Orphan user — drop it so we can re-register cleanly.</span>
+        <span class="kw">if</span> (profile != <span class="kw">null</span>) {
+            userProfileRepository.delete(profile);
+        }
+        userRepository.delete(existingUser);
+        userRepository.flush();
+    });
+
+    <span class="com">// ── STEP 3: Insert the Employee row ─────────────────────────</span>
+    Employee employee = Employee.builder()
+            .name(requestDto.getEmployeeName())
+            .mobileNumber(mobile)
+            .joiningDate(requestDto.getJoiningDate())
+            .polishRate(requestDto.getPolishingRate())
+            .status(EmployeeStatus.ACTIVE)        <span class="com">// new workers are ACTIVE</span>
+            .build();
+    Employee saved = employeeRepository.save(employee);
+
+    <span class="com">// ── STEP 4: Create the User + UserProfile (delegate) ────────</span>
+    User user = adminUserService.createEmployeeUser(
+        mobile,
+        requestDto.getPassword(),
+        saved.getId()
+    );
+    saved.setUser(user);                          <span class="com">// link User back to Employee</span>
+    saved = employeeRepository.save(saved);
+
+    <span class="com">// ── STEP 5: Return the response DTO ─────────────────────────</span>
+    <span class="kw">return</span> EmployeeResponseDto.builder()
+            .employeeId(saved.getId())
+            .employeeName(saved.getName())
+            .mobileNumber(saved.getMobileNumber())
+            .joiningDate(saved.getJoiningDate())
+            .polishingRate(saved.getPolishRate())
+            .status(saved.getStatus().name())
+            .build();
+}</pre>
+    </div>
+
+    <h3>The orphan-cleanup trick — why it exists</h3>
+    <div class="callout brain">
+      <strong>Scenario:</strong> Dad tries to create a worker. The User row gets created
+      successfully, but the next step (UserProfile insert) fails due to a DB hiccup. The
+      <code>@Transactional</code> rolls back the UserProfile, but Hibernate sometimes leaves
+      the User row committed before the rollback (depends on the transaction propagation).
+      That orphan User row now blocks any retry with the same mobile.
+      <br><br>
+      <strong>The fix:</strong> on retry, the code detects "this User exists but has no profile
+      and isn't an admin" → that's an orphan from a prior failure → safe to delete and re-create.
+      This is defensive code born from real production debugging.
+    </div>
+
+    <!-- ─── updateEmployee ─── -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>updateEmployee()</code> — Editing a Worker</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.updateEmployee()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Transactional</span>
+<span class="ann">@Override</span>
+<span class="kw">public void</span> updateEmployee(UpdateEmployeeRequestDto requestDto) {
+
+    <span class="com">// ── STEP 1: Fetch the existing row ──────────────────────────</span>
+    Employee employee = employeeRepository.findById(requestDto.getEmployeeId())
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+
+    <span class="com">// ── STEP 2: If mobile is changing, ensure new one is free ───</span>
+    <span class="kw">if</span> (!employee.getMobileNumber().equals(requestDto.getMobileNumber())
+            &amp;&amp; employeeRepository.existsByMobileNumber(requestDto.getMobileNumber())){
+        <span class="kw">throw new</span> DuplicateResourceException(<span class="str">"Mobile number already in use"</span>);
+    }
+    <span class="kw">if</span> (!employee.getMobileNumber().equals(requestDto.getMobileNumber())
+            &amp;&amp; userRepository.existsByMobileNumber(requestDto.getMobileNumber())) {
+        <span class="kw">throw new</span> DuplicateResourceException(
+            <span class="str">"A login account with this mobile number already exists"</span>);
+    }
+
+    <span class="com">// ── STEP 3: Apply the changes to the Employee row ───────────</span>
+    employee.setName(requestDto.getEmployeeName());
+    employee.setPolishRate(requestDto.getPolishingRate());
+    employee.setMobileNumber(requestDto.getMobileNumber());
+
+    <span class="com">// ── STEP 4: Sync the mobile on the linked User row too ──────</span>
+    User user = employee.getUser();
+    <span class="kw">if</span> (user == <span class="kw">null</span>) {                                <span class="com">// fallback: lookup via profile</span>
+        user = userProfileRepository.findByEmployeeId(employee.getId())
+                .map(profile -&gt; profile.getUser())
+                .orElse(<span class="kw">null</span>);
+    }
+    <span class="kw">if</span> (user != <span class="kw">null</span>) {
+        user.setMobileNumber(requestDto.getMobileNumber());
+        userRepository.save(user);
+        employee.setUser(user);
+    }
+
+    employeeRepository.save(employee);
+}</pre>
+    </div>
+
+    <p>Two important details:</p>
+    <ul>
+      <li><strong>Only check duplicates if mobile is actually changing.</strong> If Dad is editing Prema's name but keeping her mobile the same, we DON'T trigger a uniqueness check that would find her own existing row.</li>
+      <li><strong>Mobile is synced to BOTH Employee and User.</strong> They're stored separately (denormalized) — if we only updated one, the two tables would drift. The login table is the source of truth for auth; the Employee mobile is for quick contact display. They must match.</li>
+    </ul>
+
+    <!-- ─── updateStatus ─── -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>updateEmployeeStatus()</code> — Mark as Left / Reactivate</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.updateEmployeeStatus()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Transactional</span>
+<span class="ann">@Override</span>
+<span class="kw">public void</span> updateEmployeeStatus(EmployeeStatusUpdateDto requestDto) {
+    Employee employee = employeeRepository.findById(requestDto.getEmployeeId())
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+    employee.setStatus(requestDto.getStatus());     <span class="com">// ACTIVE or LEFT</span>
+    employeeRepository.save(employee);
+}</pre>
+    </div>
+
+    <p>
+      Tiny method but important — it's the "soft delete" mechanism for workers. When Suresh
+      leaves the workshop, Dad calls this with <code>{ employeeId: 7, status: LEFT }</code>.
+      The row stays in the DB (preserving history); only the flag flips.
+    </p>
+
+    <div class="callout warn">
+      <strong>What this method does NOT do:</strong> it doesn't also disable the User's
+      <code>active</code> flag. So even after status=LEFT, the worker could technically still
+      log in. A stricter implementation would also flip <code>User.active=false</code> here.
+      Right now NOOL relies on the status flag for UI filtering (the user would just see an
+      empty dashboard).
+    </div>
+
+    <!-- ─── getEmployeeById ─── -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>getEmployeeById()</code> — With Permission Check</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.getEmployeeById()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> EmployeeResponseDto getEmployeeById(Long employeeId) {
+
+    <span class="com">// ── A WORKER can only read their own profile, never another employee's ─</span>
+    String role = CurrentUserUtil.getRole();
+    <span class="kw">if</span> (!<span class="str">"ADMIN"</span>.equals(role)) {
+        Long callerEmployeeId = CurrentUserUtil.getEmployeeId();
+        <span class="kw">if</span> (callerEmployeeId == <span class="kw">null</span> || !callerEmployeeId.equals(employeeId)) {
+            <span class="kw">throw new</span> org.springframework.security.access.AccessDeniedException(
+                <span class="str">"You can only view your own profile"</span>);
+        }
+    }
+
+    <span class="com">// ── Permission check passed — fetch and return ──────────────</span>
+    Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+
+    <span class="kw">return</span> EmployeeResponseDto.builder()
+            .employeeId(employee.getId())
+            .employeeName(employee.getName())
+            .joiningDate(employee.getJoiningDate())
+            .polishingRate(employee.getPolishRate())
+            .mobileNumber(employee.getMobileNumber())
+            .status(employee.getStatus().name())
+            .build();
+}</pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>Defense in depth at work.</strong> SecurityConfig already allows the endpoint
+      to be called by either ADMIN or WORKER. But this service adds a finer check:
+      <em>"if you're a WORKER, the ID you're asking for must match YOUR id"</em>. Without
+      this, Prema could call <code>GET /api/employees/8</code> and read Ravi's polish rate.
+      Two layers of protection: URL-level (SecurityConfig) and row-level (here).
+    </div>
+
+    <!-- ─── getEmployeeList ─── -->
+    <h2><span class="h2-emoji">6️⃣</span> <code>getEmployeeList()</code> — Paginated, Searchable</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.getEmployeeList()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> PaginationResponseDto&lt;EmployeeListResponse&gt; getEmployeeList(PaginationRequestDto paginationRequestDto) {
+
+    <span class="com">// ── STEP 1: Build the Spring Data PageRequest ───────────────</span>
+    PageRequest pageRequest = PageRequest.of(
+            paginationRequestDto.getPage(),
+            paginationRequestDto.getSize(),
+            Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+            paginationRequestDto.getSortBy()
+    );
+
+    <span class="com">// ── STEP 2: Search if keyword present, else findAll ─────────</span>
+    String keyword = paginationRequestDto.getSearchKeyword();
+    Page&lt;Employee&gt; page = (keyword != <span class="kw">null</span> &amp;&amp; !keyword.isBlank())
+            ? employeeRepository.searchEmployees(keyword, pageRequest)
+            : employeeRepository.findAll(pageRequest);
+
+    <span class="com">// ── STEP 3: Map entities to DTOs ────────────────────────────</span>
+    <span class="kw">return</span> PaginationResponseDto.&lt;EmployeeListResponse&gt;builder()
+            .content(
+                page.getContent().stream().map(employee -&gt;
+                    EmployeeListResponse.builder()
+                            .employeeId(employee.getId())
+                            .employeeName(employee.getName())
+                            .mobileNumber(employee.getMobileNumber())
+                            .joiningDate(employee.getJoiningDate())
+                            .polishingRate(employee.getPolishRate())
+                            .status(employee.getStatus().name())
+                            .build()
+                ).collect(Collectors.toList())
+            )
+            .page(page.getNumber())
+            .size(page.getSize())
+            .totalElements(page.getTotalElements())
+            .totalPages(page.getTotalPages())
+            .last(page.isLast())
+            .build();
+}</pre>
+    </div>
+
+    <p>Pure orchestration — builds a PageRequest, calls the right repo method (search or findAll), maps entities to DTOs, wraps in a PaginationResponseDto.</p>
+
+    <!-- ─── getMyProfile ─── -->
+    <h2><span class="h2-emoji">7️⃣</span> <code>getMyProfile()</code> — Worker Views Own Profile</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.getMyProfile()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> EmployeeResponseDto getMyProfile() {
+    Long employeeId = CurrentUserUtil.getEmployeeId();   <span class="com">// from JWT</span>
+    <span class="kw">if</span> (employeeId == <span class="kw">null</span>){
+        <span class="kw">throw new</span> RuntimeException(<span class="str">"Access denied"</span>);    <span class="com">// caller has no employeeId claim → not a worker</span>
+    }
+    Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+    <span class="kw">return</span> EmployeeResponseDto.builder()
+            .employeeId(employee.getId())
+            .employeeName(employee.getName())
+            .joiningDate(employee.getJoiningDate())
+            .polishingRate(employee.getPolishRate())
+            .mobileNumber(employee.getMobileNumber())
+            .status(employee.getStatus().name())
+            .build();
+}</pre>
+    </div>
+
+    <p>The frontend can call this without sending any ID. The backend just reads <code>employeeId</code> from the JWT — guaranteed to be the caller's own. <strong>Cannot be tricked into returning someone else's profile.</strong></p>
+
+    <!-- ─── deleteEmployee ─── -->
+    <h2><span class="h2-emoji">8️⃣</span> <code>deleteEmployee()</code> — The Cascading Deletion</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeServiceImpl.deleteEmployee()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="ann">@Transactional</span>
+<span class="kw">public void</span> deleteEmployee(Long employeeId) {
+    Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(
+                    <span class="str">"Employee not found with id: "</span> + employeeId));
+
+    <span class="com">// ── 1. Cascade-delete all child records that reference employee_id ──
+    //    MySQL won't let us drop the parent row while children exist.</span>
+    dailyWorkRepository.deleteAllByEmployeeId(employeeId);
+    salaryPaymentRepository.deleteAllByEmployeeId(employeeId);
+    attendanceRepository.deleteAllByEmployeeId(employeeId);
+
+    <span class="com">// ── 2. Unlink the user from the employee, then delete profile + user ──</span>
+    UserProfile profile = userProfileRepository.findByEmployeeId(employeeId).orElse(<span class="kw">null</span>);
+    User user = employee.getUser();
+    <span class="kw">if</span> (user == <span class="kw">null</span> &amp;&amp; profile != <span class="kw">null</span>) {
+        user = profile.getUser();
+    }
+    <span class="kw">if</span> (user != <span class="kw">null</span>) {
+        employee.setUser(<span class="kw">null</span>);
+        employeeRepository.save(employee);
+        employeeRepository.flush();
+    }
+    <span class="kw">if</span> (profile != <span class="kw">null</span>) {
+        userProfileRepository.delete(profile);
+        userProfileRepository.flush();
+    }
+    <span class="kw">if</span> (user != <span class="kw">null</span>) {
+        userRepository.delete(user);
+    }
+
+    <span class="com">// ── 3. Finally drop the employee row ─────────────────────────</span>
+    employeeRepository.delete(employee);
+}</pre>
+    </div>
+
+    <h3>Why is delete so complicated?</h3>
+    <p>Because the Employee row is the parent of <strong>five</strong> dependent tables:</p>
+
+    <ul>
+      <li><code>attendance</code> — FK <code>employee_id</code></li>
+      <li><code>employee_daily_work</code> — FK <code>employee_id</code></li>
+      <li><code>salary_payments</code> — FK <code>employee_id</code></li>
+      <li><code>user_profiles</code> — has <code>employee_id</code> column (not strict FK, but logical link)</li>
+      <li><code>users</code> — has the linked User row to clean up</li>
+    </ul>
+
+    <p>MySQL's foreign-key constraints prevent dropping a row that has children. So we must
+    delete the children first, in the right order, then the Employee. The
+    <code>flush()</code> calls force Hibernate to actually run the DELETEs immediately instead
+    of batching them — important because the order matters here.</p>
+
+    <div class="callout warn">
+      <strong>Hard delete is RARE in NOOL.</strong> The normal flow is "mark as LEFT" via
+      <code>updateEmployeeStatus</code>, which preserves history. Hard-delete should only be
+      used to remove test data or fix mistakes — and it irreversibly destroys all the
+      worker's history. The GlobalExceptionHandler (Chapter 09) even has a specific message
+      for the foreign-key violation case, urging the admin to use "Mark as Left" instead.
+    </div>
+
+    <!-- ─── Scenarios ─── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad adds Prema as a new worker</h5>
+      <ol>
+        <li>Dad clicks "Add Employee" → form with name "Prema", mobile <code>9000000002</code>, joining date, rate ₹30, password.</li>
+        <li>Frontend posts to <code>POST /api/employees</code> with CreateEmployeeRequestDto.</li>
+        <li>Controller → <code>createEmployee()</code>.</li>
+        <li>Step 1: <code>existsByMobileNumber("9000000002")</code> → false.</li>
+        <li>Step 2: no existing User with that mobile → orphan-cleanup branch doesn't trigger.</li>
+        <li>Step 3: insert Employee row → returns id=5.</li>
+        <li>Step 4: <code>adminUserService.createEmployeeUser("9000000002", "prema123", 5)</code> creates User + UserProfile.</li>
+        <li>Step 5: Employee row updated with User pointer. Saved again.</li>
+        <li>Response DTO returned: <code>{ employeeId: 5, employeeName: "Prema", ..., status: "ACTIVE" }</code>.</li>
+        <li>Dad sees Prema in the employee list. Prema can now log in with her phone.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Prema gets a raise</h5>
+      <ol>
+        <li>Dad opens Prema's row, edits her polishing rate from 30.0 to 32.0.</li>
+        <li>Frontend posts to <code>PUT /api/employees</code> with <code>{ employeeId: 5, employeeName: "Prema", polishingRate: 32.0, mobileNumber: "9000000002" }</code>.</li>
+        <li>Step 1: Employee #5 found.</li>
+        <li>Step 2: mobile NOT changing → skip duplicate checks.</li>
+        <li>Step 3: <code>employee.setPolishRate(32.0)</code>.</li>
+        <li>Step 4: User mobile NOT changing → no User update needed (but we still execute the save — small inefficiency).</li>
+        <li>Hibernate UPDATE runs. From May 16 onwards, Prema's daily earnings use ₹32.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Prema views her own profile</h5>
+      <ol>
+        <li>Prema's app calls <code>GET /api/employees/me</code> on the worker dashboard.</li>
+        <li>Controller → <code>getMyProfile()</code>.</li>
+        <li>Reads <code>employeeId = 5</code> from her JWT via <code>CurrentUserUtil.getEmployeeId()</code>.</li>
+        <li>Fetches Employee #5, builds DTO, returns it.</li>
+        <li>Prema's UI shows her name, joining date, rate, status.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Prema tries to view Ravi's profile via URL manipulation</h5>
+      <ol>
+        <li>Prema (employeeId=5) manually calls <code>GET /api/employees/8</code> (Ravi's ID).</li>
+        <li>SecurityConfig allows it (<code>GET /employees/**</code> → ADMIN or WORKER).</li>
+        <li>Service: <code>getEmployeeById(8)</code>.</li>
+        <li>Permission check: role is WORKER (not ADMIN). Check callerEmployeeId(5) vs requestedId(8) → mismatch.</li>
+        <li>Throws <code>AccessDeniedException("You can only view your own profile")</code>.</li>
+        <li>Spring Security returns 403 Forbidden. Cross-worker access prevented at the service layer.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Dad tries to delete a worker who has history</h5>
+      <ol>
+        <li>Dad accidentally clicks "Delete" on Prema instead of "Mark as Left".</li>
+        <li>Controller → <code>deleteEmployee(5)</code>.</li>
+        <li>Step 1: Employee found.</li>
+        <li>Step 2a: <code>dailyWorkRepository.deleteAllByEmployeeId(5)</code> — wipes ALL her daily work history.</li>
+        <li>Step 2b: <code>salaryPaymentRepository.deleteAllByEmployeeId(5)</code> — wipes ALL her salary records.</li>
+        <li>Step 2c: <code>attendanceRepository.deleteAllByEmployeeId(5)</code> — wipes ALL her attendance.</li>
+        <li>Step 3: unlink User → delete UserProfile → delete User.</li>
+        <li>Step 4: delete the Employee row.</li>
+        <li>Everything is GONE. <strong>Permanently.</strong> This is why NOOL urges admins to use "Mark as Left" — soft delete preserves history.</li>
+      </ol>
+    </div>
+
+    <!-- ─── Mistakes ─── -->
+    <div class="mistakes">
+      <h5>Common service-layer mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Transactional</code> on createEmployee</div>
+        <div class="good">Multiple inserts (Employee, User, UserProfile) — if one fails, the others must roll back. Without @Transactional you get half-created accounts.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Letting workers view any employee by ID</div>
+        <div class="good">The self-or-admin check is critical. SecurityConfig allows WORKERs to call the endpoint, but the SERVICE narrows it to "self only". Two layers.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Not syncing mobile updates between Employee and User</div>
+        <div class="good">The mobile is denormalized — exists on both rows. Editing one without the other causes login/contact mismatch. Always update both together.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using hard delete as the standard removal flow</div>
+        <div class="good">Default to <code>updateEmployeeStatus(LEFT)</code> — soft delete preserves history. Hard delete is the nuclear option, reserved for test data and accidents.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Calling <code>employeeRepository.findAll()</code> without pagination on the list endpoint</div>
+        <div class="good">Loading thousands of rows blows up memory. The PageRequest pattern is mandatory for any potentially-large list.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting to flush() between unlink and delete during cascade-delete</div>
+        <div class="good">Hibernate batches operations by default. If you delete the parent before flushing the child unlink, you can get FK violations. <code>flush()</code> forces the buffered changes to run immediately.</div>
+      </div>
+    </div>
+
+    <!-- ─── Q&A ─── -->
+    <div class="qabox">
+      <h5>Interview questions</h5>
+
+      <div class="qa">
+        <div class="q">Why is the orphan-cleanup logic in createEmployee?</div>
+        <div class="a">
+          To handle retries after a previously-failed create. If the User row got committed
+          before something downstream failed, that User row would block the retry (mobile is
+          UNIQUE). The cleanup detects "an orphan exists with no business link" and removes
+          it so the retry can succeed. Real production code — born from debugging actual
+          failures.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why two duplicate checks in updateEmployee — one against Employee and one against User?</div>
+        <div class="a">
+          Mobile is denormalized between the two tables. The new mobile could clash with another
+          Employee's mobile OR with an unrelated User's mobile (e.g., an owner who happens to
+          have the same number). Both checks are needed. The conditional ensures we don't
+          self-clash with the row being edited.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why don't workers see other workers via getEmployeeById?</div>
+        <div class="a">
+          The service does an explicit permission check: if the caller isn't an ADMIN, the
+          requested employeeId must match the caller's own employeeId (from the JWT). If they
+          don't match, AccessDeniedException is thrown. This is defense-in-depth on top of
+          the SecurityConfig URL rules.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is getMyProfile a separate endpoint from getEmployeeById?</div>
+        <div class="a">
+          For UX clarity and security. The worker's frontend doesn't need to know its own
+          employeeId — it just calls <code>GET /employees/me</code> and the backend infers
+          identity from the JWT. This avoids leaking the ID in URLs and prevents the worker
+          from constructing requests that could be confused with admin-style lookups.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">When would you actually use deleteEmployee vs updateEmployeeStatus?</div>
+        <div class="a">
+          Almost always use status-update. Hard delete is for: (a) test data cleanup, (b)
+          removing a worker that was added by mistake before they had any activity, or (c)
+          legal compliance (e.g., GDPR right-to-erasure). For normal "they left the job"
+          situations, status=LEFT preserves the history needed for audit, future salary
+          reconciliation, and tax records.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could createEmployee skip step 2 (orphan cleanup) and rely on @Transactional?</div>
+        <div class="a">
+          In theory yes — if @Transactional always rolls back perfectly. In practice, Spring
+          transactions sometimes don't roll back as expected (REQUIRES_NEW propagation, nested
+          transactions, exceptions caught mid-flow). The orphan-cleanup is belt-and-braces:
+          if a previous run left an orphan, the retry self-heals.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does the response DTO not include the password (even hashed)?</div>
+        <div class="a">
+          Three reasons. (1) The password isn't on the Employee entity anyway — it's on the
+          linked User. (2) Even if it were, exposing the hash is a security mistake — attackers
+          can run offline BCrypt brute-force on hashes they obtain. (3) The DTO is the boundary
+          between "what we store" and "what we expose" — only put what the frontend needs.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>The service is the brain. Next chapter is the <strong>HTTP face</strong> of the module — <code>EmployeeController.java</code>, which receives requests and delegates to this service.</p>
+
+    <div class="chapnav">
+      <a href="29-employee-repository-and-dtos.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 29 · Employee Repository &amp; DTOs</span></a>
+      <a href="31-employee-controller.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 31 · EmployeeController</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 30 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 24 · Auth DTOs &amp; Repositories · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 24 · The Plumbing of Login</span>
+    <h1>
+      Auth <span class="gradient">DTOs &amp; Repositories</span>
+    </h1>
+    <p class="subtitle">
+      Four small files that together define <em>what</em> a login request looks like, what comes
+      back, and how to query the User and UserProfile tables. Pure plumbing — but every login,
+      register, and "me" endpoint depends on them.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🔌</div>
+      <div class="fmeta">
+        <h3>4 files in the auth layer</h3>
+        <span class="fpath">backend/.../auth/dto/ + repository/auth/</span>
+        <div class="ftags"><span>DTOs</span><span>Repositories</span><span>JpaRepository</span><span>Validation</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Four Files in Play</h2>
+    <table class="ftable">
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>AuthLoginRequestDto.java</code></td><td>Shape of the JSON body the frontend POSTs to <code>/api/auth/login</code></td></tr>
+        <tr><td><code>AuthLoginResponseDto.java</code></td><td>Shape of the JSON the backend sends back on success</td></tr>
+        <tr><td><code>UserRepository.java</code></td><td>Spring Data interface for the <code>users</code> table</td></tr>
+        <tr><td><code>UserProfileRepository.java</code></td><td>Spring Data interface for the <code>user_profiles</code> table</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── DTO 1 ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> <code>AuthLoginRequestDto.java</code> — The Login Form</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">auth/dto/AuthLoginRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.dto;
+
+<span class="kw">import</span> jakarta.validation.constraints.NotBlank;
+<span class="kw">import</span> jakarta.validation.constraints.Size;
+<span class="kw">import</span> lombok.Getter;
+<span class="kw">import</span> lombok.Setter;
+
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="kw">public class</span> AuthLoginRequestDto {
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Mobile number is required"</span>)
+    <span class="ann">@Size</span>(min = <span class="num2">10</span>, max = <span class="num2">15</span>,
+           message = <span class="str">"Mobile number must be valid"</span>)
+    <span class="kw">private</span> String mobileNumber;
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Password is required"</span>)
+    <span class="kw">private</span> String password;
+}</pre>
+    </div>
+
+    <p>Validation in action:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Annotation</th><th>What it enforces</th></tr></thead>
+      <tbody>
+        <tr><td><code>@NotBlank</code></td><td>Field cannot be null, empty, or whitespace-only</td></tr>
+        <tr><td><code>@Size(min=10, max=15)</code></td><td>Mobile number length between 10 and 15 chars (covers +91 prefix)</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      When the frontend posts <code>{ "mobileNumber": "9876543210", "password": "Admin@123" }</code>,
+      Spring's <code>@Valid</code> annotation in the controller triggers these validators
+      <em>before</em> any business code runs. If the mobile is empty, the request fails at
+      this stage with HTTP 400 — <code>GlobalExceptionHandler</code> (Chapter 09) converts the
+      <code>MethodArgumentNotValidException</code> into a friendly JSON error.
+    </p>
+
+    <!-- ─── DTO 2 ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>AuthLoginResponseDto.java</code> — The Login Result</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">auth/dto/AuthLoginResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.dto;
+
+<span class="kw">import</span> com.nool.backend.enums.Role;
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Getter;
+<span class="kw">import</span> lombok.Setter;
+
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> AuthLoginResponseDto {
+    <span class="kw">private</span> String token;       <span class="com">// the signed JWT</span>
+    <span class="kw">private</span> Role   role;        <span class="com">// ADMIN / WORKER / SAREE_OWNER</span>
+    <span class="kw">private</span> Long   employeeId;  <span class="com">// for workers; null otherwise</span>
+    <span class="kw">private</span> Long   ownerId;     <span class="com">// for owners; null otherwise</span>
+}</pre>
+    </div>
+
+    <p>Sample JSON returned to the frontend after a successful login:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Login response for Rahul</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"token"</span>:      <span class="str">"eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjIs..."</span>,
+  <span class="str">"role"</span>:       <span class="str">"SAREE_OWNER"</span>,
+  <span class="str">"employeeId"</span>: <span class="kw">null</span>,
+  <span class="str">"ownerId"</span>:    <span class="num2">1</span>
+}</pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>Why does the response duplicate info that's already inside the token?</strong>
+      Convenience. The frontend would otherwise have to decode the JWT to know "what role
+      did I just log in as?". Returning <code>role</code>, <code>employeeId</code>,
+      <code>ownerId</code> alongside the token lets the frontend immediately render the correct
+      sidebar and dashboard without parsing anything.
+    </div>
+
+    <!-- ─── Repo 1 ─── -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>UserRepository.java</code> — Queries on the <code>users</code> Table</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">repository/auth/UserRepository.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.repository.auth;
+
+<span class="kw">import</span> com.nool.backend.auth.entity.User;
+<span class="kw">import</span> com.nool.backend.enums.Role;
+<span class="kw">import</span> org.springframework.data.jpa.repository.JpaRepository;
+<span class="kw">import</span> org.springframework.stereotype.Repository;
+<span class="kw">import</span> java.util.Optional;
+
+<span class="ann">@Repository</span>
+<span class="kw">public interface</span> UserRepository <span class="kw">extends</span> JpaRepository&lt;User, Long&gt; {
+
+    Optional&lt;User&gt; findByMobileNumber(String mobileNumber);
+    <span class="kw">boolean</span> existsByMobileNumber(String mobileNumber);
+    <span class="kw">boolean</span> existsByRole(Role role);
+}</pre>
+    </div>
+
+    <p>Three custom finders + the entire JpaRepository toolkit:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Generated SQL</th><th>Used in</th></tr></thead>
+      <tbody>
+        <tr><td><code>findByMobileNumber(mobile)</code></td><td><code>SELECT * FROM users WHERE mobile_number = ?</code></td><td>Login (Chapter 25)</td></tr>
+        <tr><td><code>existsByMobileNumber(mobile)</code></td><td><code>SELECT 1 FROM users WHERE mobile_number = ? LIMIT 1</code></td><td>Duplicate-check before insert (Chapter 26)</td></tr>
+        <tr><td><code>existsByRole(role)</code></td><td><code>SELECT 1 FROM users WHERE role = ? LIMIT 1</code></td><td>Seed admin check (Chapter 27)</td></tr>
+        <tr><td><em>(inherited from JpaRepository)</em></td><td><code>save()</code>, <code>findById()</code>, <code>findAll()</code>, <code>deleteById()</code>, <code>count()</code></td><td>Everywhere</td></tr>
+      </tbody>
+    </table>
+
+    <h3>How Spring Data generates the SQL</h3>
+    <p>
+      Spring Data JPA parses the method <em>name</em> at startup and generates the SQL
+      automatically. <code>findByMobileNumber</code> breaks down as:
+    </p>
+    <ul>
+      <li><code>find</code> → <code>SELECT</code> a User</li>
+      <li><code>By</code> → <code>WHERE</code> clause follows</li>
+      <li><code>MobileNumber</code> → match the field named <code>mobileNumber</code> (maps to column <code>mobile_number</code>)</li>
+    </ul>
+
+    <div class="callout brain">
+      <strong>No SQL written by hand.</strong> Spring generates the query, prepares the
+      statement, executes it, and maps the result into a <code>User</code> entity. We just
+      declare the method signature.
+    </div>
+
+    <!-- ─── Repo 2 ─── -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>UserProfileRepository.java</code> — Queries on <code>user_profiles</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">repository/auth/UserProfileRepository.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.repository.auth;
+
+<span class="kw">import</span> com.nool.backend.auth.entity.UserProfile;
+<span class="kw">import</span> org.springframework.data.jpa.repository.JpaRepository;
+<span class="kw">import</span> org.springframework.stereotype.Repository;
+<span class="kw">import</span> java.util.Optional;
+
+<span class="ann">@Repository</span>
+<span class="kw">public interface</span> UserProfileRepository <span class="kw">extends</span> JpaRepository&lt;UserProfile, Long&gt; {
+    Optional&lt;UserProfile&gt; findByUserId(Long userId);
+    Optional&lt;UserProfile&gt; findByEmployeeId(Long employeeId);
+    Optional&lt;UserProfile&gt; findByOwnerId(Long ownerId);
+}</pre>
+    </div>
+
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>findByUserId(userId)</code></td><td>"Given a User, what's their profile?"</td></tr>
+        <tr><td><code>findByEmployeeId(empId)</code></td><td>"Given an Employee, find the User who can log in as them"</td></tr>
+        <tr><td><code>findByOwnerId(ownerId)</code></td><td>"Given a SareeOwner, find their login profile"</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Notice the second and third finders use plain Long IDs — that matches the entity from
+      Chapter 12, where <code>employeeId</code> and <code>ownerId</code> are stored as Long
+      not @ManyToOne relationships. The repository method names follow Spring Data's
+      naming convention directly.
+    </p>
+
+    <h2><span class="h2-emoji">🗄️</span> SQL Examples</h2>
+    <div class="sqlbox">
+<pre><span class="sc">-- findByMobileNumber("9876543210"):</span>
+<span class="sk">SELECT</span> u.* <span class="sk">FROM</span> users u <span class="sk">WHERE</span> u.mobile_number = <span class="ss">'9876543210'</span>;
+
+<span class="sc">-- existsByMobileNumber returns true/false fast:</span>
+<span class="sk">SELECT</span> <span class="sk">CASE WHEN COUNT</span>(*) &gt; 0 <span class="sk">THEN</span> 1 <span class="sk">ELSE</span> 0 <span class="sk">END</span>
+  <span class="sk">FROM</span> users <span class="sk">WHERE</span> mobile_number = <span class="ss">'9876543210'</span>;
+
+<span class="sc">-- findByUserId(2) — Rahul's profile:</span>
+<span class="sk">SELECT</span> p.* <span class="sk">FROM</span> user_profiles p <span class="sk">WHERE</span> p.user_id = <span class="num2">2</span>;</pre>
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul submits the login form</h5>
+      <ol>
+        <li>Frontend posts <code>{ "mobileNumber": "9000000001", "password": "rahul123" }</code>.</li>
+        <li>Spring deserializes into an <code>AuthLoginRequestDto</code>.</li>
+        <li><code>@Valid</code> kicks in — both fields are present and length is valid.</li>
+        <li>Controller hands the DTO to <code>AuthServiceImpl.login()</code>.</li>
+        <li>Service calls <code>userRepository.findByMobileNumber("9000000001")</code> → returns the User row.</li>
+        <li>Service calls <code>user.getUserProfile()</code> (LAZY-loaded), gets <code>ownerId = 1</code>.</li>
+        <li>Service builds an <code>AuthLoginResponseDto.builder()...build()</code> with token + role + ownerId.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Empty password — validation rejects early</h5>
+      <ol>
+        <li>Frontend posts <code>{ "mobileNumber": "9876543210", "password": "" }</code>.</li>
+        <li>Spring deserializes into the DTO.</li>
+        <li><code>@Valid</code> runs <code>@NotBlank</code> on <code>password</code> → fails.</li>
+        <li>Spring throws <code>MethodArgumentNotValidException</code>.</li>
+        <li><code>GlobalExceptionHandler.handleValidation</code> catches it.</li>
+        <li>Returns HTTP 400: <code>{ "status": 400, "error": "Bad Request", "message": "password: Password is required", ... }</code>.</li>
+        <li>The auth service is never invoked — saves a wasted DB query.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Seed-admin check at startup</h5>
+      <ol>
+        <li><code>AdminBootstrapRunner</code> (Chapter 27) runs on first boot.</li>
+        <li>Calls <code>userRepository.existsByRole(Role.ADMIN)</code>.</li>
+        <li>SQL: <code>SELECT 1 FROM users WHERE role = 'ADMIN' LIMIT 1</code>.</li>
+        <li>Returns <code>false</code> on first boot (empty DB).</li>
+        <li>Runner inserts the seed admin User row.</li>
+        <li>On subsequent boots, returns <code>true</code>, so the runner skips.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common mistakes</h5>
+      <div class="item">
+        <div class="bad">Forgetting <code>@Valid</code> on the controller's <code>@RequestBody</code> parameter</div>
+        <div class="good">Without <code>@Valid</code>, none of the <code>@NotBlank</code> / <code>@Size</code> annotations run. Empty inputs slip through to the service and cause cryptic errors later. Always add <code>@Valid</code>.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Returning the entity directly from the controller instead of a DTO</div>
+        <div class="good">Returning <code>User</code> would expose the BCrypt-hashed password, timestamps, etc. The DTO is the security boundary — it exposes only what the client should see.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Using <code>List&lt;User&gt; findByMobileNumber</code> instead of <code>Optional&lt;User&gt;</code></div>
+        <div class="good">Mobile is UNIQUE in the schema — at most one match. <code>Optional</code> is the correct return type. List would force consumers to handle "what if there are multiple" — which never happens.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Adding business logic to the repository interface</div>
+        <div class="good">Repositories should only describe queries. Business logic goes in services. Mixing the two makes the repository hard to test and reuse.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why use <code>Optional</code> instead of returning <code>null</code>?</div>
+        <div class="a">
+          Optional explicitly forces the caller to handle the "not found" case at compile time.
+          You can't accidentally dereference a null because <code>orElseThrow()</code> or
+          <code>ifPresent()</code> makes the absence-handling explicit. With raw nulls, the
+          caller might forget — leading to <code>NullPointerException</code> in production.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">How does Spring Data generate the SQL from a method name?</div>
+        <div class="a">
+          At startup, Spring parses the interface's method names. <code>findByMobileNumber</code>
+          becomes <code>SELECT FROM User WHERE mobileNumber = ?</code>. The parser knows about
+          keywords like <code>findBy</code>, <code>existsBy</code>, <code>countBy</code>,
+          <code>And</code>, <code>Or</code>, <code>Like</code>, etc. Method names must match
+          field names exactly (camelCase) — typos like "MobilNumber" cause a startup error.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why are the DTOs in a different package from the entities?</div>
+        <div class="a">
+          DTOs and entities serve different layers. Entities live near the database; DTOs live
+          near the API. Separating packages signals that DTOs can change shape (for API
+          versioning) without affecting persistence, and vice versa.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>The DTOs and repositories are the plumbing. Next chapter wires them together in the <strong>AuthService</strong>'s actual login logic.</p>
+
+    <div class="chapnav">
+      <a href="23-current-user-util.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 23 · CurrentUserUtil.java</span></a>
+      <a href="25-auth-service.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 25 · AuthService + Impl</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 24 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 17 · EmployeeDailyWork.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 17 · How Much Each Worker Did</span>
+    <h1>
+      <span class="gradient">EmployeeDailyWork.java</span> —<br/>
+      Daily polishing output
+    </h1>
+    <p class="subtitle">
+      One row per worker per day, recording <em>how many sarees they actually polished</em>.
+      This is the entity that — combined with the worker's polish rate — drives every salary
+      calculation in NOOL.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📝</div>
+      <div class="fmeta">
+        <h3>EmployeeDailyWork.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/employee/EmployeeDailyWork.java</span>
+        <div class="ftags"><span>Entity</span><span>Daily output</span><span>UNIQUE constraint</span><span>Earnings driver</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What this entity is for ──────── -->
+    <h2><span class="h2-emoji">🧠</span> What This Entity Tracks</h2>
+    <p>
+      Attendance answers <em>"did Prema show up today?"</em>. EmployeeDailyWork answers
+      <em>"what did she produce while she was here?"</em> — broken into two numbers:
+    </p>
+
+    <ul>
+      <li><strong>freshCount</strong> — brand-new sarees polished for the first time</li>
+      <li><strong>rePolishCount</strong> — touch-ups on sarees that came back from a client</li>
+    </ul>
+
+    <p>
+      Together, those two numbers × the worker's polish rate = their earnings for that day.
+      Multiply by all days of the week = weekly earnings. The whole salary system is built on
+      summing these rows.
+    </p>
+
+    <div class="callout brain">
+      <strong>Why split fresh vs re-polish?</strong> Because they're operationally different
+      work. Sometimes my parents want to know <em>"how many of yesterday's polishes were
+      re-work?"</em> as a quality signal. Storing the two counts separately lets that
+      analysis happen later without changing the schema. The salary formula treats them
+      equally (both earn the same rate), but the data tells two stories.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/employee/EmployeeDailyWork.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.employee;
+
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(
+    name = <span class="str">"employee_daily_work"</span>,
+    uniqueConstraints = {                                  <span class="com">// ★ same pattern as Attendance</span>
+        <span class="ann">@UniqueConstraint</span>(columnNames = {<span class="str">"employee_id"</span>, <span class="str">"work_date"</span>})
+    }
+)
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> EmployeeDailyWork {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"work_id"</span>)
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── THE DATE ──────────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"work_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate workDate;
+    <span class="com">// Day-precision — same reasoning as Attendance.attendanceDate.</span>
+
+    <span class="com">// ── FRESH SAREE COUNT ────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"fresh_saree_count"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Integer freshCount;
+    <span class="com">// Number of brand-new sarees polished today. Always &gt;= 0.</span>
+
+    <span class="com">// ── RE-POLISH COUNT ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"repolish_saree_count"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Integer rePolishCount;
+    <span class="com">// Number of touch-up polishes today. Always &gt;= 0.</span>
+
+    <span class="com">// ── REMARKS (optional) ────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"remarks"</span>)
+    <span class="kw">private</span> String remarks;
+    <span class="com">// e.g., "Heavy work day", "Two damaged sarees rejected".</span>
+
+    <span class="com">// ── EMPLOYEE LINK ─────────────────────────────────────────────</span>
+    <span class="ann">@ManyToOne</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"employee_id"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Employee employee;
+    <span class="com">// Many daily-work rows belong to one employee — across days.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>work_id (PK)</td><td>Unique row ID</td><td><code>89</code></td></tr>
+        <tr><td><code>workDate</code></td><td>LocalDate</td><td>work_date</td><td>The work day</td><td><code>2026-05-15</code></td></tr>
+        <tr><td><code>freshCount</code></td><td>Integer</td><td>fresh_saree_count</td><td>Brand-new polishes today</td><td><code>8</code></td></tr>
+        <tr><td><code>rePolishCount</code></td><td>Integer</td><td>repolish_saree_count</td><td>Touch-up polishes today</td><td><code>2</code></td></tr>
+        <tr><td><code>remarks</code></td><td>String</td><td>remarks</td><td>Optional note</td><td><code>"Heavy work day"</code></td></tr>
+        <tr><td><code>employee</code></td><td>Employee</td><td>employee_id (FK)</td><td>Which worker</td><td>FK → employees(employee_id)</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When entered into NOOL</td><td><code>2026-05-15T17:30:00</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Last edit</td><td><code>2026-05-15T18:00:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── The earnings formula ──────── -->
+    <h2><span class="h2-emoji">💰</span> The Earnings Formula</h2>
+    <p>This entity exists primarily to drive ONE calculation:</p>
+
+    <div class="formula">
+      <div class="label">A worker's earnings on a single day</div>
+      <div class="eq">
+        <span class="var">dailyEarnings</span> <span class="op">=</span>
+        (freshCount <span class="op">+</span> rePolishCount)
+        <span class="op">×</span>
+        <span class="var">employee.polishRate</span>
+      </div>
+    </div>
+
+    <p>With Prema's rate of ₹30/saree and her work row above (8 fresh + 2 re-polish):</p>
+    <p style="text-align:center; font-family:'Menlo',monospace; font-size:15px;">
+      dailyEarnings = (8 + 2) × ₹30 = <strong>₹300 for May 15</strong>
+    </p>
+
+    <p>To get weekly or monthly earnings, the salary service sums across many rows:</p>
+
+    <div class="formula">
+      <div class="label">Total earnings for a date range</div>
+      <div class="eq">
+        <span class="var">totalEarnings</span> <span class="op">=</span>
+        SUM((freshCount <span class="op">+</span> rePolishCount) <span class="op">×</span> polishRate) over rows in [from, to]
+      </div>
+    </div>
+
+    <p>
+      Then subtract the SUM of <code>salary_payment.amount_paid</code> for the same range to
+      get the pending salary. We'll see that exact code in Chapter 39
+      (<code>SalaryServiceImpl</code>).
+    </p>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> employee_daily_work (
+    work_id              <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    employee_id          <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span>,
+    work_date            <span class="sk">DATE</span>        <span class="sk">NOT NULL</span>,
+    fresh_saree_count    <span class="sk">INT</span>         <span class="sk">NOT NULL</span>,
+    repolish_saree_count <span class="sk">INT</span>         <span class="sk">NOT NULL</span>,
+    remarks              <span class="sk">VARCHAR</span>(255),
+    created_at           <span class="sk">DATETIME</span>(6) <span class="sk">NOT NULL</span>,
+    updated_at           <span class="sk">DATETIME</span>(6),
+
+    <span class="sk">PRIMARY KEY</span> (work_id),
+    <span class="sk">UNIQUE KEY</span> uk_dailywork_emp_date (employee_id, work_date),   <span class="sc">-- ★ the guard</span>
+    <span class="sk">FOREIGN KEY</span> (employee_id) <span class="sk">REFERENCES</span> employees(employee_id)
+);
+
+<span class="sc">-- Dad logs Prema's output for May 15:</span>
+<span class="sk">INSERT INTO</span> employee_daily_work
+    (employee_id, work_date, fresh_saree_count, repolish_saree_count,
+     remarks, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">5</span>, <span class="ss">'2026-05-15'</span>, <span class="num2">8</span>, <span class="num2">2</span>, <span class="kw">NULL</span>,
+     <span class="ss">'2026-05-15 17:30:00'</span>, <span class="ss">'2026-05-15 17:30:00'</span>);
+
+<span class="sc">-- A second insert for the same employee + date — UNIQUE constraint blocks it:</span>
+<span class="sk">INSERT INTO</span> employee_daily_work (employee_id, work_date, ...)
+<span class="sk">VALUES</span> (<span class="num2">5</span>, <span class="ss">'2026-05-15'</span>, ...);
+<span class="sc">-- ERROR 1062: Duplicate entry '5-2026-05-15' for key 'uk_dailywork_emp_date'</span>
+<span class="sc">-- → Caught by GlobalExceptionHandler, returned as:</span>
+<span class="sc">--   "A daily work entry already exists for this employee on this date."</span>
+
+<span class="sc">-- Salary calculation for Prema for May 11-15:</span>
+<span class="sk">SELECT</span> <span class="sk">SUM</span>((fresh_saree_count + repolish_saree_count) * <span class="num2">30.0</span>)
+<span class="sk">FROM</span>   employee_daily_work
+<span class="sk">WHERE</span>  employee_id = <span class="num2">5</span>
+  <span class="sk">AND</span>  work_date <span class="sk">BETWEEN</span> <span class="ss">'2026-05-11'</span> <span class="sk">AND</span> <span class="ss">'2026-05-15'</span>;</pre>
+    </div>
+
+    <!-- ──────── Why a sister entity to Attendance ──────── -->
+    <h2><span class="h2-emoji">👯</span> Twin of Attendance — But Solving a Different Problem</h2>
+    <p>
+      Notice that EmployeeDailyWork is <em>structurally identical</em> to Attendance:
+    </p>
+
+    <table class="ftable">
+      <thead>
+        <tr><th></th><th>Attendance</th><th>EmployeeDailyWork</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Table name</td><td>attendance</td><td>employee_daily_work</td></tr>
+        <tr><td>Primary key</td><td>attendance_id</td><td>work_id</td></tr>
+        <tr><td>Date field</td><td>attendance_date</td><td>work_date</td></tr>
+        <tr><td>FK</td><td>employee_id</td><td>employee_id</td></tr>
+        <tr><td>UNIQUE constraint</td><td>(employee_id, attendance_date)</td><td>(employee_id, work_date)</td></tr>
+        <tr><td>Audit fields</td><td>created_at, updated_at</td><td>created_at, updated_at</td></tr>
+        <tr><td>Lifecycle hooks</td><td>@PrePersist + @PreUpdate</td><td>@PrePersist + @PreUpdate</td></tr>
+        <tr><td><strong>Real difference</strong></td><td>Status (PRESENT/ABSENT)</td><td>Two integer counts</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <strong>Why two tables instead of one?</strong> They answer different business questions
+      and have different audit requirements. Attendance can be inferred quickly ("is this
+      worker around today?"); daily work needs deliberate end-of-day entry. Mixing them
+      would mean rows with attendance but no counts, or counts but no attendance — confusing.
+      Keep them separate, indexed identically, and let the salary service JOIN them when
+      needed.
+    </div>
+
+    <!-- ──────── Why Integer (not int) ──────── -->
+    <h2><span class="h2-emoji">🔢</span> Why <code>Integer</code> (Wrapper) Not <code>int</code> (Primitive)?</h2>
+    <p>
+      Notice <code>freshCount</code> and <code>rePolishCount</code> are <code>Integer</code>,
+      not the primitive <code>int</code>. There's a practical reason for entities:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th><code>Integer</code> (wrapper)</th><th><code>int</code> (primitive)</th></tr></thead>
+      <tbody>
+        <tr><td>Can be <code>null</code></td><td>Cannot be null (always defaults to 0)</td></tr>
+        <tr><td>Hibernate distinguishes "not set" from "0"</td><td>Hibernate sees 0 — ambiguous</td></tr>
+        <tr><td>Bean Validation (@NotNull, @Min) works</td><td>@NotNull can't apply to primitives</td></tr>
+        <tr><td>Slightly more memory</td><td>Tiny bit less memory</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      For entity fields, <code>Integer</code> is the right call — it lets the schema and code
+      distinguish between "the value is zero" and "the value was never provided", and plays
+      well with validation annotations.
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad logs Prema's day-end output</h5>
+      <ol>
+        <li>5:30 PM. Dad logs into NOOL → Admin → Daily Work → Add.</li>
+        <li>Picks Prema, date today (2026-05-15), fresh count 8, re-polish 2.</li>
+        <li>Frontend POSTs to <code>/api/employee-daily-working</code>.</li>
+        <li>Service checks: row exists for (5, today)? No.</li>
+        <li>Inserts: <code>work_id=89, employee_id=5, work_date=2026-05-15, fresh=8, repolish=2</code>.</li>
+        <li>Prema's earnings for the day are now derivable: (8+2) × ₹30 = ₹300.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Dad realizes he made a typo</h5>
+      <ol>
+        <li>After saving, Dad realizes he typed fresh=8 but it should have been 9.</li>
+        <li>He opens the existing entry, changes fresh from 8 to 9, saves.</li>
+        <li>Backend issues <code>UPDATE employee_daily_work SET fresh_saree_count=9, updated_at=NOW() WHERE work_id=89</code>.</li>
+        <li><code>@PreUpdate</code> stamps the new updated_at. Original <code>created_at</code> stays.</li>
+        <li>New earnings: (9+2) × ₹30 = ₹330. All downstream calculations reflect the correction immediately.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Two NOOL tabs open, both try to save Prema for today</h5>
+      <ol>
+        <li>Mom is using NOOL on her phone; Dad on the laptop. Both navigate to Prema's daily work page.</li>
+        <li>Both type fresh/repolish values, both click Save almost simultaneously.</li>
+        <li>One INSERT succeeds first. The second hits the UNIQUE constraint and fails.</li>
+        <li>The failing client gets a 409 with message: <em>"A daily work entry already exists for this employee on this date."</em></li>
+        <li>The race condition is impossible to corrupt the data — at most one row exists for that (employee, date).</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around EmployeeDailyWork</h5>
+
+      <div class="item">
+        <div class="bad">Using <code>int</code> instead of <code>Integer</code> for counts</div>
+        <div class="good">Use <code>Integer</code> for entity fields. It lets you distinguish "not set" from 0, allows validation annotations like <code>@NotNull</code>, and avoids subtle Hibernate quirks.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Combining fresh and re-polish into one number</div>
+        <div class="good">Keep them separate — they tell different stories. Even though the salary formula adds them, future analytics may want to know the breakdown ("rework ratio" = re-polish ÷ total).</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Allowing negative counts (typo: -8 instead of 8)</div>
+        <div class="good">Add a validation rule like <code>@Min(0)</code> on the corresponding DTO field. The entity itself doesn't enforce non-negative, but the DTO + GlobalExceptionHandler combo catches it before insert.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing the earned amount on this row (e.g., <code>amountEarned = ₹300</code>)</div>
+        <div class="good">Don't store derived values. Compute <code>(fresh + rePolish) × polishRate</code> on demand. If the rate ever changes, the stored value would become wrong. The ledger pattern again: store events, derive numbers.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting that a day with zero work still needs no row</div>
+        <div class="good">Days a worker did no polishing simply have no row in this table. Don't insert "0/0" rows — they clutter queries. The salary service treats "no row" as 0 earnings for the day automatically (since SUM() ignores missing rows).</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about EmployeeDailyWork</h5>
+
+      <div class="qa">
+        <div class="q">Why split fresh and re-polish into two counts?</div>
+        <div class="a">
+          They're operationally different work. Fresh polish is on brand-new sarees; re-polish
+          is touch-ups on sarees that came back from a client. The salary formula treats them
+          equally (both earn the same rate), but the breakdown is useful for analytics:
+          "what's our rework ratio?" Storing them separately costs nothing and unlocks future
+          questions without a schema migration.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is this table different from <code>attendance</code> when they look so similar?</div>
+        <div class="a">
+          They answer different questions. Attendance is "did the worker show up?";
+          DailyWork is "what did they produce?". A worker can be PRESENT and have done zero work
+          (training day), or be ABSENT with zero work. Mixing them into one table would
+          create awkward semantics — "are these counts ABSENT-and-still-did-3-sarees?" Keeping
+          them separate is clearer.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">If a worker did 0/0 on a day, do we insert a row?</div>
+        <div class="a">
+          No — we just don't insert anything. The salary calculation uses SUM, which ignores
+          missing rows. Having an explicit "0/0" row would be noise: it wouldn't change any
+          totals and would clutter dashboard queries. The presence of a row means "we logged
+          work that day". The absence means "nothing to log".
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why isn't the earned amount stored on each row?</div>
+        <div class="a">
+          Because it's derived — and storing derived values invites drift. If we ever change
+          Prema's rate from ₹30 to ₹32, old rows with the old computed amount become wrong.
+          Storing only the counts + employee FK lets us always recompute at query time using
+          the current rate. Same philosophy as the inventory ledger.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the UNIQUE constraint protecting against?</div>
+        <div class="a">
+          Double-logging the same worker for the same day — accidentally inserting two rows
+          (8/2 and 9/3) for (Prema, May 15). Without it, the salary calculation would
+          double-count. The constraint at the database level makes the corruption impossible
+          regardless of any bug in the application layer.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could you compute fresh-vs-rePolish ratios using only this table?</div>
+        <div class="a">
+          Yes — <code>SELECT employee_id, SUM(fresh_saree_count) AS fresh, SUM(repolish_saree_count) AS rep FROM employee_daily_work WHERE work_date BETWEEN ? AND ? GROUP BY employee_id</code>.
+          Each worker's rework ratio = rep ÷ (fresh + rep). That's exactly the kind of analysis
+          the split design enables.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      We know <em>what</em> each worker produced. Next we look at the entity that records
+      the <em>money paid out to them</em>: <code>SalaryPayment.java</code>.
+    </p>
+
+    <div class="chapnav">
+      <a href="16-attendance-entity.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 16 · Attendance.java</span>
+      </a>
+      <a href="18-salary-payment.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 18 · SalaryPayment.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 17 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

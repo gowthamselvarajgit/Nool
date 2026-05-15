@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 25 · AuthService + AuthServiceImpl · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 25 · The Login Brain</span>
+    <h1>
+      <span class="gradient">AuthService</span> &amp; AuthServiceImpl
+    </h1>
+    <p class="subtitle">
+      When the login form is submitted, this is the file that decides: "yes, you are who you
+      say you are." It checks the mobile number, verifies the BCrypt-hashed password, builds
+      the JWT, and returns it. The brain of NOOL's login flow.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🔑</div>
+      <div class="fmeta">
+        <h3>AuthService.java + AuthServiceImpl.java</h3>
+        <span class="fpath">backend/.../auth/service/ + auth/service/impl/</span>
+        <div class="ftags"><span>@Service</span><span>Login logic</span><span>BCrypt</span><span>JWT minting</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> Interface + Implementation Pattern</h2>
+    <p>
+      NOOL follows the classic Spring pattern of <em>interface for contract, class for
+      implementation</em>:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>AuthService.java</code> (interface)</td><td>The contract — what methods this service offers</td></tr>
+        <tr><td><code>AuthServiceImpl.java</code> (class)</td><td>The actual implementation — the body of those methods</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>Why split into two files?</strong> So tests can mock the interface without
+      caring about the implementation, so we can swap implementations (e.g., a fake auth for
+      integration tests), and so the interface acts as documentation — you can see at a glance
+      what the service offers without reading the body.
+    </div>
+
+    <!-- ─── Interface ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> The Interface — <code>AuthService.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">auth/service/AuthService.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.service;
+
+<span class="kw">import</span> com.nool.backend.auth.dto.AuthLoginRequestDto;
+<span class="kw">import</span> com.nool.backend.auth.dto.AuthLoginResponseDto;
+
+<span class="kw">public interface</span> AuthService {
+    AuthLoginResponseDto login(AuthLoginRequestDto requestDto);
+}</pre>
+    </div>
+
+    <p>Six lines. One method. <code>login()</code> takes the request DTO and returns the response DTO. That's the contract.</p>
+
+    <!-- ─── Impl ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> The Implementation — <code>AuthServiceImpl.java</code></h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">auth/service/impl/AuthServiceImpl.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.service.impl;
+
+<span class="com">// imports omitted for brevity</span>
+
+<span class="ann">@Service</span>                                          <span class="com">// Spring auto-detects this</span>
+<span class="ann">@RequiredArgsConstructor</span>                         <span class="com">// Lombok: constructor for final fields</span>
+<span class="kw">public class</span> AuthServiceImpl <span class="kw">implements</span> AuthService {
+
+    <span class="kw">private final</span> UserRepository  userRepository;       <span class="com">// to query users table</span>
+    <span class="kw">private final</span> PasswordEncoder passwordEncoder;      <span class="com">// BCrypt</span>
+    <span class="kw">private final</span> JwtUtil         jwtUtil;              <span class="com">// to mint the JWT</span>
+
+    <span class="ann">@Override</span>
+    <span class="kw">public</span> AuthLoginResponseDto login(AuthLoginRequestDto requestDto) {
+
+        <span class="com">// ── STEP 1: Look up the user by mobile number ────────────</span>
+        User user = userRepository
+                .findByMobileNumber(requestDto.getMobileNumber())
+                .orElseThrow(() -&gt; <span class="kw">new</span> BadRequestException(
+                        <span class="str">"Invalid mobile number or password"</span>));
+        <span class="com">// ★ Deliberately vague message — doesn't reveal whether the user exists.</span>
+
+        <span class="com">// ── STEP 2: Block disabled accounts ──────────────────────</span>
+        <span class="kw">if</span> (!user.isActive()) {
+            <span class="kw">throw new</span> BadRequestException(<span class="str">"User account is inactive"</span>);
+        }
+
+        <span class="com">// ── STEP 3: Verify password ──────────────────────────────</span>
+        <span class="kw">if</span> (!passwordEncoder.matches(requestDto.getPassword(), user.getPassword())) {
+            <span class="kw">throw new</span> BadRequestException(<span class="str">"Invalid mobile number or password"</span>);
+        }
+        <span class="com">// ★ matches() re-hashes the typed password and compares to the stored hash.
+        //   The stored value is a BCrypt hash, never plain text.</span>
+
+        <span class="com">// ── STEP 4: Build JWT claims ─────────────────────────────</span>
+        UserProfile profile = user.getUserProfile();   <span class="com">// LAZY-loaded once here</span>
+
+        Map&lt;String, Object&gt; claims = <span class="kw">new</span> HashMap&lt;&gt;();
+        claims.put(<span class="str">"userId"</span>,     user.getId());
+        claims.put(<span class="str">"role"</span>,       user.getRole().name());
+        claims.put(<span class="str">"employeeId"</span>, profile != <span class="kw">null</span> ? profile.getEmployeeId() : <span class="kw">null</span>);
+        claims.put(<span class="str">"ownerId"</span>,    profile != <span class="kw">null</span> ? profile.getOwnerId()    : <span class="kw">null</span>);
+
+        <span class="com">// ── STEP 5: Mint the JWT ─────────────────────────────────</span>
+        String token = jwtUtil.generateToken(claims, user.getMobileNumber());
+
+        <span class="com">// ── STEP 6: Build the response DTO ───────────────────────</span>
+        <span class="kw">return</span> AuthLoginResponseDto.builder()
+                .token(token)
+                .role(user.getRole())
+                .employeeId(profile != <span class="kw">null</span> ? profile.getEmployeeId() : <span class="kw">null</span>)
+                .ownerId(profile != <span class="kw">null</span> ? profile.getOwnerId()    : <span class="kw">null</span>)
+                .build();
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">📋</span> Step-by-Step Walk-Through</h2>
+    <table class="ftable">
+      <thead><tr><th>Step</th><th>What it does</th><th>If it fails</th></tr></thead>
+      <tbody>
+        <tr><td>1. Find user</td><td><code>SELECT * FROM users WHERE mobile_number = ?</code></td><td>Throws "Invalid mobile or password" (vague on purpose)</td></tr>
+        <tr><td>2. Check active</td><td>Boolean check on User.active</td><td>Throws "User account is inactive"</td></tr>
+        <tr><td>3. Verify password</td><td>BCrypt re-hashes input and compares</td><td>Throws "Invalid mobile or password"</td></tr>
+        <tr><td>4. Build claims</td><td>Map of userId, role, employeeId, ownerId</td><td>Never fails (just allocates)</td></tr>
+        <tr><td>5. Generate JWT</td><td>JwtUtil signs the claims with HS256</td><td>Never fails (config errors caught at startup)</td></tr>
+        <tr><td>6. Build response</td><td>Wrap token + role + IDs into AuthLoginResponseDto</td><td>Never fails</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">🗄️</span> The Database Operations</h2>
+    <div class="sqlbox">
+<pre><span class="sc">-- Step 1: lookup by mobile</span>
+<span class="sk">SELECT</span> u.* <span class="sk">FROM</span> users u <span class="sk">WHERE</span> u.mobile_number = <span class="ss">'9000000001'</span>;
+
+<span class="sc">-- Step 4: LAZY-load the user_profile (triggered by user.getUserProfile())</span>
+<span class="sk">SELECT</span> p.* <span class="sk">FROM</span> user_profiles p <span class="sk">WHERE</span> p.user_id = <span class="num2">2</span>;
+
+<span class="sc">-- That's it. No writes happen during login.</span>
+<span class="sc">-- BCrypt verification is pure CPU work, JWT signing is in-memory.</span></pre>
+    </div>
+
+    <h2><span class="h2-emoji">🔐</span> The Vague Error Message</h2>
+    <p>Notice that step 1 and step 3 both throw the same message: <em>"Invalid mobile number or password"</em>.</p>
+
+    <div class="callout warn">
+      <strong>Why not say "no such user" vs "wrong password"?</strong> Because differentiating
+      the messages reveals which mobile numbers are registered. An attacker could probe with
+      hundreds of mobile numbers and learn which ones have accounts (then target those for
+      phishing or brute-force attacks). A single vague message gives away nothing.
+      <br><br>
+      The <em>"User account is inactive"</em> message at step 2 is slightly more revealing —
+      it tells an attacker the account exists but is disabled. A stricter security posture
+      would use the same vague message there too. NOOL accepts this tiny information leak
+      for clearer user feedback.
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad (admin) logs in successfully</h5>
+      <ol>
+        <li>Frontend posts mobile <code>9876543210</code>, password <code>Admin@123</code>.</li>
+        <li>Service finds user_id=1, role=ADMIN, active=true.</li>
+        <li>BCrypt verifies the password → matches.</li>
+        <li>UserProfile loaded — employeeId=null, ownerId=null (admins have neither).</li>
+        <li>Claims: <code>{ userId: 1, role: "ADMIN", employeeId: null, ownerId: null }</code>.</li>
+        <li>JwtUtil signs the token with 24h expiry.</li>
+        <li>Response sent back. Frontend stores token in localStorage and navigates to <code>/admin/dashboard</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Rahul (owner) logs in</h5>
+      <ol>
+        <li>Frontend posts mobile <code>9000000001</code>, password <code>rahul123</code>.</li>
+        <li>Service finds user_id=2, role=SAREE_OWNER, active=true.</li>
+        <li>BCrypt verifies the password → matches.</li>
+        <li>UserProfile loaded — ownerId=1 (links to his SareeOwner row).</li>
+        <li>Claims: <code>{ userId: 2, role: "SAREE_OWNER", employeeId: null, ownerId: 1 }</code>.</li>
+        <li>JwtUtil mints the token. Frontend navigates to <code>/owner/dashboard</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Prema types the wrong password</h5>
+      <ol>
+        <li>Frontend posts <code>9000000002</code>, <code>prema12</code> (forgot the last digit).</li>
+        <li>Service finds user_id=3.</li>
+        <li>BCrypt re-hashes "prema12", compares to the stored hash → no match.</li>
+        <li>Throws <code>BadRequestException("Invalid mobile number or password")</code>.</li>
+        <li>GlobalExceptionHandler converts to HTTP 400.</li>
+        <li>Frontend shows the error in red. Prema retypes and gets in on the second try.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: A disabled worker tries to log in</h5>
+      <ol>
+        <li>Suresh left the workshop 6 months ago; his User.active was flipped to false.</li>
+        <li>He tries to log in with his old (still correct) credentials.</li>
+        <li>Service finds his User row.</li>
+        <li>Step 2: <code>!user.isActive()</code> → true → throw "User account is inactive".</li>
+        <li>Returns HTTP 400 with clear message. Suresh knows his account was disabled.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common login-service mistakes</h5>
+      <div class="item">
+        <div class="bad">Saying "no such user" vs "wrong password" in different cases</div>
+        <div class="good">Use the SAME vague message for both. Attackers can otherwise enumerate valid mobile numbers by reading error responses.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Comparing passwords with <code>typed.equals(stored)</code></div>
+        <div class="good">The stored value is a BCrypt hash. <code>matches()</code> re-hashes the input and compares. Never plain-text compare.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Logging the password (even hashed) anywhere</div>
+        <div class="good">Never. Logs leak. The password should only travel from the HTTPS request body into <code>matches()</code> and then be forgotten.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Putting the password in the JWT claims</div>
+        <div class="good">JWT payloads are readable by anyone. Claims should only contain non-sensitive identifiers (userId, role, FK IDs). NEVER passwords.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting <code>profile != null</code> guards</div>
+        <div class="good">Admins have no UserProfile. Direct calls to <code>profile.getOwnerId()</code> would NullPointerException. The null check is essential.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why is the login error message intentionally vague?</div>
+        <div class="a">
+          To prevent username enumeration. If the system said "no such user" vs "wrong password",
+          attackers could probe with mobile numbers and learn which ones exist — useful for
+          targeted phishing or focused brute-force attempts. A vague message reveals nothing.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does <code>matches()</code> work if BCrypt is one-way?</div>
+        <div class="a">
+          BCrypt is one-way for <em>recovery</em> — you can't decrypt a hash back. But verification
+          works differently: <code>matches()</code> takes the typed password, re-hashes it with
+          the SAME salt embedded in the stored hash, and byte-compares the two hashes. If the
+          typed password is correct, the two hashes match exactly.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why both <code>employeeId</code> and <code>ownerId</code> in the JWT?</div>
+        <div class="a">
+          For workers, <code>employeeId</code> is set so "my data" endpoints can filter without
+          a DB lookup. For owners, <code>ownerId</code>. For admins, both are null (admins
+          specify the target ID in URL paths). Embedding these IDs in the token avoids hitting
+          the DB just to find out "who is this person in the business sense?".
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is there no <code>logout()</code> method?</div>
+        <div class="a">
+          Because logout is stateless on the server. JWTs aren't tracked server-side, so
+          "logout" just means the frontend deletes the token from localStorage. The
+          <code>POST /api/auth/logout</code> endpoint exists for API symmetry but its handler
+          method body is empty.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why <code>@RequiredArgsConstructor</code> over field <code>@Autowired</code>?</div>
+        <div class="a">
+          Constructor injection (which @RequiredArgsConstructor generates) is recommended by
+          Spring: makes dependencies explicit, fields can be <code>final</code>, easier to
+          unit-test with mocks. Field <code>@Autowired</code> is older and harder to test.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>AuthService handles login. The next file handles the <strong>opposite direction</strong> — creating new login accounts when an admin adds a worker or owner. That's <code>AdminUserService</code>.</p>
+
+    <div class="chapnav">
+      <a href="24-auth-dtos-and-repositories.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 24 · Auth DTOs &amp; Repos</span></a>
+      <a href="26-admin-user-service.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 26 · AdminUserService</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 25 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

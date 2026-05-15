@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 23 · CurrentUserUtil.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 23 · The "Who Am I?" Helper</span>
+    <h1>
+      <span class="gradient">CurrentUserUtil.java</span> —<br/>
+      Reading the caller's identity
+    </h1>
+    <p class="subtitle">
+      Tiny class — under 40 lines — but called from <em>everywhere</em>. Whenever any service
+      method needs to know "who's making this request?", it calls one of these static methods.
+      It's the bridge between Spring's security context and plain business code.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">👤</div>
+      <div class="fmeta">
+        <h3>CurrentUserUtil.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/auth/security/CurrentUserUtil.java</span>
+        <div class="ftags"><span>Static utility</span><span>SecurityContext reader</span><span>4 getters + 1 helper</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── The problem this solves ──────── -->
+    <h2><span class="h2-emoji">🧠</span> The Problem It Solves</h2>
+    <p>
+      After <code>JwtAuthenticationFilter</code> (Chapter 21) sets the security context with
+      Claims, business code needs an easy way to ask <em>"who's calling this method?"</em>
+      Without a helper, every service method would have to write something like:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Without the helper — verbose and error-prone</span><span class="lang">Java</span></div>
+<pre>Object principal = SecurityContextHolder
+        .getContext()
+        .getAuthentication()
+        .getPrincipal();
+Claims claims = (Claims) principal;
+Long ownerId = claims.get(<span class="str">"ownerId"</span>, Long.class);
+
+<span class="com">// Repeat this ~7-line pattern in 50 different service methods. Easy to typo
+// "owner_id" or "ownerID", easy to forget the null check, easy to confuse
+// principal with the user object.</span></pre>
+    </div>
+
+    <p>With <code>CurrentUserUtil</code>, the same lookup becomes:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">With the helper — one line</span><span class="lang">Java</span></div>
+<pre>Long ownerId = CurrentUserUtil.getOwnerId();</pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>The whole point of this file:</strong> one place that knows how to read the
+      JWT's Claims out of the security context. Every other class just calls these static
+      methods. No copy-paste, no typos, no chance of forgetting to cast Object to Claims.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/security/CurrentUserUtil.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.security;
+
+<span class="kw">import</span> io.jsonwebtoken.Claims;
+<span class="kw">import</span> org.springframework.security.core.context.SecurityContextHolder;
+
+<span class="kw">public class</span> CurrentUserUtil {              <span class="com">// no @Component — purely static utility</span>
+
+    <span class="com">// ── PRIVATE HELPER — get the Claims out of the security context ─</span>
+    <span class="kw">private static</span> Claims getClaims(){
+        Object principal = SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        <span class="kw">if</span> (principal <span class="kw">instanceof</span> Claims claims) {   <span class="com">// Java 16+ pattern matching</span>
+            <span class="kw">return</span> claims;
+        }
+        <span class="kw">throw new</span> RuntimeException(<span class="str">"Invalid security context"</span>);
+    }
+
+    <span class="com">// ── PUBLIC GETTERS — one per Claim we care about ─────────────</span>
+
+    <span class="kw">public static</span> Long getUserId(){
+        <span class="kw">return</span> getClaims().get(<span class="str">"userId"</span>, Long.class);
+    }
+
+    <span class="kw">public static</span> String getRole(){
+        <span class="kw">return</span> getClaims().get(<span class="str">"role"</span>, String.class);
+    }
+
+    <span class="kw">public static</span> Long getEmployeeId() {
+        <span class="kw">return</span> getClaims().get(<span class="str">"employeeId"</span>, Long.class);
+    }
+
+    <span class="kw">public static</span> Long getOwnerId() {
+        <span class="kw">return</span> getClaims().get(<span class="str">"ownerId"</span>, Long.class);
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Methods at a glance ──────── -->
+    <h2><span class="h2-emoji">📋</span> Method Reference</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Returns</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>getUserId()</code></td><td>Long (always present)</td><td>Identifying the User row of the caller</td></tr>
+        <tr><td><code>getRole()</code></td><td>String ("ADMIN"/"WORKER"/"SAREE_OWNER")</td><td>Business-rule branching ("am I admin or not?")</td></tr>
+        <tr><td><code>getEmployeeId()</code></td><td>Long or null</td><td>Workers: find their own Employee row. ADMINs/owners: null.</td></tr>
+        <tr><td><code>getOwnerId()</code></td><td>Long or null</td><td>Owners: find their own SareeOwner row. ADMINs/workers: null.</td></tr>
+        <tr><td><code>getClaims()</code> (private)</td><td>Claims</td><td>Internal helper — extracts and validates the principal</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Why static methods ──────── -->
+    <h2><span class="h2-emoji">⚡</span> Why <code>static</code> and Not a Spring Bean?</h2>
+    <p>
+      Notice this class is <strong>not annotated</strong> with <code>@Component</code> — it's
+      purely static. Why?
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Static utility (NOOL's choice)</th><th>Spring bean alternative</th></tr></thead>
+      <tbody>
+        <tr><td>Call from anywhere: <code>CurrentUserUtil.getOwnerId()</code></td><td>Must inject: <code>@Autowired CurrentUserService cus;</code></td></tr>
+        <tr><td>No constructor changes needed in callers</td><td>Every service needs an extra constructor argument</td></tr>
+        <tr><td>Reads from <code>ThreadLocal</code> — already per-request</td><td>Same, but with injection overhead</td></tr>
+        <tr><td>Slightly harder to mock in unit tests</td><td>Easier to mock (just inject a fake)</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The trade-off: static methods are slightly harder to mock in unit tests. For NOOL,
+      we accept that because (a) we test mostly with integration tests that have real
+      security contexts, and (b) the call-site simplicity is worth a lot when used in dozens
+      of services.
+    </p>
+
+    <!-- ──────── The pattern matching idiom ──────── -->
+    <h2><span class="h2-emoji">🆕</span> Java 16+ Pattern Matching — That <code>instanceof</code> Block</h2>
+    <p>
+      One line in the file deserves a closer look — it uses a modern Java feature:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Pattern matching for instanceof (Java 16+)</span><span class="lang">Java</span></div>
+<pre><span class="kw">if</span> (principal <span class="kw">instanceof</span> Claims claims) {
+    <span class="kw">return</span> claims;
+}</pre>
+    </div>
+
+    <p>The old, pre-Java-16 way would be:</p>
+    <div class="codewrap">
+      <div class="head"><span class="path">Pre-Java-16 — verbose</span><span class="lang">Java</span></div>
+<pre><span class="kw">if</span> (principal <span class="kw">instanceof</span> Claims) {
+    Claims claims = (Claims) principal;   <span class="com">// explicit cast — redundant</span>
+    <span class="kw">return</span> claims;
+}</pre>
+    </div>
+
+    <p>
+      The modern syntax combines the type check + cast + variable declaration into one line.
+      It's safer (the variable is only in scope inside the <code>if</code>) and cleaner.
+      Java 21 (NOOL's compile target) supports this fully.
+    </p>
+
+    <!-- ──────── Why the RuntimeException ──────── -->
+    <h2><span class="h2-emoji">💥</span> Why the <code>RuntimeException</code>?</h2>
+    <p>
+      If the principal somehow isn't a Claims object, the helper throws:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">The safety throw</span><span class="lang">Java</span></div>
+<pre><span class="kw">throw new</span> RuntimeException(<span class="str">"Invalid security context"</span>);</pre>
+    </div>
+
+    <p>
+      When could this happen? In NOOL, only if:
+    </p>
+
+    <ul>
+      <li>Someone calls a getter from outside an HTTP request thread (e.g., a startup runner before a request arrives).</li>
+      <li>A different authentication mechanism populated the principal differently (won't happen in NOOL).</li>
+      <li>The security context is empty (no authenticated user).</li>
+    </ul>
+
+    <p>
+      The exception is intentionally generic — it bubbles up to the
+      <code>GlobalExceptionHandler</code> (Chapter 09), which logs it and returns 500. That's
+      acceptable because reaching this exception path indicates a bug, not a normal flow.
+    </p>
+
+    <div class="callout warn">
+      <strong>A stricter version</strong> would throw a custom <code>SecurityException</code>
+      and map it to 401 in the handler. For NOOL's current scale, the generic
+      RuntimeException is enough — the situation is rare and unambiguously a bug.
+    </div>
+
+    <!-- ──────── Where it's used ──────── -->
+    <h2><span class="h2-emoji">📍</span> Where This Helper Is Called</h2>
+    <p>Almost every <em>"my X"</em> endpoint depends on it. A few examples:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">From SareeInventoryServiceImpl — fetching the caller's own ledger</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> PaginationResponseDto&lt;LedgerEntryResponseDto&gt; getMyLedger(...) {
+
+    Long ownerId = CurrentUserUtil.getOwnerId();   <span class="com">// ★ who's calling?</span>
+    <span class="kw">if</span> (ownerId == <span class="kw">null</span>) {
+        <span class="kw">throw new</span> BadRequestException(<span class="str">"Not an owner account"</span>);
+    }
+
+    <span class="com">// Now query the ledger scoped to this owner only:</span>
+    <span class="kw">return</span> getOwnerLedgerInternal(ownerId, ...);
+}</pre>
+    </div>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">From AttendanceServiceImpl — checking permissions</span><span class="lang">Java</span></div>
+<pre><span class="kw">private void</span> assertSelfOrAdmin(Long employeeId) {
+    String role = CurrentUserUtil.getRole();
+    Long  myId  = CurrentUserUtil.getEmployeeId();
+
+    <span class="kw">if</span> (<span class="str">"ADMIN"</span>.equals(role)) <span class="kw">return</span>;          <span class="com">// admin sees anyone</span>
+    <span class="kw">if</span> (employeeId.equals(myId)) <span class="kw">return</span>;        <span class="com">// worker sees self</span>
+
+    <span class="kw">throw new</span> ResourceNotFoundException(<span class="str">"Not allowed"</span>);
+}</pre>
+    </div>
+
+    <p>This pattern repeats across many services. Each "my data" endpoint and each
+    cross-user access check goes through this helper.</p>
+
+    <!-- ──────── The full identity chain ──────── -->
+    <h2><span class="h2-emoji">🔗</span> The Full Identity Chain</h2>
+    <p>Here's how a user's identity flows from login all the way to a database query:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">From login to query</span><span class="lang">flow</span></div>
+<pre>1. Login
+   POST /api/auth/login {mobile, password}
+                ↓
+2. AuthServiceImpl
+   Verifies password.
+   Builds claims map {userId, role, employeeId, ownerId}.
+   JwtUtil.generateToken(claims) → JWT string.
+                ↓
+3. Frontend stores token in localStorage.
+
+══════════ Next request ══════════
+
+4. POST /api/inventory/my-ledger
+   Header: "Authorization: Bearer eyJhbGc..."
+                ↓
+5. JwtAuthenticationFilter
+   Verifies signature + expiry.
+   Decodes Claims.
+   SecurityContextHolder.setAuthentication(claims, ...).
+                ↓
+6. SecurityConfig rules
+   "/inventory/my-ledger" → hasAnyAuthority(ADMIN, SAREE_OWNER).
+   role is SAREE_OWNER → ALLOW.
+                ↓
+7. SareeInventoryController.getMyLedger()
+                ↓
+8. SareeInventoryServiceImpl.getMyLedger()
+                ↓
+9. <span class="kw">★ CurrentUserUtil.getOwnerId()</span>
+   Reads SecurityContextHolder → principal → Claims → "ownerId" → 1
+                ↓
+10. Query database scoped to ownerId = 1
+    "SELECT * FROM saree_ledger WHERE owner_id = 1 ..."</pre>
+    </div>
+
+    <p>
+      The entire chain works because every step trusts the previous one. The JWT is verified
+      once at the filter; downstream code can trust the Claims completely.
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul requests his own inventory</h5>
+      <ol>
+        <li>Frontend sends POST <code>/api/inventory/my-ledger</code> with Rahul's JWT.</li>
+        <li>Filter sets Claims with <code>ownerId=1</code> in the security context.</li>
+        <li>Controller delegates to service.</li>
+        <li>Service calls <code>CurrentUserUtil.getOwnerId()</code> → returns 1.</li>
+        <li>Service queries: <code>SELECT * FROM saree_ledger WHERE owner_id = 1 ...</code>.</li>
+        <li>Rahul sees only HIS data — never anyone else's.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Prema checks her own salary history</h5>
+      <ol>
+        <li>Frontend sends POST <code>/api/salary-payments/history</code> with Prema's JWT.</li>
+        <li>Filter sets Claims with <code>employeeId=5, role=WORKER</code>.</li>
+        <li>Service calls <code>CurrentUserUtil.getEmployeeId()</code> → 5.</li>
+        <li>Service queries: <code>SELECT * FROM salary_payments WHERE employee_id = 5 ...</code>.</li>
+        <li>Prema sees only her own salary history.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Admin views any employee's salary history</h5>
+      <ol>
+        <li>Dad (admin) sends POST <code>/api/salary-payments/employee/5/history</code> with the employee ID in the URL.</li>
+        <li>Filter sets Claims with <code>role=ADMIN, employeeId=null</code>.</li>
+        <li>Service: <code>assertSelfOrAdmin(5)</code>. Role is ADMIN → return without check.</li>
+        <li>Service queries for <code>employee_id = 5</code> (from the URL path variable).</li>
+        <li>Admin sees Prema's history even though they're not Prema.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Ravi (worker) tries to view Prema's salary (should fail)</h5>
+      <ol>
+        <li>Ravi crafts a request: POST <code>/api/salary-payments/employee/5/history</code> (Prema's ID).</li>
+        <li>SecurityConfig allows the URL pattern for ADMIN or WORKER — passes.</li>
+        <li>Service: <code>assertSelfOrAdmin(5)</code>.
+          <ul>
+            <li>Role = WORKER. Not admin → continue checking.</li>
+            <li><code>CurrentUserUtil.getEmployeeId()</code> → 7 (Ravi's ID).</li>
+            <li>7.equals(5)? No → throw <code>ResourceNotFoundException</code>.</li>
+          </ul>
+        </li>
+        <li>Handler returns 404. <strong>Cross-worker access prevented at the service layer.</strong></li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common CurrentUserUtil mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Calling <code>CurrentUserUtil.getOwnerId()</code> from a non-request context (e.g., a startup hook)</div>
+        <div class="good">There's no security context outside of HTTP requests. Calling these methods elsewhere throws "Invalid security context". Pass user IDs explicitly to background jobs.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Trusting <code>getEmployeeId()</code> to never return null</div>
+        <div class="good">Admins have <code>employeeId = null</code>. Always check for null before using it. Or use it only in WORKER-only endpoints.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Reading raw <code>SecurityContextHolder</code> in services directly</div>
+        <div class="good">Always go through <code>CurrentUserUtil</code>. The utility is the single source of truth — if the JWT format changes, you only edit one file.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Comparing role strings inconsistently: <code>role.equals("admin")</code> vs <code>"ADMIN".equals(role)</code></div>
+        <div class="good">JWT stores roles as uppercase enum names ("ADMIN", "WORKER", "SAREE_OWNER"). Always compare against uppercase literals. Use <code>"ADMIN".equals(role)</code> to avoid null pointer exceptions.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing the current-user info in a regular instance field of a service</div>
+        <div class="good">Spring services are singletons — sharing a field would cause concurrent requests to overwrite each other. Always fetch from the security context per-call (which is per-request via ThreadLocal).</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about CurrentUserUtil</h5>
+
+      <div class="qa">
+        <div class="q">Why is this class not a Spring bean?</div>
+        <div class="a">
+          It's purely static — no state, no dependencies, just reads from
+          <code>SecurityContextHolder</code> which is itself a static facade backed by
+          ThreadLocal. Making it a bean would mean every service that uses it has to inject
+          one more dependency, adding noise without any benefit. Static methods are simpler
+          for this case.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How does <code>SecurityContextHolder</code> know which user is "current"?</div>
+        <div class="a">
+          By default, it uses a <code>ThreadLocal</code>. The web servlet container (Tomcat in
+          NOOL's case) handles each HTTP request on a dedicated thread, so the ThreadLocal
+          naturally scopes to that request. The JwtAuthenticationFilter writes to it; everything
+          downstream on the same thread reads from it.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the cost of calling <code>getOwnerId()</code> dozens of times in one request?</div>
+        <div class="a">
+          Effectively zero. Each call is: ThreadLocal lookup, get authentication, get principal,
+          cast to Claims, Map.get. All in-memory operations totaling microseconds. No DB hit,
+          no network. We can call these helpers freely without performance worry.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Would caching the result inside a request help performance?</div>
+        <div class="a">
+          Not meaningfully. The lookup is already fast. Caching would add complexity and the
+          risk of stale data. For NOOL's scale, the straightforward repeated calls are fine.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How would you unit-test code that uses <code>CurrentUserUtil</code>?</div>
+        <div class="a">
+          Two common approaches. (1) For integration tests, use Spring Security's testing
+          support: <code>@WithMockUser</code> or manually setting up the security context
+          before each test. (2) For pure unit tests, refactor the service to accept the user
+          ID as a parameter (one method overload takes the ID, another reads from CurrentUserUtil
+          internally). The latter approach is what Spring patterns recommend.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What if NOOL ever supports impersonation ("admin logs in as a specific user to debug")?</div>
+        <div class="a">
+          The cleanest way: add an "impersonatedOwnerId" claim to the JWT during impersonation,
+          and add corresponding getters to this util. Spring Security also has a built-in
+          <code>SwitchUserFilter</code> that handles the role-swap automatically. Either way,
+          this utility would be the natural place to expose the impersonated identity to
+          services.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Phase 5 wrap-up — how do the four security files work together?</div>
+        <div class="a">
+          (1) <code>JwtUtil</code> mints and verifies JWTs.
+          (2) <code>JwtAuthenticationFilter</code> intercepts every request and uses JwtUtil
+          to put the user's Claims into the SecurityContext.
+          (3) <code>SecurityConfig</code> declares URL-to-role rules that check those Claims
+          before letting the request reach a controller.
+          (4) <code>CurrentUserUtil</code> exposes the Claims to business code in a clean,
+          one-line API. Together they form NOOL's complete stateless auth system.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── Phase 5 complete ──────── -->
+    <h2><span class="h2-emoji">🎉</span> Phase 5 (Security) Complete</h2>
+    <div class="callout brain">
+      You've now seen NOOL's full security architecture — JWT creation, request-level
+      verification, URL-level rules, and how business code reads the caller's identity.
+      Together they enforce that only Mom and Dad can add workers, only owners see their
+      own data, and tokens cannot be forged. Defense in depth: every layer protects what
+      the previous layer might miss.
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Security is done. Next, we walk through the <strong>Auth Module</strong> — the actual
+      login flow end-to-end. We'll cover the auth DTOs, the User and UserProfile repositories,
+      the AuthService implementation, the seed-admin runner, and the AuthController. Chapter
+      24 starts with the DTOs and repositories.
+    </p>
+
+    <div class="chapnav">
+      <a href="22-security-config.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 22 · SecurityConfig.java</span>
+      </a>
+      <a class="dim next">
+        <span class="arrow next">Coming soon →</span>
+        <span class="title">Ch 24 · Auth DTOs &amp; Repositories</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 23 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

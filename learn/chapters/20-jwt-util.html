@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 20 · JwtUtil.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 20 · The Token Factory</span>
+    <h1>
+      <span class="gradient">JwtUtil.java</span> —<br/>
+      Making &amp; verifying the ID cards
+    </h1>
+    <p class="subtitle">
+      When someone logs into NOOL, they get a digital ID card called a <strong>JWT</strong>.
+      For the next 24 hours, every request they make carries this card. This file is the
+      factory that creates those cards and the verifier that checks them.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🎫</div>
+      <div class="fmeta">
+        <h3>JwtUtil.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/auth/security/JwtUtil.java</span>
+        <div class="ftags"><span>@Component</span><span>JWT</span><span>HS256</span><span>Crypto</span><span>⭐ Critical</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What is a JWT ──────── -->
+    <h2><span class="h2-emoji">🧠</span> What Is a JWT, Really?</h2>
+    <p>
+      JWT stands for <strong>JSON Web Token</strong>. It's a long string with three parts
+      separated by dots:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">A real JWT — three parts joined by dots</span><span class="lang">JWT</span></div>
+<pre><span class="kw">eyJhbGciOiJIUzI1NiJ9</span>.<span class="str">eyJ1c2VySWQiOjEsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc0NzIw...</span>.<span class="num2">YkE9Yz3jZ-XwQ7tR8KvLp9N2sM4...</span>
+└─── HEADER ─────────┘ └─── PAYLOAD ──────────────────────────────────┘ └─── SIGNATURE ──────────┘</pre>
+    </div>
+
+    <table class="ftable">
+      <thead><tr><th>Part</th><th>What's in it</th><th>Who can read it?</th></tr></thead>
+      <tbody>
+        <tr><td><strong>HEADER</strong></td><td>The algorithm used (HS256 for NOOL)</td><td>Anyone — it's just Base64</td></tr>
+        <tr><td><strong>PAYLOAD</strong></td><td>The actual data: userId, role, employeeId, ownerId, expiry</td><td>Anyone — Base64 again</td></tr>
+        <tr><td><strong>SIGNATURE</strong></td><td>A cryptographic stamp created with the server's secret</td><td>Anyone can read; only the secret-holder can produce a valid one</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>The magic of JWTs:</strong> the payload is <em>readable</em> but <em>not
+      forgeable</em>. Anyone can decode and see the contents (no encryption — don't put
+      passwords inside!). But if anyone tries to <em>change</em> the contents, the signature
+      no longer matches, and verification fails. It's like a passport: anyone can read it,
+      only the government can issue one.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/security/JwtUtil.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.security;
+
+<span class="kw">import</span> io.jsonwebtoken.Claims;                <span class="com">// the decoded payload object</span>
+<span class="kw">import</span> io.jsonwebtoken.Jwts;                  <span class="com">// factory for building/parsing JWTs</span>
+<span class="kw">import</span> io.jsonwebtoken.SignatureAlgorithm;    <span class="com">// HS256, HS384, HS512, RS256, etc.</span>
+<span class="kw">import</span> io.jsonwebtoken.security.Keys;         <span class="com">// safe key creation helpers</span>
+<span class="kw">import</span> org.springframework.beans.factory.annotation.Value;
+<span class="kw">import</span> org.springframework.stereotype.Component;
+
+<span class="kw">import</span> javax.crypto.SecretKey;
+<span class="kw">import</span> java.nio.charset.StandardCharsets;
+<span class="kw">import</span> java.util.Date;
+<span class="kw">import</span> java.util.Map;
+
+<span class="ann">@Component</span>                                   <span class="com">// Spring auto-creates a singleton of this class</span>
+<span class="kw">public class</span> JwtUtil {
+
+    <span class="com">// ── INJECTED SETTINGS (from application.properties) ───────────</span>
+    <span class="ann">@Value</span>(<span class="str">"${jwt.secret}"</span>)
+    <span class="kw">private</span> String secret;                     <span class="com">// the master secret. Long random string.</span>
+
+    <span class="ann">@Value</span>(<span class="str">"${jwt.expiration}"</span>)
+    <span class="kw">private long</span> expiration;                   <span class="com">// 86_400_000 ms = 24 hours</span>
+
+    <span class="com">// ── HELPER: turn the secret String into a real crypto SecretKey ─</span>
+    <span class="kw">private</span> SecretKey getSigningKey() {
+        <span class="kw">return</span> Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
+    <span class="com">// ★ Keys.hmacShaKeyFor validates the key length (must be &ge; 256 bits for HS256).
+    //   It also catches "weak secret" bugs at startup instead of mysterious
+    //   runtime errors. UTF-8 byte encoding ensures consistent results across
+    //   any operating system.</span>
+
+    <span class="com">// ── MINT A NEW JWT ────────────────────────────────────────────</span>
+    <span class="kw">public</span> String generateToken(Map&lt;String, Object&gt; claims, String subject) {
+
+        <span class="kw">return</span> Jwts.builder()
+                .setClaims(claims)                                <span class="com">// the payload data (userId, role, ...)</span>
+                .setSubject(subject)                              <span class="com">// the "sub" claim — usually the mobile</span>
+                .setIssuedAt(<span class="kw">new</span> Date())                      <span class="com">// "iat" claim — now</span>
+                .setExpiration(<span class="kw">new</span> Date(                      <span class="com">// "exp" claim — now + 24h</span>
+                    System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey(),
+                          SignatureAlgorithm.HS256)              <span class="com">// HMAC-SHA-256 signature</span>
+                .compact();                                       <span class="com">// produce the final dotted string</span>
+    }
+
+    <span class="com">// ── PARSE &amp; VERIFY A JWT ──────────────────────────────────────</span>
+    <span class="kw">public</span> Claims extractAllClaims(String token) {
+        <span class="kw">return</span> Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())   <span class="com">// SAME key used for signing</span>
+                .build()
+                .parseClaimsJws(token)            <span class="com">// ★ throws if signature is invalid</span>
+                .getBody();                       <span class="com">// returns the Claims (payload)</span>
+    }
+    <span class="com">// ★ The library does the signature check INSIDE parseClaimsJws.
+    //   If anyone tampered with the payload, the recomputed signature
+    //   won't match and an exception is thrown.</span>
+
+    <span class="com">// ── HAS THE TOKEN EXPIRED? ────────────────────────────────────</span>
+    <span class="kw">public boolean</span> isTokenExpired(String token) {
+        <span class="kw">return</span> extractAllClaims(token)
+                .getExpiration()
+                .before(<span class="kw">new</span> Date());
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Methods at a glance ──────── -->
+    <h2><span class="h2-emoji">📋</span> Methods at a Glance</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Purpose</th><th>Throws</th><th>Used by</th></tr></thead>
+      <tbody>
+        <tr><td><code>getSigningKey()</code></td><td>Convert <code>secret</code> string → cryptographic <code>SecretKey</code></td><td><code>WeakKeyException</code> if secret too short</td><td>Both other methods, internally</td></tr>
+        <tr><td><code>generateToken(claims, subject)</code></td><td>Mint a fresh JWT containing the given claims</td><td>—</td><td><code>AuthServiceImpl.login()</code></td></tr>
+        <tr><td><code>extractAllClaims(token)</code></td><td>Verify signature + decode payload</td><td><code>SignatureException</code>, <code>MalformedJwtException</code>, etc.</td><td><code>JwtAuthenticationFilter</code> on every request</td></tr>
+        <tr><td><code>isTokenExpired(token)</code></td><td>Quick check on the <code>exp</code> claim</td><td>Same as <code>extractAllClaims</code> (calls it)</td><td><code>JwtAuthenticationFilter</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Real JWT contents ──────── -->
+    <h2><span class="h2-emoji">🔍</span> What's Actually Inside a NOOL JWT</h2>
+    <p>A typical token decodes to this:</p>
+
+    <div class="sqlbox">
+<pre><span class="sc">-- HEADER (Base64 decoded):</span>
+{
+  <span class="ss">"alg"</span>: <span class="ss">"HS256"</span>,        <span class="sc">-- algorithm</span>
+  <span class="ss">"typ"</span>: <span class="ss">"JWT"</span>           <span class="sc">-- token type</span>
+}
+
+<span class="sc">-- PAYLOAD (Base64 decoded) — for Rahul after he logs in:</span>
+{
+  <span class="ss">"userId"</span>:     <span class="num2">2</span>,                       <span class="sc">-- his User.id</span>
+  <span class="ss">"role"</span>:       <span class="ss">"SAREE_OWNER"</span>,             <span class="sc">-- his User.role</span>
+  <span class="ss">"employeeId"</span>: <span class="kw">null</span>,                    <span class="sc">-- not a worker</span>
+  <span class="ss">"ownerId"</span>:    <span class="num2">1</span>,                       <span class="sc">-- his SareeOwner.id</span>
+  <span class="ss">"sub"</span>:        <span class="ss">"9000000001"</span>,              <span class="sc">-- mobile (subject)</span>
+  <span class="ss">"iat"</span>:        <span class="num2">1747203131</span>,                 <span class="sc">-- issued-at (Unix seconds)</span>
+  <span class="ss">"exp"</span>:        <span class="num2">1747289531</span>                  <span class="sc">-- expires (24h later)</span>
+}
+
+<span class="sc">-- SIGNATURE:</span>
+<span class="sc">-- HMAC-SHA-256( base64(HEADER) + "." + base64(PAYLOAD),  jwt.secret )</span>
+<span class="sc">-- → a fixed 32-byte hash, Base64-encoded.</span></pre>
+    </div>
+
+    <p>
+      You can paste any JWT into <a href="https://jwt.io" target="_blank">jwt.io</a> and see
+      exactly this structure. Try it during development — but never share a real production
+      token publicly, because while the payload is readable, the token is still a valid
+      credential.
+    </p>
+
+    <!-- ──────── How signing works ──────── -->
+    <h2><span class="h2-emoji">✍️</span> How Signing Actually Protects the Payload</h2>
+    <p>
+      The magic is HMAC-SHA-256. Here's a simplified view of what <code>signWith()</code> does:
+    </p>
+
+    <ol>
+      <li>Take the base64-encoded HEADER + "." + base64-encoded PAYLOAD.</li>
+      <li>Run HMAC-SHA-256 over that string, using the secret as the key.</li>
+      <li>Get a fixed 32-byte hash. Base64-encode it. That's the SIGNATURE.</li>
+    </ol>
+
+    <p>When <code>extractAllClaims()</code> verifies a token:</p>
+
+    <ol>
+      <li>Split the token into HEADER, PAYLOAD, SIGNATURE.</li>
+      <li>Recompute HMAC-SHA-256 over HEADER + "." + PAYLOAD using the secret.</li>
+      <li>Compare the recomputed hash to the token's SIGNATURE.</li>
+      <li>Match? Token is authentic. Mismatch? Tampered or forged — throw.</li>
+    </ol>
+
+    <div class="callout warn">
+      <strong>An attacker tries to escalate to ADMIN:</strong>
+      <ol>
+        <li>Rahul (a SAREE_OWNER) base64-decodes his token, edits the payload: <code>"role": "ADMIN"</code>.</li>
+        <li>Re-encodes the modified payload, glues it back with the ORIGINAL signature.</li>
+        <li>Sends a request to <code>/api/employees</code> (admin-only).</li>
+        <li>Server recomputes the signature using the modified payload + the server's secret.</li>
+        <li>Recomputed signature ≠ token's signature. Verification fails. 401 returned.</li>
+      </ol>
+      Without the secret, an attacker cannot produce a signature that matches modified content.
+      <strong>That's the whole reason JWTs are secure.</strong>
+    </div>
+
+    <!-- ──────── Why HS256 ──────── -->
+    <h2><span class="h2-emoji">🤔</span> Why HS256 (Symmetric) Instead of RS256 (Asymmetric)?</h2>
+    <table class="ftable">
+      <thead><tr><th></th><th>HS256 (NOOL's choice)</th><th>RS256 (the asymmetric alternative)</th></tr></thead>
+      <tbody>
+        <tr><td>Type</td><td>Symmetric — same key signs and verifies</td><td>Asymmetric — private key signs, public key verifies</td></tr>
+        <tr><td>Keys</td><td>One shared secret</td><td>Public/private key pair</td></tr>
+        <tr><td>Speed</td><td>Faster</td><td>Slower</td></tr>
+        <tr><td>Best for</td><td>Single backend (NOOL)</td><td>OAuth servers issuing tokens to many verifiers</td></tr>
+        <tr><td>Key distribution</td><td>Keep secret on the server only</td><td>Distribute public key freely</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      NOOL has one backend that both issues AND verifies tokens. HS256 is simpler, faster,
+      and adequate. If we ever needed third-party services to verify NOOL-issued tokens
+      without sharing the secret, we'd switch to RS256.
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul logs in successfully</h5>
+      <ol>
+        <li>Rahul types mobile + password. Frontend posts to <code>/api/auth/login</code>.</li>
+        <li><code>AuthServiceImpl.login()</code> verifies the password with BCrypt — passes.</li>
+        <li>Service builds claims map: <code>{ userId: 2, role: "SAREE_OWNER", ownerId: 1, employeeId: null }</code>.</li>
+        <li>Calls <code>jwtUtil.generateToken(claims, "9000000001")</code>.</li>
+        <li>JwtUtil:
+          <ul>
+            <li>Sets <code>iat</code> = now (e.g., 1747203131).</li>
+            <li>Sets <code>exp</code> = now + 24 hours (1747289531).</li>
+            <li>Signs with HS256 + the configured secret.</li>
+            <li>Returns the dotted JWT string.</li>
+          </ul>
+        </li>
+        <li>Service returns to controller → controller returns to frontend.</li>
+        <li>Frontend stores the token in <code>localStorage</code> as <code>nool_token</code>.</li>
+        <li>For the next 24 hours, every API request carries <code>Authorization: Bearer eyJhbGc...</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Token verification on a protected endpoint</h5>
+      <ol>
+        <li>Rahul makes a request to <code>/api/inventory/my-ledger</code>.</li>
+        <li>Browser includes the Authorization header automatically.</li>
+        <li>Backend's <code>JwtAuthenticationFilter</code> (Chapter 21) strips the "Bearer " prefix.</li>
+        <li>Calls <code>jwtUtil.isTokenExpired(token)</code> first — false (still 23 hours left).</li>
+        <li>Calls <code>jwtUtil.extractAllClaims(token)</code> — returns the payload object.</li>
+        <li>Filter extracts <code>role = "SAREE_OWNER"</code> and sets it in Spring's security context.</li>
+        <li>The request continues. <code>SecurityConfig</code> rule for that endpoint requires ADMIN or SAREE_OWNER — passes.</li>
+        <li>Controller runs, fetches Rahul's ledger, returns JSON.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Token expires</h5>
+      <ol>
+        <li>Rahul logged in Monday at 10 AM. Expiry = Tuesday 10 AM.</li>
+        <li>Tuesday 11 AM, he clicks "View Inventory".</li>
+        <li>JwtUtil's <code>isTokenExpired</code> compares <code>exp</code> claim to "now" → true.</li>
+        <li>Filter rejects with 401.</li>
+        <li>Frontend's <code>handleResponse</code> in <code>api.js</code> sees 401, wipes localStorage, redirects to <code>/login</code>.</li>
+        <li>Rahul logs in again, gets a fresh 24-hour token, continues.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Trying to verify a tampered token</h5>
+      <ol>
+        <li>Attacker copies Rahul's token, changes <code>"role"</code> from <code>"SAREE_OWNER"</code> to <code>"ADMIN"</code> in the payload.</li>
+        <li>Re-Base64-encodes the modified payload but keeps the OLD signature (because they don't have the secret).</li>
+        <li>Sends a request to <code>POST /api/employees</code> (admin-only).</li>
+        <li><code>jwtUtil.extractAllClaims()</code> is called.</li>
+        <li>Internally, the library recomputes signature using modified payload + secret.</li>
+        <li>Recomputed signature ≠ token's signature.</li>
+        <li>Throws <code>SignatureException</code>. Filter falls through without setting any authentication. The request reaches the <code>.anyRequest().authenticated()</code> rule, fails, returns 401.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common JwtUtil mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Hard-coding the secret in this file</div>
+        <div class="good">Keep it in <code>application.properties</code> and inject via <code>@Value</code> — exactly what NOOL does. In production, override via environment variable.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using a short secret like <code>"mysecret"</code></div>
+        <div class="good">HMAC-SHA-256 requires the key to be at least 256 bits = 32 bytes = 32 ASCII characters. <code>Keys.hmacShaKeyFor</code> throws <code>WeakKeyException</code> if you try a shorter one. NOOL's secret is intentionally long.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing sensitive data inside the JWT payload (passwords, API keys, etc.)</div>
+        <div class="good">The payload is base64-encoded, NOT encrypted. Anyone can decode and read it. Only put non-sensitive identifiers (userId, role, foreign-key IDs).</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Setting expiration to "forever" or several months</div>
+        <div class="good">If a token leaks, attackers can use it for the entire lifetime. 24 hours is a reasonable balance. For higher security, use short access tokens (15 min) + refresh tokens.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Catching JWT exceptions and silently allowing the request through</div>
+        <div class="good">Any verification failure means "I don't know who this is" — never grant access. Let the exception propagate; the filter chain will return 401.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting to rotate the secret if it leaks</div>
+        <div class="good">Rotating the secret instantly invalidates every issued token. Users have to log in again — but the leaked token becomes useless. Plan rotation: change the property, restart the backend.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about JwtUtil</h5>
+
+      <div class="qa">
+        <div class="q">Why JWT and not server-side sessions?</div>
+        <div class="a">
+          Statelessness. The server doesn't have to keep a "logged-in users" table — the user
+          carries proof of who they are. That means I can run multiple backend instances behind
+          a load balancer without sharing session state, and restarts don't kick anyone out.
+          Easier to scale, easier to debug.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between Base64-encoding and encryption?</div>
+        <div class="a">
+          Encoding (Base64) just makes binary data ASCII-friendly. It's NOT secret — anyone
+          can decode it instantly. Encryption transforms data such that only someone with
+          the right key can read it. JWTs use Base64 for compactness and signing for
+          integrity. <strong>The payload is readable; what matters is that it's
+          not forgeable.</strong>
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why HS256 and not RS256?</div>
+        <div class="a">
+          HS256 is symmetric — same key signs and verifies. Simple and fast, perfect for a
+          single backend like NOOL. RS256 is asymmetric (private signs, public verifies),
+          useful when multiple services need to verify but only one issues — for example, an
+          OAuth provider giving tokens to third parties. NOOL doesn't have that requirement.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">If a user logs out, how do you invalidate their JWT?</div>
+        <div class="a">
+          In NOOL, we don't invalidate it server-side — the frontend just deletes the token
+          from localStorage. The token remains technically valid on the server until its
+          expiry, but with no one possessing it, that's effectively fine. If we needed real
+          server-side revocation (e.g., "force logout this stolen token NOW"), we'd maintain
+          a blacklist in Redis and check it in the filter — but that adds back the stateful
+          complexity JWTs are designed to avoid.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens if the secret changes after users log in?</div>
+        <div class="a">
+          Every existing token becomes instantly invalid — signature verification needs the
+          same secret used to sign. Users get 401 on their next request and have to log in
+          again. This is actually a useful emergency lever — if you suspect a secret leak,
+          rotate it.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the role of <code>Keys.hmacShaKeyFor</code>?</div>
+        <div class="a">
+          It validates the key length and converts the byte array into a <code>SecretKey</code>
+          that the JWT library can use. The crucial bit: it refuses keys shorter than 256 bits
+          for HS256, catching weak-secret bugs early (at startup) instead of after deployment.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Can a JWT be re-used multiple times?</div>
+        <div class="a">
+          Yes — that's the whole point. A single login produces one token, which is then sent
+          on every request until it expires. JWTs are inherently bearer tokens: whoever holds
+          them can use them. That's why HTTPS in production is non-negotiable — anyone who
+          intercepts a token can impersonate the user.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      JwtUtil makes and verifies tokens. The next file actually <em>uses</em> it on every
+      request — <code>JwtAuthenticationFilter.java</code>, the guard at the door that
+      intercepts every incoming HTTP request, extracts the JWT, verifies it, and tells the
+      rest of Spring Security who's calling.
+    </p>
+
+    <div class="chapnav">
+      <a href="19-owner-payment.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 19 · OwnerPayment.java</span>
+      </a>
+      <a href="21-jwt-authentication-filter.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 21 · JwtAuthenticationFilter</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 20 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

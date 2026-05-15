@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 37 · EmployeeDailyWorkController · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 37 · The HTTP Face</span>
+    <h1>
+      <span class="gradient">EmployeeDailyWorkController.java</span>
+    </h1>
+    <p class="subtitle">
+      Five endpoints, all under the slightly-unusual base path <code>/api/employee-daily-working</code>.
+      Same thin-controller pattern, same twin-endpoint design (admin <code>/list</code> vs
+      worker <code>/my-list</code>). Wraps up the Daily Work module.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🌐</div>
+      <div class="fmeta">
+        <h3>EmployeeDailyWorkController.java</h3>
+        <span class="fpath">backend/.../controller/employee/EmployeeDailyWorkController.java</span>
+        <div class="ftags"><span>@RestController</span><span>5 endpoints</span><span>POST for body endpoints</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Five Endpoints</h2>
+    <table class="ftable">
+      <thead><tr><th>HTTP</th><th>Path</th><th>Purpose</th><th>Required role</th></tr></thead>
+      <tbody>
+        <tr><td>POST</td><td><code>/api/employee-daily-working</code></td><td>Log one (worker, date, counts) row</td><td>ADMIN</td></tr>
+        <tr><td>POST</td><td><code>/api/employee-daily-working/list</code></td><td>Admin paginated browse</td><td>ADMIN</td></tr>
+        <tr><td>POST</td><td><code>/api/employee-daily-working/my-list</code></td><td>Worker views own history</td><td>ADMIN or WORKER (self via JWT)</td></tr>
+        <tr><td>POST</td><td><code>/api/employee-daily-working/employee/{id}/summary</code></td><td>Range summary for one worker</td><td>ADMIN or WORKER (self only)</td></tr>
+        <tr><td>POST</td><td><code>/api/employee-daily-working/summary</code></td><td>Worker's own range summary</td><td>ADMIN or WORKER</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">🤔</span> The Slightly-Unusual Path: <code>/employee-daily-working</code></h2>
+    <p>
+      You'll have noticed: this controller's <code>@RequestMapping</code> is
+      <code>"/employee-daily-working"</code> — with an <em>"-ing"</em> suffix. The other
+      controllers use cleaner nouns like <code>/employees</code> and <code>/attendance</code>.
+      Why the inconsistency?
+    </p>
+
+    <div class="callout warn">
+      <strong>Honest answer: historical drift.</strong> The path was named when the feature
+      was being thought of as a verb ("daily working" = the act of working daily). A cleaner
+      name following the rest of NOOL's conventions would be <code>/daily-work</code> or
+      <code>/employee-daily-work</code>. Renaming it now would mean updating the frontend's
+      <code>api.js</code> service AND the SecurityConfig rules — doable but not free. So
+      the URL stayed. A worthwhile cleanup for a future major version.
+    </div>
+
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">controller/employee/EmployeeDailyWorkController.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.controller.employee;
+
+<span class="kw">import</span> com.nool.backend.dto.common.DateRangeDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationResponseDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeDailyWorkListDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeDailyWorkRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeDailyWorkResponseDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeWorkSummaryDto;
+<span class="kw">import</span> com.nool.backend.service.employee.EmployeeDailyWorkService;
+<span class="kw">import</span> jakarta.validation.Valid;
+<span class="kw">import</span> lombok.RequiredArgsConstructor;
+<span class="kw">import</span> org.springframework.web.bind.annotation.*;
+
+<span class="ann">@RestController</span>
+<span class="ann">@RequestMapping</span>(<span class="str">"/employee-daily-working"</span>)   <span class="com">// all URLs: /api/employee-daily-working/*</span>
+<span class="ann">@RequiredArgsConstructor</span>
+<span class="kw">public class</span> EmployeeDailyWorkController {
+
+    <span class="kw">private final</span> EmployeeDailyWorkService employeeDailyWorkService;
+
+    <span class="com">// ── 1. LOG DAILY WORK ──────────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>
+    <span class="kw">public</span> EmployeeDailyWorkResponseDto addDailyWork(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> EmployeeDailyWorkRequestDto requestDto){
+        <span class="kw">return</span> employeeDailyWorkService.addDailyWork(requestDto);
+    }
+
+    <span class="com">// ── 2. ADMIN PAGINATED LIST ────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/list"</span>)
+    <span class="kw">public</span> PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getDailyWorkList(
+            <span class="ann">@RequestBody</span> PaginationRequestDto paginationRequestDto){
+        <span class="kw">return</span> employeeDailyWorkService.getDailyWorkList(paginationRequestDto);
+    }
+
+    <span class="com">// ── 3. WORKER'S OWN PAGINATED LIST ─────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/my-list"</span>)
+    <span class="kw">public</span> PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getMyDailyWorkList(
+            <span class="ann">@RequestBody</span> PaginationRequestDto paginationRequestDto){
+        <span class="kw">return</span> employeeDailyWorkService.getMyDailyWorkList(paginationRequestDto);
+    }
+
+    <span class="com">// ── 4. SUMMARY FOR A SPECIFIC EMPLOYEE ─────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/employee/{employeeId}/summary"</span>)
+    <span class="kw">public</span> EmployeeWorkSummaryDto getEmployeeWorkSummary(
+            <span class="ann">@PathVariable</span> Long employeeId,
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> DateRangeDto dateRangeDto){
+        <span class="kw">return</span> employeeDailyWorkService.getEmployeeWorkSummary(employeeId, dateRangeDto);
+    }
+
+    <span class="com">// ── 5. WORKER'S OWN SUMMARY ────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/summary"</span>)
+    <span class="kw">public</span> EmployeeWorkSummaryDto getMyWorkSummary(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> DateRangeDto dateRangeDto){
+        <span class="kw">return</span> employeeDailyWorkService.getMyWorkSummary(dateRangeDto);
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">📋</span> Endpoint Reference Table</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>HTTP + Path</th><th>Body</th><th>Returns</th></tr></thead>
+      <tbody>
+        <tr><td>addDailyWork</td><td>POST /employee-daily-working</td><td>EmployeeDailyWorkRequestDto</td><td>EmployeeDailyWorkResponseDto</td></tr>
+        <tr><td>getDailyWorkList</td><td>POST /employee-daily-working/list</td><td>PaginationRequestDto</td><td>PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt;</td></tr>
+        <tr><td>getMyDailyWorkList</td><td>POST /employee-daily-working/my-list</td><td>PaginationRequestDto</td><td>PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt;</td></tr>
+        <tr><td>getEmployeeWorkSummary</td><td>POST /employee-daily-working/employee/{id}/summary</td><td>DateRangeDto</td><td>EmployeeWorkSummaryDto</td></tr>
+        <tr><td>getMyWorkSummary</td><td>POST /employee-daily-working/summary</td><td>DateRangeDto</td><td>EmployeeWorkSummaryDto</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">📁</span> Notice — No GET, No PUT, No DELETE</h2>
+    <p>This is the first NOOL controller we've seen with <strong>only POST endpoints</strong>.</p>
+
+    <table class="ftable">
+      <thead><tr><th>Standard CRUD verb</th><th>NOOL daily-work pattern</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>POST (Create)</td><td>POST <code>/</code></td><td>Standard — add a new row</td></tr>
+        <tr><td>GET (Read by id)</td><td>(none)</td><td>No "get one row" endpoint — daily-work rows are seen via lists only</td></tr>
+        <tr><td>GET (List)</td><td>POST <code>/list</code></td><td>POST used because the body has many filter fields</td></tr>
+        <tr><td>PUT (Update)</td><td>(none)</td><td>Once entered, daily-work entries shouldn't be edited (history)</td></tr>
+        <tr><td>PATCH (Partial)</td><td>(none)</td><td>Same reasoning</td></tr>
+        <tr><td>DELETE (Remove)</td><td>(none — only cascade)</td><td>Daily-work history is never directly deleted; only removed when a worker is hard-deleted</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>Why no GET / PUT / DELETE?</strong> Once Dad logs Prema's work for May 15, that
+      row is meant to be permanent history. If a mistake is made, the correct fix is to
+      delete the row (admin-only DB action) and re-create it — not to PATCH the count. This
+      "append-only-ish" pattern mirrors the ledger philosophy from the SareeLedgerEntry
+      (Chapter 15). Keeping history immutable preserves audit integrity for salary calculations.
+    </div>
+
+    <h2><span class="h2-emoji">🛡️</span> Where Authorization Is Enforced</h2>
+    <p>Same two-layer model as every other controller:</p>
+
+    <ol>
+      <li>
+        <strong>SecurityConfig URL rules</strong> (Chapter 22). The Daily Work rules:
+        <ul>
+          <li><code>POST /employee-daily-working</code> → ADMIN only</li>
+          <li><code>POST /employee-daily-working/list</code> → ADMIN only</li>
+          <li><code>POST /employee-daily-working/my-list</code> → ADMIN or WORKER</li>
+          <li><code>POST /employee-daily-working/employee/*/summary</code> → ADMIN or WORKER</li>
+          <li><code>POST /employee-daily-working/summary</code> → ADMIN or WORKER</li>
+        </ul>
+      </li>
+      <li>
+        <strong>Service-layer self-or-admin check</strong> (Chapter 36) — narrows the
+        <code>/employee/{id}/summary</code> endpoint so workers can only request their own ID.
+      </li>
+    </ol>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad logs Friday's polishing for all workers</h5>
+      <ol>
+        <li>End of day. Dad asks each worker. He fills the form 5 times — once per worker.</li>
+        <li>Each submission goes to <code>POST /api/employee-daily-working</code>.</li>
+        <li>JWT filter (Chapter 21) verifies token, sets role=ADMIN.</li>
+        <li>SecurityConfig matches the URL → ADMIN required → passes.</li>
+        <li>@Valid on the DTO validates fields (all four @NotNull pass, both counts ≥ 0).</li>
+        <li>Service inserts the row. UNIQUE constraint backstops against duplicates.</li>
+        <li>Response includes <code>todayRevenue</code> per worker. Dad sees a running total.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Prema checks her own week</h5>
+      <ol>
+        <li>Saturday morning. Prema opens NOOL on her phone.</li>
+        <li>Frontend POSTs <code>/api/employee-daily-working/my-list</code> with pagination.</li>
+        <li>SecurityConfig: ADMIN or WORKER → passes.</li>
+        <li>Service reads employeeId=5 from JWT, fetches paginated rows.</li>
+        <li>Each row includes its computed <code>todayEarning</code>.</li>
+        <li>Frontend renders a table. Prema sees: Mon ₹240, Tue ₹270, Wed ₹300, Thu (no row), Fri ₹240.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Dad pulls workforce productivity for May</h5>
+      <ol>
+        <li>Admin → Workforce Analytics → "May 1-15".</li>
+        <li>For each worker, frontend POSTs <code>/api/employee-daily-working/employee/{id}/summary</code> with <code>{ "fromDate": "2026-05-01", "toDate": "2026-05-15" }</code>.</li>
+        <li>SecurityConfig: ADMIN or WORKER → passes.</li>
+        <li>Service self-or-admin: role=ADMIN → no narrowing.</li>
+        <li>Service computes totals: 13 workdays, 104 fresh, 26 repolish, ₹3,120 revenue.</li>
+        <li>Dashboard renders a sortable table.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Ravi tries to view Prema's summary</h5>
+      <ol>
+        <li>Ravi (WORKER, employeeId=8) crafts POST <code>/api/employee-daily-working/employee/5/summary</code>.</li>
+        <li>SecurityConfig: WORKER allowed at the URL level.</li>
+        <li>Service: role=WORKER, caller(8) != requested(5) → throws AccessDeniedException.</li>
+        <li>Spring returns 403. Defense in depth.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Prema views her own summary via /summary</h5>
+      <ol>
+        <li>Prema's app POSTs <code>/api/employee-daily-working/summary</code> with just the date range.</li>
+        <li>No employeeId in the URL — service infers from JWT.</li>
+        <li>Service delegates to <code>getEmployeeWorkSummary(5, range)</code>.</li>
+        <li>Permission check: trivially passes (caller is requesting own data).</li>
+        <li>Returns summary DTO.</li>
+        <li>The URL itself makes it impossible to request someone else's summary — extra safety on top of the in-service check.</li>
+      </ol>
+    </div>
+
+    <h2><span class="h2-emoji">🗄️</span> Sample API Calls (cURL)</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">All five endpoints</span><span class="lang">bash</span></div>
+<pre><span class="com"># 1. Log daily work</span>
+curl -X POST http://localhost:8083/api/employee-daily-working \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"employeeId":5,"workDate":"2026-05-15","freshCount":10,"rePolishCount":2}'</span>
+
+<span class="com"># 2. Admin list</span>
+curl -X POST http://localhost:8083/api/employee-daily-working/list \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"page":0,"size":20,"sortBy":"workDate","sortingDirection":"DESC"}'</span>
+
+<span class="com"># 3. Worker's own list</span>
+curl -X POST http://localhost:8083/api/employee-daily-working/my-list \
+  -H <span class="str">"Authorization: Bearer $PREMA_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"page":0,"size":20,"sortBy":"workDate","sortingDirection":"DESC"}'</span>
+
+<span class="com"># 4. Summary for a specific employee</span>
+curl -X POST http://localhost:8083/api/employee-daily-working/employee/5/summary \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"fromDate":"2026-05-01","toDate":"2026-05-15"}'</span>
+
+<span class="com"># 5. Worker's own summary</span>
+curl -X POST http://localhost:8083/api/employee-daily-working/summary \
+  -H <span class="str">"Authorization: Bearer $PREMA_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"fromDate":"2026-05-01","toDate":"2026-05-15"}'</span></pre>
+    </div>
+
+    <h2><span class="h2-emoji">🔗</span> Comparing With Attendance Controller</h2>
+    <p>Side-by-side, the Daily Work and Attendance controllers are nearly identical in shape:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Endpoint</th><th>Attendance (Ch 34)</th><th>Daily Work (this chapter)</th></tr></thead>
+      <tbody>
+        <tr><td>Create</td><td>POST /attendance</td><td>POST /employee-daily-working</td></tr>
+        <tr><td>Get by id</td><td>GET /attendance/{id} ✓</td><td>(missing — by design)</td></tr>
+        <tr><td>Admin list</td><td>POST /attendance/list</td><td>POST /employee-daily-working/list</td></tr>
+        <tr><td>Worker's list</td><td>POST /attendance/my-list</td><td>POST /employee-daily-working/my-list</td></tr>
+        <tr><td>Per-employee summary</td><td>POST /attendance/employee/{id}/summary</td><td>POST /employee-daily-working/employee/{id}/summary</td></tr>
+        <tr><td>Worker's summary</td><td>POST /attendance/summary</td><td>POST /employee-daily-working/summary</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <strong>The pattern is the template.</strong> Once you've seen Attendance and Daily Work,
+      the remaining business modules (Salary, Owner, Inventory, Owner Payment) follow the
+      exact same structure. Each module has its quirks (e.g., Inventory's locking), but the
+      shape — 5-7 endpoints split between admin and worker variants — is the same.
+    </div>
+
+    <div class="mistakes">
+      <h5>Common daily-work-controller mistakes</h5>
+      <div class="item">
+        <div class="bad">Adding a PATCH endpoint to edit existing rows</div>
+        <div class="good">Daily work entries are meant to be immutable history. If a mistake needs correction, the right path is DB-level admin action — not an API endpoint that workers could exploit to revise their counts.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Renaming the path to <code>/daily-work</code> without coordination</div>
+        <div class="good">The frontend's <code>api.js</code> hardcodes <code>/employee-daily-working</code>. SecurityConfig has rules referencing this path. Renaming requires updating both. Plan it as a coordinated change.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting @Valid on the request body</div>
+        <div class="good">Without it, <code>@PositiveOrZero</code> on counts doesn't run — negative numbers would silently be accepted, throwing off salary calculations.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Returning the entity directly from <code>addDailyWork</code></div>
+        <div class="good">The DTO contains the computed <code>todayRevenue</code> field. The entity doesn't have that — it's derived. Always go through the service's DTO builder.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Adding a "delete one row" endpoint</div>
+        <div class="good">Conscious omission. Daily work history shouldn't be deleted casually — it's the basis of salary trust. If correction is needed, hard-delete a worker (which cascades) or fix at the DB level.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why does this module have no GET-by-id endpoint?</div>
+        <div class="a">
+          Because the use cases don't need it. The UI shows either a paginated list (with all
+          fields) or a summary (aggregated). There's never a reason to fetch one specific
+          work row by its ID — you'd already have all its data from the list. Avoiding
+          unnecessary endpoints keeps the API surface small.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is the base path <code>/employee-daily-working</code> and not just <code>/daily-work</code>?</div>
+        <div class="a">
+          Historical artifact. The verb-form name was chosen early and stuck. Renaming
+          would require coordinated changes to the frontend api.js, SecurityConfig rules,
+          and any external documentation. The cost-benefit didn't justify the cleanup. A
+          future major-version rewrite would fix it.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What's the role pattern across all five endpoints?</div>
+        <div class="a">
+          Writes are ADMIN-only (only Dad can log work). Admin reads (<code>/list</code>,
+          <code>/employee/{id}/summary</code>) are ADMIN-or-WORKER, with the service narrowing
+          to "self only" for workers. Worker-scoped reads (<code>/my-list</code>,
+          <code>/summary</code>) accept either role but always operate on the caller's own
+          data — physically impossible to misuse.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">If a worker accidentally types negative numbers, what happens?</div>
+        <div class="a">
+          The frontend prevents it (form validation). If somehow bypassed, the
+          <code>@PositiveOrZero</code> on the DTO catches it. Validation kicks in BEFORE the
+          method body runs; <code>MethodArgumentNotValidException</code> bubbles up to
+          GlobalExceptionHandler (Chapter 09); user gets a clean 400 with a friendly message.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Could you add an <code>/employee-daily-working/today</code> endpoint?</div>
+        <div class="a">
+          Easily — but the existing <code>/list</code> with a sortBy=workDate DESC and size=N
+          serves the same need. Adding more endpoints means more SecurityConfig rules, more
+          test surface, more documentation. The NOOL philosophy: avoid endpoints that don't
+          earn their keep.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🎉</span> Phase 9 (Daily Work Module) Complete</h2>
+    <div class="callout brain">
+      Three chapters covering repository, service, and controller. From here on the
+      remaining modules become quicker — the pattern is firmly established. Next we go into
+      <strong>Salary</strong>, where the daily-work rows we've been logging finally meet
+      the polish rate to produce actual paid salaries.
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Phase 10 — Salary module (Chapters 38-40). The DailyWork rows from this phase feed
+      directly into the salary calculations. We'll see the formula for "amount earned" being
+      reconciled against "amount paid" to compute pending salary.
+    </p>
+
+    <div class="chapnav">
+      <a href="36-daily-work-service.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 36 · DailyWorkService + Impl</span></a>
+      <a class="dim next"><span class="arrow next">Coming soon →</span><span class="title">Ch 38 · Salary Repo &amp; DTOs</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 37 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

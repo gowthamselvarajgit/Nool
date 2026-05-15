@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 18 · SalaryPayment.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 18 · Money Out to Workers</span>
+    <h1>
+      <span class="gradient">SalaryPayment.java</span> —<br/>
+      Recording every payout
+    </h1>
+    <p class="subtitle">
+      EmployeeDailyWork tracks what a worker <em>earned</em>. SalaryPayment tracks what they
+      were <em>actually paid</em>. Each row represents one disbursement — covering one
+      specific date range — with date, amount, payment mode, and an optional remark.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">💸</div>
+      <div class="fmeta">
+        <h3>SalaryPayment.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/employee/SalaryPayment.java</span>
+        <div class="ftags"><span>Entity</span><span>Money out</span><span>Payment</span><span>Date range</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── The big idea ──────── -->
+    <h2><span class="h2-emoji">🧠</span> Three Dates, One Payout</h2>
+    <p>
+      The most unusual thing about this entity is that it has <strong>three</strong> date
+      fields. Most entities have one or two. Let's understand why each is needed:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Field</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td><code>fromDate</code></td><td>Start of the work period being paid for</td></tr>
+        <tr><td><code>toDate</code></td><td>End of that work period</td></tr>
+        <tr><td><code>paymentDate</code></td><td>When the money was actually handed over</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Example: on May 15, Dad pays Prema ₹1,200 cash for her work between May 11 and May 14.
+      That row stores: fromDate=2026-05-11, toDate=2026-05-14, paymentDate=2026-05-15.
+    </p>
+
+    <div class="callout brain">
+      <strong>Why three dates?</strong> Because pay days and work days are not the same.
+      Workers might be paid weekly, monthly, or on-demand — and the payment date can be days
+      after the work was done. Recording both lets us answer different questions:
+      <em>"how much did we pay Prema in May?"</em> (uses paymentDate) and
+      <em>"how much was she paid for her work in week 19?"</em> (uses fromDate/toDate).
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/employee/SalaryPayment.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.employee;
+
+<span class="kw">import</span> com.nool.backend.enums.PaymentMode;     <span class="com">// CASH / UPI / BANK_TRANSFER</span>
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"salary_payments"</span>)            <span class="com">// SQL table = salary_payments</span>
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> SalaryPayment {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"salary_payment_id"</span>)
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── WORK PERIOD START ─────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"from_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate fromDate;                    <span class="com">// e.g., 2026-05-11</span>
+
+    <span class="com">// ── WORK PERIOD END ───────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"to_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate toDate;                      <span class="com">// e.g., 2026-05-14</span>
+
+    <span class="com">// ── AMOUNT PAID ───────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"amount_paid"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Double amountPaid;                    <span class="com">// in rupees, e.g., 1200.00</span>
+
+    <span class="com">// ── ACTUAL PAYMENT DATE ───────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"payment_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate paymentDate;                 <span class="com">// when the money handed over</span>
+
+    <span class="com">// ── HOW WAS IT PAID ───────────────────────────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)
+    <span class="ann">@Column</span>(name = <span class="str">"payment_mode"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> PaymentMode paymentMode;               <span class="com">// CASH / UPI / BANK_TRANSFER</span>
+
+    <span class="com">// ── REMARKS (optional) ────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"remarks"</span>)
+    <span class="kw">private</span> String remarks;
+    <span class="com">// "Weekly advance", "Festival bonus included", etc.</span>
+
+    <span class="com">// ── EMPLOYEE LINK ─────────────────────────────────────────────</span>
+    <span class="ann">@ManyToOne</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"employee_id"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Employee employee;
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>salary_payment_id (PK)</td><td>Unique row ID</td><td><code>27</code></td></tr>
+        <tr><td><code>fromDate</code></td><td>LocalDate</td><td>from_date</td><td>Work period start</td><td><code>2026-05-11</code></td></tr>
+        <tr><td><code>toDate</code></td><td>LocalDate</td><td>to_date</td><td>Work period end</td><td><code>2026-05-14</code></td></tr>
+        <tr><td><code>amountPaid</code></td><td>Double</td><td>amount_paid</td><td>How much money handed over</td><td><code>1200.0</code></td></tr>
+        <tr><td><code>paymentDate</code></td><td>LocalDate</td><td>payment_date</td><td>When the money was paid</td><td><code>2026-05-15</code></td></tr>
+        <tr><td><code>paymentMode</code></td><td>PaymentMode</td><td>payment_mode</td><td>CASH / UPI / BANK_TRANSFER</td><td><code>CASH</code></td></tr>
+        <tr><td><code>remarks</code></td><td>String</td><td>remarks</td><td>Optional note</td><td><code>"Weekly advance"</code></td></tr>
+        <tr><td><code>employee</code></td><td>Employee</td><td>employee_id (FK)</td><td>Who got paid</td><td>FK → employees(employee_id)</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When typed into NOOL</td><td><code>2026-05-15T16:00:00</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Last edit</td><td><code>2026-05-15T16:00:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> salary_payments (
+    salary_payment_id <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    employee_id       <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span>,
+    from_date         <span class="sk">DATE</span>        <span class="sk">NOT NULL</span>,
+    to_date           <span class="sk">DATE</span>        <span class="sk">NOT NULL</span>,
+    amount_paid       <span class="sk">DOUBLE</span>      <span class="sk">NOT NULL</span>,
+    payment_date      <span class="sk">DATE</span>        <span class="sk">NOT NULL</span>,
+    payment_mode      <span class="sk">VARCHAR</span>(20) <span class="sk">NOT NULL</span>,        <span class="sc">-- CASH / UPI / BANK_TRANSFER</span>
+    remarks           <span class="sk">VARCHAR</span>(255),
+    created_at        <span class="sk">DATETIME</span>(6) <span class="sk">NOT NULL</span>,
+    updated_at        <span class="sk">DATETIME</span>(6),
+
+    <span class="sk">PRIMARY KEY</span> (salary_payment_id),
+    <span class="sk">FOREIGN KEY</span> (employee_id) <span class="sk">REFERENCES</span> employees(employee_id)
+);
+
+<span class="sc">-- Dad pays Prema ₹1,200 cash on May 15 for her May 11-14 work:</span>
+<span class="sk">INSERT INTO</span> salary_payments
+    (employee_id, from_date, to_date, amount_paid, payment_date,
+     payment_mode, remarks, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">5</span>, <span class="ss">'2026-05-11'</span>, <span class="ss">'2026-05-14'</span>, <span class="num2">1200.0</span>, <span class="ss">'2026-05-15'</span>,
+     <span class="ss">'CASH'</span>, <span class="ss">'Weekly advance'</span>,
+     <span class="ss">'2026-05-15 16:00:00'</span>, <span class="ss">'2026-05-15 16:00:00'</span>);
+
+<span class="sc">-- How much have we paid Prema this month (by payment date)?</span>
+<span class="sk">SELECT</span> <span class="sk">SUM</span>(amount_paid)
+<span class="sk">FROM</span>   salary_payments
+<span class="sk">WHERE</span>  employee_id = <span class="num2">5</span>
+  <span class="sk">AND</span>  payment_date <span class="sk">BETWEEN</span> <span class="ss">'2026-05-01'</span> <span class="sk">AND</span> <span class="ss">'2026-05-31'</span>;
+
+<span class="sc">-- How much have we paid Prema FOR her work in a specific period?</span>
+<span class="sk">SELECT</span> <span class="sk">SUM</span>(amount_paid)
+<span class="sk">FROM</span>   salary_payments
+<span class="sk">WHERE</span>  employee_id = <span class="num2">5</span>
+  <span class="sk">AND</span>  from_date &gt;= <span class="ss">'2026-05-11'</span>
+  <span class="sk">AND</span>  to_date   &lt;= <span class="ss">'2026-05-14'</span>;</pre>
+    </div>
+
+    <!-- ──────── The salary lifecycle ──────── -->
+    <h2><span class="h2-emoji">🔄</span> How EmployeeDailyWork + SalaryPayment Work Together</h2>
+    <p>Together, these two tables answer the pending-salary question:</p>
+
+    <div class="formula">
+      <div class="label">Pending salary for one worker in a period</div>
+      <div class="eq">
+        <span class="var">pending</span> = SUM(daily earnings) − SUM(amount_paid in same period)
+      </div>
+    </div>
+
+    <p>In SQL:</p>
+    <div class="sqlbox">
+<pre><span class="sc">-- The full pending-salary calc for Prema (employee_id=5) for May 1-15:</span>
+
+<span class="sc">-- Step 1: total earned</span>
+<span class="sk">SELECT</span> <span class="sk">SUM</span>((fresh_saree_count + repolish_saree_count) * e.polishing_rate) <span class="sk">AS</span> earned
+<span class="sk">FROM</span>   employee_daily_work w
+<span class="sk">JOIN</span>   employees e <span class="sk">ON</span> e.employee_id = w.employee_id
+<span class="sk">WHERE</span>  w.employee_id = <span class="num2">5</span>
+  <span class="sk">AND</span>  w.work_date <span class="sk">BETWEEN</span> <span class="ss">'2026-05-01'</span> <span class="sk">AND</span> <span class="ss">'2026-05-15'</span>;
+<span class="sc">-- Result: 1500.0  (50 sarees × ₹30)</span>
+
+<span class="sc">-- Step 2: total already paid in the same period (by from_date/to_date range)</span>
+<span class="sk">SELECT</span> <span class="sk">COALESCE</span>(<span class="sk">SUM</span>(amount_paid), 0) <span class="sk">AS</span> paid
+<span class="sk">FROM</span>   salary_payments
+<span class="sk">WHERE</span>  employee_id = <span class="num2">5</span>
+  <span class="sk">AND</span>  from_date &gt;= <span class="ss">'2026-05-01'</span>
+  <span class="sk">AND</span>  to_date   &lt;= <span class="ss">'2026-05-15'</span>;
+<span class="sc">-- Result: 1200.0</span>
+
+<span class="sc">-- Pending = earned - paid = 1500 - 1200 = 300</span></pre>
+    </div>
+
+    <p>
+      The actual code in <code>SalaryServiceImpl</code> (Chapter 39) does these two queries
+      separately and computes the difference in Java. Simpler to read and debug than one
+      monster SQL.
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: End-of-week payout</h5>
+      <ol>
+        <li>It's Friday May 15. Prema's week (Mon-Thu) had 50 polished sarees × ₹30 = ₹1,500 earned.</li>
+        <li>Dad gives her ₹1,200 in cash as a partial advance.</li>
+        <li>Dad logs into NOOL → Salary → Pay. Picks Prema, amount 1200, from 2026-05-11, to 2026-05-14, payment date today, mode CASH.</li>
+        <li>Backend inserts a SalaryPayment row.</li>
+        <li>Dashboard now shows: Prema · Earned ₹1,500 · Paid ₹1,200 · Pending ₹300.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Same-day work, deferred pay</h5>
+      <ol>
+        <li>Prema works through May 11-17 (a full week), earning ₹2,100.</li>
+        <li>Dad doesn't pay her until May 20 (waited until the bank deposit cleared).</li>
+        <li>On May 20, Dad records: from_date=11, to_date=17, payment_date=20, amount=2100, mode=BANK_TRANSFER.</li>
+        <li>Two different reports can use this row:
+          <ul>
+            <li>"What did we pay Prema in May?" → SUM where <code>payment_date</code> is in May → ₹2,100.</li>
+            <li>"Pending salary as of May 17?" → SUM where <code>from_date</code>/<code>to_date</code> fall in the work period → ₹2,100 paid, so pending = 0.</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Festival bonus on top of regular wage</h5>
+      <ol>
+        <li>It's Diwali week. Dad gives Prema ₹2,500 even though her actual earnings were ₹2,000.</li>
+        <li>Dad records: amount=2500, remarks="₹500 Diwali bonus included".</li>
+        <li>The dashboard now shows Prema as "overpaid" — earned ₹2,000 but paid ₹2,500 → pending = −₹500.</li>
+        <li>This is fine. Negative pending = "we paid them in advance". Future earnings will offset it naturally.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around SalaryPayment</h5>
+
+      <div class="item">
+        <div class="bad">Using only one date field (e.g., dropping <code>paymentDate</code> and using <code>toDate</code>)</div>
+        <div class="good">Work date and payment date are different things. Conflating them breaks reports — you can't answer "what did we pay in May?" if payment_date is missing.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing the salary calculation result on this entity (e.g., <code>earnedAmount</code>)</div>
+        <div class="good">Earnings are computed from EmployeeDailyWork × polish rate, not stored here. SalaryPayment stores only what was actually paid out. Mixing them creates double-truth.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using <code>int</code> or <code>BigDecimal</code> instead of <code>Double</code></div>
+        <div class="good">NOOL uses Double for consistency with polishRate and polishRatePerSaree on the other entities. Going forward with BigDecimal would mean changing all three together — not a one-off decision.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-deleting a payment to "fix" an over-pay</div>
+        <div class="good">Don't delete. Insert a corrective payment for the difference (negative amount, or a separate row with an explanatory remark). The audit trail matters.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Skipping the <code>paymentMode</code> field as "not important"</div>
+        <div class="good">It's essential for reconciliation. At month-end Dad needs to confirm "we paid ₹15,000 in CASH this month — does that match what we took out of the cash box?". Without paymentMode, that reconciliation is impossible.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about SalaryPayment</h5>
+
+      <div class="qa">
+        <div class="q">Why store BOTH a work-period (from/to) AND a payment date?</div>
+        <div class="a">
+          Because they answer different questions. <code>fromDate/toDate</code> tells us
+          which work this payment was FOR; <code>paymentDate</code> tells us WHEN money
+          left the till. These can be days or weeks apart, and reports need to slice by both
+          axes — e.g., "what did we pay <em>in May</em>?" (paymentDate) vs "what's the pending
+          for <em>week 19's work</em>?" (fromDate/toDate).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why no UNIQUE constraint on (employee_id, from_date, to_date)?</div>
+        <div class="a">
+          Because a single work period can have multiple payments — e.g., a ₹500 advance on
+          Monday and a ₹700 settlement on Friday, both for the same week. Both rows are
+          legitimate. The salary calc SUMs them. A UNIQUE constraint would prevent this very
+          natural pattern.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Should payments be immutable like ledger entries?</div>
+        <div class="a">
+          Arguably yes — money records should be auditable. But NOOL currently allows
+          <code>@PreUpdate</code> because Dad might want to fix a typo (amount entered as
+          1200 instead of 1300) within a few minutes of recording. The audit timestamp tells
+          you when an edit happened. If we ever needed stricter audit (for tax purposes), we'd
+          remove the setters and require corrective rows instead — same pattern as the
+          inventory ledger.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does negative pending mean?</div>
+        <div class="a">
+          That we've paid the worker MORE than they've earned in the period — an advance or
+          a bonus. Negative pending isn't an error; it's an "owed by the worker" state that
+          naturally settles as future work earns more. The dashboard handles it gracefully
+          (typically shows "₹500 advance" instead of "-₹500 pending").
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why use <code>Double</code> for the amount instead of <code>BigDecimal</code>?</div>
+        <div class="a">
+          Consistency with the rest of NOOL's money columns (polishRate, polishRatePerSaree).
+          For whole-rupee values used in our context, the floating-point risk is negligible.
+          <code>BigDecimal</code> would be safer for international currencies with sub-units
+          (cents/paise), but adds boilerplate. Pragmatic trade-off accepted.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between this entity and a "transaction log" for cash-out?</div>
+        <div class="a">
+          Conceptually similar — both record money leaving. The difference is purpose: this
+          entity is specifically about payroll, with worker FK and work-period context. A
+          general cash-out log would lack the from_date/to_date and the link to a specific
+          employee. NOOL keeps them separate because mixing all "money out" into one table
+          would lose semantic clarity.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Money <em>going out</em> is recorded. Next: money <em>coming in</em> — payments owners
+      make to the workshop. <code>OwnerPayment.java</code> is the mirror-image entity, the
+      final entity in our model.
+    </p>
+
+    <div class="chapnav">
+      <a href="17-employee-daily-work.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 17 · EmployeeDailyWork</span>
+      </a>
+      <a href="19-owner-payment.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 19 · OwnerPayment.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 18 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

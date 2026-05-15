@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 21 · JwtAuthenticationFilter.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 21 · The Guard at the Door</span>
+    <h1>
+      <span class="gradient">JwtAuthenticationFilter</span>.java —<br/>
+      Checking every request's ID
+    </h1>
+    <p class="subtitle">
+      Every single API request flows through this file before reaching any controller. It
+      checks for a JWT token, verifies it, extracts the user's role — and tells Spring
+      Security "this is who's calling". If something's wrong, the request is rejected
+      before any business code even runs.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🛡️</div>
+      <div class="fmeta">
+        <h3>JwtAuthenticationFilter.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/auth/security/JwtAuthenticationFilter.java</span>
+        <div class="ftags"><span>@Component</span><span>Servlet Filter</span><span>OncePerRequestFilter</span><span>⭐ Critical</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What is a filter ──────── -->
+    <h2><span class="h2-emoji">🧠</span> What's a Servlet Filter?</h2>
+    <p>
+      A filter is a piece of code that runs <em>before</em> every HTTP request reaches its
+      controller. Spring Boot uses filters to handle cross-cutting concerns: logging,
+      compression, security, CORS, etc. Filters form a <strong>chain</strong> — each
+      filter does its job, then calls the next one.
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">The filter chain (simplified)</span><span class="lang">flow</span></div>
+<pre>HTTP request arrives
+       │
+       ▼
+[ CORS Filter ]              <span class="com">← handles Cross-Origin Resource Sharing</span>
+       │
+       ▼
+[ JwtAuthenticationFilter ]  <span class="com">★ ← THIS FILE — extracts the JWT</span>
+       │
+       ▼
+[ Spring Security Filters ]  <span class="com">← checks role-based rules</span>
+       │
+       ▼
+[ DispatcherServlet ]        <span class="com">← routes to the right controller</span>
+       │
+       ▼
+[ @RestController ]          <span class="com">← business code finally runs</span></pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>Why have this as a filter and not inside the controller?</strong> Because
+      every single endpoint needs auth — putting the check in each controller would mean
+      copy-pasting code 50 times. A filter runs once per request, centrally, before any
+      controller is reached. One place to maintain, one place to debug.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/security/JwtAuthenticationFilter.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.security;
+
+<span class="kw">import</span> io.jsonwebtoken.Claims;
+<span class="kw">import</span> jakarta.servlet.FilterChain;
+<span class="kw">import</span> jakarta.servlet.ServletException;
+<span class="kw">import</span> jakarta.servlet.http.HttpServletRequest;
+<span class="kw">import</span> jakarta.servlet.http.HttpServletResponse;
+<span class="kw">import</span> org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+<span class="kw">import</span> org.springframework.security.core.authority.SimpleGrantedAuthority;
+<span class="kw">import</span> org.springframework.security.core.context.SecurityContextHolder;
+<span class="kw">import</span> org.springframework.stereotype.Component;
+<span class="kw">import</span> org.springframework.web.filter.OncePerRequestFilter;
+
+<span class="kw">import</span> java.io.IOException;
+<span class="kw">import</span> java.util.List;
+
+<span class="ann">@Component</span>                                          <span class="com">// Spring picks this up automatically</span>
+<span class="kw">public class</span> JwtAuthenticationFilter
+        <span class="kw">extends</span> OncePerRequestFilter {              <span class="com">// ★ guarantees this runs exactly once per request</span>
+
+    <span class="kw">private final</span> JwtUtil jwtUtil;
+
+    <span class="kw">public</span> JwtAuthenticationFilter(JwtUtil jwtUtil) {
+        <span class="kw">this</span>.jwtUtil = jwtUtil;                       <span class="com">// constructor injection of JwtUtil</span>
+    }
+
+    <span class="ann">@Override</span>
+    <span class="kw">protected void</span> doFilterInternal(
+            HttpServletRequest  request,
+            HttpServletResponse response,
+            FilterChain         filterChain
+    ) <span class="kw">throws</span> ServletException, IOException {
+
+        <span class="com">// ── STEP 1: Look for the Authorization header ────────────────</span>
+        String authHeader = request.getHeader(<span class="str">"Authorization"</span>);
+        <span class="com">// Standard HTTP header: "Authorization: Bearer eyJhbGc..."</span>
+
+        <span class="com">// ── STEP 2: If header exists and starts with "Bearer ", extract token ─</span>
+        <span class="kw">if</span> (authHeader != <span class="kw">null</span> &amp;&amp; authHeader.startsWith(<span class="str">"Bearer "</span>)) {
+
+            String token = authHeader.substring(<span class="num2">7</span>);     <span class="com">// strip "Bearer " (7 chars)</span>
+
+            <span class="com">// ── STEP 3: Check expiry &amp; signature ─────────────────────</span>
+            <span class="kw">if</span> (!jwtUtil.isTokenExpired(token)) {     <span class="com">// also implicitly checks signature</span>
+
+                <span class="com">// ── STEP 4: Decode the payload ───────────────────────</span>
+                Claims claims = jwtUtil.extractAllClaims(token);
+                String role   = claims.get(<span class="str">"role"</span>, String.class);
+
+                <span class="com">// ── STEP 5: Tell Spring Security who is calling ──────</span>
+                UsernamePasswordAuthenticationToken authentication =
+                        <span class="kw">new</span> UsernamePasswordAuthenticationToken(
+                                claims,                              <span class="com">// principal = the JWT claims</span>
+                                <span class="kw">null</span>,                                <span class="com">// credentials (we don't need them)</span>
+                                List.of(<span class="kw">new</span> SimpleGrantedAuthority(role))   <span class="com">// authorities = [role]</span>
+                        );
+
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authentication);
+                <span class="com">// ★ From here on, any code in this request can call
+                //   SecurityContextHolder.getContext().getAuthentication()
+                //   and find out "the user calling is role X".</span>
+            }
+            <span class="com">// If isTokenExpired threw or returned true, we DON'T set authentication.
+            // The request continues but as an "anonymous" user — Spring Security's
+            // role checks will then reject it.</span>
+        }
+
+        <span class="com">// ── STEP 6: Pass to the next filter (always) ─────────────────</span>
+        filterChain.doFilter(request, response);
+        <span class="com">// Whether or not we authenticated, the chain continues.
+        // Downstream filters will reject unauthenticated requests at the
+        // SecurityConfig rules.</span>
+    }
+
+    <span class="com">// ── SKIP PUBLIC URLs ──────────────────────────────────────────</span>
+    <span class="ann">@Override</span>
+    <span class="kw">protected boolean</span> shouldNotFilter(HttpServletRequest request) {
+        <span class="kw">return</span> request.getRequestURI().startsWith(<span class="str">"/api/auth/"</span>);
+    }
+    <span class="com">// ★ Don't run this filter for /api/auth/* endpoints (login, register).
+    //   Those endpoints exist precisely to GET a token, so requiring a
+    //   token to call them would be a chicken-and-egg problem.</span>
+}</pre>
+    </div>
+
+    <!-- ──────── Method-by-method ──────── -->
+    <h2><span class="h2-emoji">📋</span> The Two Methods Explained</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Purpose</th><th>When called</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>doFilterInternal(req, res, chain)</code></td>
+          <td>The core logic — extract token, verify, populate security context, continue the chain</td>
+          <td>Once per HTTP request</td>
+        </tr>
+        <tr>
+          <td><code>shouldNotFilter(req)</code></td>
+          <td>Decide whether to skip this filter for this request</td>
+          <td>Spring asks before running <code>doFilterInternal</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Why OncePerRequestFilter ──────── -->
+    <h2><span class="h2-emoji">🔄</span> Why <code>OncePerRequestFilter</code>?</h2>
+    <p>
+      Spring's <code>OncePerRequestFilter</code> base class guarantees the filter runs
+      <strong>exactly once per request</strong>, even if the request goes through internal
+      forwards or includes (e.g., when a controller does <code>request.getRequestDispatcher(...)</code>).
+      Without it, the same filter could run multiple times per request, which would either
+      waste CPU re-verifying the same token or — worse — overwrite the security context
+      with stale data.
+    </p>
+
+    <!-- ──────── Why skip /api/auth ──────── -->
+    <h2><span class="h2-emoji">🚪</span> Why <code>/api/auth/*</code> Endpoints Are Skipped</h2>
+    <p>
+      The login endpoint (<code>POST /api/auth/login</code>) is the very mechanism by which
+      users get a JWT in the first place. Requiring a JWT to call it would be a
+      chicken-and-egg problem: <em>"to log in, you need to already be logged in"</em>.
+    </p>
+
+    <div class="callout info">
+      The <code>shouldNotFilter</code> override returns <code>true</code> for any URL starting
+      with <code>/api/auth/</code>. So login, logout, and token validation endpoints skip this
+      filter entirely. <code>SecurityConfig</code> (Chapter 22) separately marks these
+      paths as <code>permitAll()</code>.
+    </div>
+
+    <!-- ──────── How SecurityContext works ──────── -->
+    <h2><span class="h2-emoji">🧰</span> What Is the SecurityContext?</h2>
+    <p>
+      <code>SecurityContextHolder.getContext()</code> is Spring Security's per-request
+      "who is calling?" object. It's typically backed by a <code>ThreadLocal</code>, so it's
+      automatically scoped to the current request thread.
+    </p>
+
+    <p>When the filter does:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Setting authentication</span><span class="lang">Java</span></div>
+<pre>SecurityContextHolder.getContext().setAuthentication(authentication);</pre>
+    </div>
+
+    <p>
+      ...it's saying: <em>"For the rest of this HTTP request, treat the caller as having
+      these credentials and authorities."</em> Downstream filters and controllers can read this
+      info via:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Reading authentication anywhere downstream</span><span class="lang">Java</span></div>
+<pre>Object principal = SecurityContextHolder.getContext()
+                       .getAuthentication()
+                       .getPrincipal();
+<span class="com">// principal is the Claims object we set in the filter</span></pre>
+    </div>
+
+    <p>
+      That's exactly what <code>CurrentUserUtil</code> (Chapter 23) does to expose the caller's
+      <code>userId</code>, <code>role</code>, <code>employeeId</code>, and <code>ownerId</code>
+      to service-layer code.
+    </p>
+
+    <!-- ──────── Why pass `claims` as principal ──────── -->
+    <h2><span class="h2-emoji">🎯</span> Why Pass <code>claims</code> as the Principal?</h2>
+    <p>
+      Notice the unusual choice — the filter passes the JWT's <code>Claims</code> object as
+      the principal:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">The principal IS the Claims</span><span class="lang">Java</span></div>
+<pre><span class="kw">new</span> UsernamePasswordAuthenticationToken(
+    claims,                            <span class="com">// ★ the entire JWT payload</span>
+    <span class="kw">null</span>,
+    List.of(<span class="kw">new</span> SimpleGrantedAuthority(role))
+);</pre>
+    </div>
+
+    <p>
+      Normally the principal would be a <code>String</code> username or a
+      <code>UserDetails</code> object. Here it's the full Claims map. Why?
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>If we used a username String</th><th>Using Claims (NOOL's choice)</th></tr></thead>
+      <tbody>
+        <tr><td>Need DB lookup on every request to get role + IDs</td><td>Everything's already in the Claims — no DB hit</td></tr>
+        <tr><td>Controllers need to take Username param, then load Employee/Owner separately</td><td><code>CurrentUserUtil.getEmployeeId()</code> reads it directly from the JWT</td></tr>
+        <tr><td>Slower under load</td><td>Pure in-memory after the initial parse</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>The whole point of JWT is to AVOID per-request DB lookups for identity.</strong>
+      By passing Claims as the principal, every layer of NOOL can read userId/role/employeeId
+      straight from the request thread — no JOINs, no caching, no complexity.
+    </div>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul requests his inventory</h5>
+      <ol>
+        <li>Frontend sends <code>POST /api/inventory/my-ledger</code> with <code>Authorization: Bearer eyJhbGc...</code>.</li>
+        <li>Filter chain reaches <code>JwtAuthenticationFilter</code>.</li>
+        <li><code>shouldNotFilter</code> sees path starts with <code>/api/inventory/</code> — does NOT skip.</li>
+        <li><code>doFilterInternal</code> reads the Authorization header.</li>
+        <li>Strips "Bearer ", verifies expiry (not expired), extracts Claims.</li>
+        <li>Role from Claims: "SAREE_OWNER".</li>
+        <li>Sets <code>SecurityContextHolder</code> with authentication = Claims + authority "SAREE_OWNER".</li>
+        <li>Calls <code>filterChain.doFilter(...)</code>.</li>
+        <li>Next filters run. <code>SecurityConfig</code> rule for that path requires ADMIN or SAREE_OWNER → passes.</li>
+        <li>Controller runs. It calls <code>CurrentUserUtil.getOwnerId()</code> to get Rahul's owner ID, fetches his ledger, returns JSON.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Login request (filter skipped)</h5>
+      <ol>
+        <li>Frontend sends <code>POST /api/auth/login</code> with mobile + password.</li>
+        <li>Filter chain reaches <code>JwtAuthenticationFilter</code>.</li>
+        <li><code>shouldNotFilter</code> sees path starts with <code>/api/auth/</code> → returns <code>true</code> → skip.</li>
+        <li>The filter is completely bypassed. The request continues directly to subsequent filters.</li>
+        <li><code>SecurityConfig</code> marks <code>/api/auth/**</code> as <code>permitAll()</code> → passes.</li>
+        <li><code>AuthController.login()</code> runs, BCrypt-verifies password, mints a JWT, returns it.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Expired token</h5>
+      <ol>
+        <li>Request arrives with a 25-hour-old JWT.</li>
+        <li>Filter extracts the token.</li>
+        <li><code>jwtUtil.isTokenExpired(token)</code> returns <code>true</code>.</li>
+        <li>The <code>if (!jwtUtil.isTokenExpired(token))</code> branch is skipped — no authentication is set.</li>
+        <li>Filter still calls <code>filterChain.doFilter(...)</code>.</li>
+        <li>Downstream <code>SecurityConfig</code> rules require authentication — request is rejected with 401.</li>
+        <li>Frontend's <code>handleResponse</code> wipes localStorage and redirects to <code>/login</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Tampered token</h5>
+      <ol>
+        <li>Attacker modifies the payload to escalate from SAREE_OWNER to ADMIN.</li>
+        <li>Filter extracts the token, calls <code>isTokenExpired</code> (which internally parses signature).</li>
+        <li>Signature recomputation fails — <code>SignatureException</code> thrown.</li>
+        <li>Exception propagates out of <code>doFilterInternal</code>.</li>
+        <li>Spring's exception handling in the filter chain catches it.</li>
+        <li>Final response: 401 Unauthorized. No business code ever runs.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Missing Authorization header</h5>
+      <ol>
+        <li>Request to a protected endpoint arrives with no Authorization header.</li>
+        <li>Filter: <code>authHeader == null</code> → skip the whole "if" block.</li>
+        <li>SecurityContext stays empty.</li>
+        <li>Filter chain continues; <code>SecurityConfig</code>'s authentication requirement rejects → 401.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common filter mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Returning early (not calling <code>filterChain.doFilter</code>)</div>
+        <div class="good">Always call <code>doFilter</code>, even on failure. Otherwise the request just hangs — no response is ever sent. Skip authentication if you must, but always continue the chain.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Catching exceptions inside the filter and returning 200 OK</div>
+        <div class="good">If parsing fails, let the exception propagate. Spring Security's exception translation will turn it into 401. Catching and swallowing means a tampered token might look "OK" downstream.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting to extend <code>OncePerRequestFilter</code></div>
+        <div class="good">Use <code>OncePerRequestFilter</code>, not the bare <code>Filter</code> interface. It deduplicates against internal Spring forwards/includes, avoiding subtle "filter ran twice" bugs.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-coding "Bearer " checks inside service code</div>
+        <div class="good">Centralize the Bearer-token extraction in this filter. Services should never look at the Authorization header — they should read <code>CurrentUserUtil</code> instead. Single source of truth.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Calling the filter for <code>/api/auth/login</code> too</div>
+        <div class="good">That's exactly what <code>shouldNotFilter</code> prevents. Without it, login requests would fail because there's no JWT yet.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Reading Claims fields with <code>.get(key)</code> (returns Object) without casting</div>
+        <div class="good">Use the typed overload: <code>claims.get("role", String.class)</code>. Catches typos at compile time and returns the right type immediately.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about JwtAuthenticationFilter</h5>
+
+      <div class="qa">
+        <div class="q">What's the difference between extending <code>Filter</code> and <code>OncePerRequestFilter</code>?</div>
+        <div class="a">
+          <code>Filter</code> is the raw Servlet API — Spring may run it multiple times per
+          request if there are internal forwards or includes. <code>OncePerRequestFilter</code>
+          is Spring's wrapper that uses request attributes to ensure the filter runs exactly
+          once. For most use cases — including auth — <code>OncePerRequestFilter</code> is
+          the safer choice.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does the filter pass <code>Claims</code> as the principal instead of a username?</div>
+        <div class="a">
+          Because the Claims already contain everything we need — userId, role, employeeId,
+          ownerId — and they're cryptographically signed. Using Claims as the principal lets
+          every downstream layer read user identity without a DB lookup. Compare to a username
+          principal, where every service method would need to load the User from the DB to
+          find out the role.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens to the security context after the request finishes?</div>
+        <div class="a">
+          Spring Security clears it. The <code>SecurityContextHolder</code> defaults to
+          ThreadLocal mode, and the filter chain's outer wrapper resets it at the end of each
+          request. So even if the same thread serves the next request, no leftover identity
+          contaminates it.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How would you handle multiple authentication mechanisms (JWT + API keys)?</div>
+        <div class="a">
+          Add a second filter (e.g., <code>ApiKeyAuthenticationFilter</code>) that runs before
+          or after this one. Each filter checks for its own credential type; whichever finds
+          one populates the security context first. Both filters call
+          <code>filterChain.doFilter</code> unconditionally so the chain continues regardless.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>shouldNotFilter</code> used instead of just checking the path inside <code>doFilterInternal</code>?</div>
+        <div class="a">
+          <code>shouldNotFilter</code> is Spring's optimized hook — it's checked BEFORE the
+          filter is invoked, saving the overhead of an inner method call. Checking inside
+          <code>doFilterInternal</code> would also work but is slightly slower and more error-prone.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the order of filters in Spring Security?</div>
+        <div class="a">
+          <code>SecurityConfig</code> registers our JWT filter explicitly with
+          <code>.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)</code>.
+          That places it before Spring's built-in form-login filter. The full chain runs in
+          a defined order; if you ever add custom filters, you control where they slot in.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">If the JWT is valid but the user has since been deleted, what happens?</div>
+        <div class="a">
+          The filter happily authenticates them based on the JWT alone — it doesn't hit the
+          DB. The deleted user can make requests until their token expires. If you need
+          immediate revocation, you'd add a per-request DB check (e.g., "is this userId still
+          active?"). NOOL accepts the up-to-24h window because the trade-off is statelessness.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      The filter knows <em>who</em> is calling. But which endpoints can they actually call?
+      That decision lives in <code>SecurityConfig.java</code> — the master rules book that
+      maps URL patterns to required roles. That's the next chapter.
+    </p>
+
+    <div class="chapnav">
+      <a href="20-jwt-util.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 20 · JwtUtil.java</span>
+      </a>
+      <a href="22-security-config.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 22 · SecurityConfig.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 21 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

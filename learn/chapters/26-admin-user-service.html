@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 26 · AdminUserService · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 26 · Provisioning Login Accounts</span>
+    <h1>
+      <span class="gradient">AdminUserService</span> &amp; Impl
+    </h1>
+    <p class="subtitle">
+      When Dad adds a new worker or client, NOOL needs to create their login account too. This
+      service is what does that work — hashing the password, inserting the <code>User</code>
+      row, creating the <code>UserProfile</code> bridge, all in one atomic transaction.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🆕</div>
+      <div class="fmeta">
+        <h3>AdminUserService.java + AdminUserServiceImpl.java</h3>
+        <span class="fpath">backend/.../auth/service/ + auth/service/impl/</span>
+        <div class="ftags"><span>@Service</span><span>Account creation</span><span>@Transactional</span><span>BCrypt</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> What This Service Does</h2>
+    <p>
+      Two methods. Both follow the same pattern, just with different roles:
+    </p>
+
+    <ol>
+      <li><code>createEmployeeUser(mobile, password, employeeId)</code> — creates a User row with role WORKER, linked via UserProfile to an Employee.</li>
+      <li><code>createOwnerUser(mobile, password, ownerId)</code> — creates a User row with role SAREE_OWNER, linked via UserProfile to a SareeOwner.</li>
+    </ol>
+
+    <div class="callout brain">
+      <strong>Important:</strong> This service is called <em>by other services</em> — never
+      directly by a controller. When Dad clicks "Add Employee" in the UI, the
+      <code>EmployeeServiceImpl</code> first creates the Employee row, then calls
+      <code>adminUserService.createEmployeeUser(...)</code> to provision the login.
+      Same for adding owners. This service is reusable building block.
+    </div>
+
+    <!-- ─── Interface ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> The Interface — <code>AdminUserService.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">auth/service/AdminUserService.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.service;
+
+<span class="kw">import</span> com.nool.backend.auth.entity.User;
+
+<span class="kw">public interface</span> AdminUserService {
+    User createEmployeeUser(String mobileNumber, String rawPassword, Long employeeId);
+    User createOwnerUser(String mobileNumber, String rawPassword, Long ownerId);
+}</pre>
+    </div>
+
+    <p>Two methods, both returning the saved <code>User</code>. The caller can use the returned User if they need its generated ID for follow-up linking.</p>
+
+    <!-- ─── Impl ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> The Implementation</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">auth/service/impl/AdminUserServiceImpl.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.service.impl;
+
+<span class="com">// imports omitted</span>
+
+<span class="ann">@Service</span>
+<span class="ann">@RequiredArgsConstructor</span>
+<span class="kw">public class</span> AdminUserServiceImpl <span class="kw">implements</span> AdminUserService {
+
+    <span class="kw">private final</span> UserRepository        userRepository;
+    <span class="kw">private final</span> UserProfileRepository userProfileRepository;
+    <span class="kw">private final</span> PasswordEncoder       passwordEncoder;       <span class="com">// BCrypt</span>
+
+    <span class="com">// ── CREATE LOGIN FOR A WORKER ─────────────────────────────────</span>
+    <span class="ann">@Override</span>
+    <span class="ann">@Transactional</span>
+    <span class="kw">public</span> User createEmployeeUser(String mobileNumber, String rawPassword, Long employeeId) {
+
+        <span class="com">// Step 1: prevent duplicate</span>
+        <span class="kw">if</span> (userRepository.findByMobileNumber(mobileNumber).isPresent()) {
+            <span class="kw">throw new</span> DuplicateResourceException(
+                <span class="str">"A login account with this mobile number already exists"</span>);
+        }
+
+        <span class="com">// Step 2: create the User row with BCrypt-hashed password</span>
+        User user = User.builder()
+                .mobileNumber(mobileNumber)
+                .password(passwordEncoder.encode(rawPassword))   <span class="com">// ★ HASH HERE</span>
+                .role(Role.WORKER)                               <span class="com">// fixed for this method</span>
+                .active(<span class="kw">true</span>)
+                .build();
+        User savedUser = userRepository.save(user);              <span class="com">// INSERT, get back the ID</span>
+
+        <span class="com">// Step 3: create the UserProfile bridging to the Employee</span>
+        UserProfile profile = UserProfile.builder()
+                .user(savedUser)
+                .employeeId(employeeId)                          <span class="com">// link to Employee row</span>
+                .build();
+        userProfileRepository.save(profile);
+
+        <span class="kw">return</span> savedUser;
+    }
+
+    <span class="com">// ── CREATE LOGIN FOR A SAREE OWNER ────────────────────────────</span>
+    <span class="ann">@Override</span>
+    <span class="ann">@Transactional</span>
+    <span class="kw">public</span> User createOwnerUser(String mobileNumber, String rawPassword, Long ownerId) {
+
+        <span class="com">// Step 1: prevent duplicate</span>
+        <span class="kw">if</span> (userRepository.findByMobileNumber(mobileNumber).isPresent()) {
+            <span class="kw">throw new</span> DuplicateResourceException(
+                <span class="str">"A login account with this mobile number already exists"</span>);
+        }
+
+        <span class="com">// Step 2: create the User row</span>
+        User user = User.builder()
+                .mobileNumber(mobileNumber)
+                .password(passwordEncoder.encode(rawPassword))
+                .role(Role.SAREE_OWNER)                          <span class="com">// fixed for this method</span>
+                .active(<span class="kw">true</span>)
+                .build();
+        User savedUser = userRepository.save(user);
+
+        <span class="com">// Step 3: create the UserProfile bridging to the SareeOwner</span>
+        UserProfile userProfile = UserProfile.builder()
+                .user(savedUser)
+                .ownerId(ownerId)                                <span class="com">// link to SareeOwner row</span>
+                .build();
+        userProfileRepository.save(userProfile);
+
+        <span class="kw">return</span> savedUser;
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">📋</span> Method-by-Method Walkthrough</h2>
+    <table class="ftable">
+      <thead><tr><th>Step</th><th>Both methods do</th></tr></thead>
+      <tbody>
+        <tr><td>Step 1: dup check</td><td>If mobile already exists → throw <code>DuplicateResourceException</code></td></tr>
+        <tr><td>Step 2: hash + save User</td><td>BCrypt the password, build User with appropriate Role, save → returns row with generated id</td></tr>
+        <tr><td>Step 3: link UserProfile</td><td>Build UserProfile with the saved User + employeeId/ownerId, save</td></tr>
+        <tr><td>@Transactional commits</td><td>Both INSERTs commit together. If step 3 fails, step 2's User is rolled back.</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">⚙️</span> The Critical Role of <code>@Transactional</code></h2>
+    <p>
+      Notice both methods are annotated with <code>@Transactional</code>. This is essential:
+      the two INSERTs (User + UserProfile) must commit together or fail together.
+    </p>
+
+    <div class="callout warn">
+      <strong>Without @Transactional, imagine:</strong>
+      <ol>
+        <li>Step 2 inserts the User row successfully (user_id = 5).</li>
+        <li>Step 3 fails (e.g., DB connection drops, or employeeId is invalid).</li>
+        <li>Without transaction rollback, the User row stays but has no profile.</li>
+        <li>That worker can now log in but the JWT will have <code>employeeId = null</code> — broken state.</li>
+      </ol>
+      <strong>With @Transactional:</strong> if step 3 fails, Spring rolls back step 2 too.
+      Either both rows exist or neither does. Atomic.
+    </div>
+
+    <h2><span class="h2-emoji">🗄️</span> What Happens in MySQL</h2>
+    <div class="sqlbox">
+<pre><span class="sc">-- When Dad adds Prema (employee_id = 5) as a worker:</span>
+
+<span class="sk">START TRANSACTION</span>;
+
+<span class="sc">-- Step 1: dup check</span>
+<span class="sk">SELECT</span> u.* <span class="sk">FROM</span> users u <span class="sk">WHERE</span> u.mobile_number = <span class="ss">'9000000002'</span>;
+<span class="sc">-- → empty, OK to proceed</span>
+
+<span class="sc">-- Step 2: insert User</span>
+<span class="sk">INSERT INTO</span> users
+    (mobile_number, password, role, active_status, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="ss">'9000000002'</span>,
+     <span class="ss">'$2a$10$abcdef1234567890...'</span>,    <span class="sc">-- BCrypt hash of "prema123"</span>
+     <span class="ss">'WORKER'</span>,
+     <span class="kw">true</span>,
+     <span class="ss">'2026-05-15 09:30:00'</span>,
+     <span class="ss">'2026-05-15 09:30:00'</span>);
+<span class="sc">-- Returns generated user_id = 3</span>
+
+<span class="sc">-- Step 3: insert UserProfile</span>
+<span class="sk">INSERT INTO</span> user_profiles
+    (user_id, employee_id, owner_id, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">3</span>, <span class="num2">5</span>, <span class="kw">NULL</span>, <span class="ss">'2026-05-15 09:30:00'</span>, <span class="ss">'2026-05-15 09:30:00'</span>);
+
+<span class="sk">COMMIT</span>;</pre>
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad adds Prema as a worker</h5>
+      <ol>
+        <li>Dad fills "Add Employee" form: name "Prema", mobile <code>9000000002</code>, password <code>prema123</code>, rate ₹30.</li>
+        <li><code>EmployeeServiceImpl.create(...)</code> runs:
+          <ul>
+            <li>Inserts the <code>Employee</code> row → gets employee_id=5.</li>
+            <li>Calls <code>adminUserService.createEmployeeUser("9000000002", "prema123", 5)</code>.</li>
+          </ul>
+        </li>
+        <li>AdminUserService:
+          <ul>
+            <li>Dup check passes (no existing user with that mobile).</li>
+            <li>BCrypt-hashes "prema123" → stores 60-char hash.</li>
+            <li>Inserts User row → user_id=3.</li>
+            <li>Inserts UserProfile linking user_id=3 to employee_id=5.</li>
+            <li>Commit.</li>
+          </ul>
+        </li>
+        <li>Prema can now log in with mobile + password.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Dad tries to add a worker with a duplicate mobile</h5>
+      <ol>
+        <li>Dad accidentally types Rahul's mobile (<code>9000000001</code>) when creating a new worker.</li>
+        <li>AdminUserService step 1 finds the existing User row → throws <code>DuplicateResourceException</code>.</li>
+        <li>The transaction has just started — nothing has been inserted yet, so nothing to roll back.</li>
+        <li>GlobalExceptionHandler (Chapter 09) converts to HTTP 409 with message: "A login account with this mobile number already exists".</li>
+        <li>Frontend shows the error. Dad realises the typo, fixes the mobile, tries again.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Adding Rahul as a SAREE_OWNER</h5>
+      <ol>
+        <li>Dad opens "Add Owner": name "Rahul Textiles", mobile <code>9000000001</code>, password <code>rahul123</code>, rate ₹65.</li>
+        <li><code>SareeOwnerServiceImpl.create(...)</code>:
+          <ul>
+            <li>Inserts SareeOwner row → owner_id=1.</li>
+            <li>Calls <code>adminUserService.createOwnerUser("9000000001", "rahul123", 1)</code>.</li>
+          </ul>
+        </li>
+        <li>Same flow as Prema's case but: role=<code>SAREE_OWNER</code>, profile.ownerId=1 (employeeId=null).</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Mid-transaction failure rollback</h5>
+      <ol>
+        <li>Dad clicks Add Employee for Prema.</li>
+        <li>Step 1 dup-check passes.</li>
+        <li>Step 2 User insert succeeds (user_id=3).</li>
+        <li>Step 3: imagine UserProfile insert fails because the database connection dropped.</li>
+        <li>@Transactional catches the failure, rolls back the User insert too.</li>
+        <li>DB returns to its pre-call state. No orphan User row remains.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common mistakes</h5>
+      <div class="item">
+        <div class="bad">Forgetting <code>@Transactional</code></div>
+        <div class="good">Without it, partial saves can leave orphan rows. ALWAYS annotate methods that do multiple writes.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Calling <code>passwordEncoder.encode()</code> on an already-hashed password</div>
+        <div class="good">BCrypt-hashing an already-hashed string produces a hash-of-a-hash that can never be verified by a typed password. Make sure callers always pass plain text.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Hard-coding the role inside this service instead of in dedicated methods</div>
+        <div class="good">Two methods (createEmployeeUser / createOwnerUser) with fixed roles prevents callers from accidentally creating an ADMIN. The role is implied by the method name — safer.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Letting the controller call this service directly</div>
+        <div class="good">This service is meant to be called by other services (EmployeeServiceImpl, SareeOwnerServiceImpl), AFTER they've created the business entity. Controllers shouldn't bypass that orchestration.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why two separate methods instead of one parameterized one?</div>
+        <div class="a">
+          Type safety. <code>createEmployeeUser(mobile, password, employeeId)</code> can only
+          create WORKERs and only links to Employee. A single
+          <code>createUser(mobile, password, role, businessId)</code> would let callers pass
+          mismatched combinations (e.g., role=WORKER with an ownerId). Separate methods make
+          impossible combinations literally uncallable.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does <code>@Transactional</code> matter here?</div>
+        <div class="a">
+          Because we do TWO inserts (User + UserProfile) and they must be atomic. If step 2
+          succeeds but step 3 fails, we'd have a User without a profile — broken state. The
+          transaction ensures both succeed or both fail together.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Could you make this an admin-only endpoint instead of a service?</div>
+        <div class="a">
+          Conceptually yes, but in NOOL there's no direct admin endpoint to "create a User in
+          isolation". User accounts are always created together with an Employee or SareeOwner.
+          So this service is more useful as a composable building block called by other services.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What if BCrypt encoding itself throws?</div>
+        <div class="a">
+          BCrypt's <code>encode()</code> is deterministic and only fails on out-of-memory or
+          invalid input (very rare). If it threw, it would be a RuntimeException — caught by
+          @Transactional, the User insert (if any) would be rolled back, and
+          GlobalExceptionHandler would return 500. The user sees a clean error and can retry.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is <code>active = true</code> hard-coded?</div>
+        <div class="a">
+          Newly-created accounts should always start active — they were just added by an admin.
+          If you want to add a disabled-on-creation flow later (e.g., "pending approval"),
+          you'd add a method param. For now, true is the right default.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>This service is for normal admin-driven creation. But how does the FIRST admin get created when NOOL boots on a fresh database? That's <code>AdminBootstrapRunner</code> — the next chapter.</p>
+
+    <div class="chapnav">
+      <a href="25-auth-service.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 25 · AuthService + Impl</span></a>
+      <a href="27-admin-bootstrap-runner.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 27 · AdminBootstrapRunner</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 26 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

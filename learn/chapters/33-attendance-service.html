@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 33 · AttendanceService + Impl · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 33 · The Attendance Brain</span>
+    <h1>
+      <span class="gradient">AttendanceService</span> &amp; Impl
+    </h1>
+    <p class="subtitle">
+      Six methods: mark attendance, fetch one by ID, list everyone's, list mine, compute one
+      worker's summary, compute my own summary. Plus a small mapper for entity-to-DTO conversion.
+      The first service we see that consistently uses the "admin or self" pattern.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📅</div>
+      <div class="fmeta">
+        <h3>AttendanceService.java + AttendanceServiceImpl.java</h3>
+        <span class="fpath">backend/.../service/employee/ + service/impl/employee/</span>
+        <div class="ftags"><span>@Service</span><span>6 methods</span><span>Admin-or-self check</span><span>Stream aggregations</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Six Methods</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>What it does</th><th>Who can call</th></tr></thead>
+      <tbody>
+        <tr><td><code>markAttendance(dto)</code></td><td>Record one PRESENT/ABSENT row</td><td>ADMIN</td></tr>
+        <tr><td><code>getAttendanceById(id)</code></td><td>Fetch one attendance entry</td><td>ADMIN or WORKER</td></tr>
+        <tr><td><code>getAttendanceList(pagination)</code></td><td>Admin view of all attendance</td><td>ADMIN</td></tr>
+        <tr><td><code>getMyAttendanceList(pagination)</code></td><td>Worker views own attendance</td><td>ADMIN or WORKER (self)</td></tr>
+        <tr><td><code>getAttendanceSummaryByEmployee(id, range)</code></td><td>Stats for one worker over a date range</td><td>ADMIN; WORKER for own id only</td></tr>
+        <tr><td><code>getMyAttendanceSummary(range)</code></td><td>Worker's own stats</td><td>WORKER</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── Interface ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> The Interface</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">service/employee/AttendanceService.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.service.employee;
+
+<span class="com">// imports omitted</span>
+
+<span class="kw">public interface</span> AttendanceService {
+    AttendanceResponseDto markAttendance(AttendanceRequestDto requestDto);
+    AttendanceResponseDto getAttendanceById(Long attendanceId);
+    PaginationResponseDto&lt;AttendanceListResponseDto&gt; getAttendanceList(PaginationRequestDto paginationRequestDto);
+    PaginationResponseDto&lt;AttendanceListResponseDto&gt; getMyAttendanceList(PaginationRequestDto paginationRequestDto);
+    AttendanceSummaryDto getAttendanceSummaryByEmployee(Long employeeId, DateRangeDto dateRangeDto);
+    AttendanceSummaryDto getMyAttendanceSummary(DateRangeDto dateRangeDto);
+}</pre>
+    </div>
+
+    <!-- ─── Impl class header + mapper ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> The Class Header + Helper Mapper</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.java — top</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.service.impl.employee;
+
+<span class="com">// imports omitted</span>
+
+<span class="ann">@Service</span>
+<span class="ann">@RequiredArgsConstructor</span>
+<span class="kw">public class</span> AttendanceServiceImpl <span class="kw">implements</span> AttendanceService {
+
+    <span class="kw">private final</span> AttendanceRepository attendanceRepository;
+    <span class="kw">private final</span> EmployeeRepository   employeeRepository;
+
+    <span class="com">// ── Private helper — turn Attendance entity into a list-row DTO ─</span>
+    <span class="kw">private</span> AttendanceListResponseDto mapToListDto(Attendance attendance) {
+        <span class="kw">return</span> AttendanceListResponseDto.builder()
+                .attendanceId(attendance.getId())
+                .employeeId(attendance.getEmployee().getId())
+                .employeeName(attendance.getEmployee().getName())
+                .attendanceDate(attendance.getAttendanceDate())
+                .status(attendance.getAttendanceStatus())
+                .build();
+    }
+    <span class="com">// Tiny helper extracted because it's used in multiple list methods.
+    // DRY pays off when you see the same 8 lines repeated otherwise.</span></pre>
+    </div>
+
+    <!-- ─── markAttendance ─── -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>markAttendance()</code> — Recording PRESENT/ABSENT</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.markAttendance()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> AttendanceResponseDto markAttendance(AttendanceRequestDto requestDto) {
+
+    <span class="com">// ── STEP 1: Verify employee exists ───────────────────────────</span>
+    Employee employee = employeeRepository.findById(requestDto.getEmployeeId())
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+
+    <span class="com">// ── STEP 2: Prevent double-marking ───────────────────────────</span>
+    <span class="kw">if</span> (attendanceRepository.existsByEmployeeIdAndAttendanceDate(
+            employee.getId(), requestDto.getAttendanceDate())) {
+        <span class="kw">throw new</span> DuplicateResourceException(
+                <span class="str">"Attendance is already marked for "</span> + employee.getName() +
+                <span class="str">" on "</span> + requestDto.getAttendanceDate());
+    }
+
+    <span class="com">// ── STEP 3: Build and save ───────────────────────────────────</span>
+    Attendance attendance = Attendance.builder()
+            .employee(employee)
+            .attendanceDate(requestDto.getAttendanceDate())
+            .attendanceStatus(requestDto.getStatus())
+            .build();
+
+    Attendance savedAttendance = attendanceRepository.save(attendance);
+
+    <span class="com">// ── STEP 4: Return the response DTO ──────────────────────────</span>
+    <span class="kw">return</span> AttendanceResponseDto.builder()
+            .attendanceId(savedAttendance.getId())
+            .employeeId(employee.getId())
+            .employeeName(employee.getName())
+            .attendanceDate(savedAttendance.getAttendanceDate())
+            .status(savedAttendance.getAttendanceStatus())
+            .build();
+}</pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>Two layers of duplicate protection:</strong> the explicit <code>existsBy...</code>
+      check up front PLUS the database's UNIQUE constraint on
+      <code>(employee_id, attendance_date)</code>. The application-level check gives a
+      friendly error message ("Attendance is already marked for Prema on 2026-05-15"); the
+      DB constraint catches any race that slips past the check.
+    </div>
+
+    <!-- ─── getAttendanceById ─── -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>getAttendanceById()</code></h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.getAttendanceById()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> AttendanceResponseDto getAttendanceById(Long attendanceId) {
+    Attendance attendance = attendanceRepository.findById(attendanceId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Attendance not found"</span>));
+
+    <span class="kw">return</span> AttendanceResponseDto.builder()
+            .attendanceId(attendance.getId())
+            .employeeId(attendance.getEmployee().getId())
+            .employeeName(attendance.getEmployee().getName())
+            .attendanceDate(attendance.getAttendanceDate())
+            .status(attendance.getAttendanceStatus())
+            .build();
+}</pre>
+    </div>
+
+    <p>
+      Straightforward. Note: no role check here. SecurityConfig allows both ADMIN and WORKER
+      to call <code>GET /attendance/{id}</code>. A WORKER could theoretically retrieve another
+      worker's attendance row by guessing IDs — a potential weakness compared to the strict
+      check in <code>getEmployeeById</code>. In practice, the frontend doesn't expose this
+      capability to workers, but a stricter implementation would replicate the self-or-admin
+      pattern here too.
+    </p>
+
+    <!-- ─── getAttendanceList ─── -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>getAttendanceList()</code> — Admin View</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.getAttendanceList()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> PaginationResponseDto&lt;AttendanceListResponseDto&gt; getAttendanceList(PaginationRequestDto paginationRequestDto) {
+    PageRequest pageRequest = PageRequest.of(
+            paginationRequestDto.getPage(),
+            paginationRequestDto.getSize(),
+            Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+            paginationRequestDto.getSortBy()
+    );
+
+    Page&lt;Attendance&gt; page = attendanceRepository.findAll(pageRequest);
+
+    List&lt;AttendanceListResponseDto&gt; content = page.getContent()
+            .stream()
+            .map(<span class="kw">this</span>::mapToListDto)        <span class="com">// reuse the helper</span>
+            .collect(Collectors.toList());
+
+    <span class="kw">return</span> PaginationResponseDto.&lt;AttendanceListResponseDto&gt;builder()
+            .content(content)
+            .page(page.getNumber())
+            .size(page.getSize())
+            .totalElements(page.getTotalElements())
+            .totalPages(page.getTotalPages())
+            .last(page.isLast())
+            .build();
+}</pre>
+    </div>
+
+    <p>Admin endpoint — no filtering, returns the whole table paginated. Used for the global attendance browser.</p>
+
+    <!-- ─── getMyAttendanceList ─── -->
+    <h2><span class="h2-emoji">6️⃣</span> <code>getMyAttendanceList()</code> — Worker's Own List</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.getMyAttendanceList()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> PaginationResponseDto&lt;AttendanceListResponseDto&gt; getMyAttendanceList(PaginationRequestDto paginationRequestDto) {
+    Long employeeId = CurrentUserUtil.getEmployeeId();    <span class="com">// read from JWT</span>
+    <span class="kw">if</span> (employeeId == <span class="kw">null</span>) {
+        <span class="kw">throw new</span> RuntimeException(<span class="str">"Access denied"</span>);    <span class="com">// caller isn't a worker</span>
+    }
+
+    PageRequest pageRequest = PageRequest.of(
+            paginationRequestDto.getPage(),
+            paginationRequestDto.getSize(),
+            Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+            paginationRequestDto.getSortBy()
+    );
+
+    Page&lt;Attendance&gt; page = attendanceRepository.findByEmployeeId(employeeId, pageRequest);
+    <span class="com">// ★ This calls the @EntityGraph-annotated method (Chapter 32),
+    //   so the Employee association loads in the same query — no N+1.</span>
+
+    List&lt;AttendanceListResponseDto&gt; content = page.getContent()
+            .stream()
+            .map(<span class="kw">this</span>::mapToListDto)
+            .collect(Collectors.toList());
+
+    <span class="kw">return</span> PaginationResponseDto.&lt;AttendanceListResponseDto&gt;builder()
+            .content(content)
+            .page(page.getNumber())
+            .size(page.getSize())
+            .totalElements(page.getTotalElements())
+            .totalPages(page.getTotalPages())
+            .last(page.isLast())
+            .build();
+}</pre>
+    </div>
+
+    <p>The worker version reads their own ID from the JWT — they can never accidentally view someone else's rows.</p>
+
+    <!-- ─── getAttendanceSummaryByEmployee ─── -->
+    <h2><span class="h2-emoji">7️⃣</span> <code>getAttendanceSummaryByEmployee()</code> — The Self-or-Admin Pattern</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.getAttendanceSummaryByEmployee()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> AttendanceSummaryDto getAttendanceSummaryByEmployee(Long employeeId, DateRangeDto dateRangeDto) {
+
+    <span class="com">// ── STEP 1: Permission check — self or admin only ────────────</span>
+    String role = CurrentUserUtil.getRole();
+    <span class="kw">if</span> (!<span class="str">"ADMIN"</span>.equals(role)) {
+        Long caller = CurrentUserUtil.getEmployeeId();
+        <span class="kw">if</span> (caller == <span class="kw">null</span> || !caller.equals(employeeId)) {
+            <span class="kw">throw new</span> org.springframework.security.access.AccessDeniedException(
+                    <span class="str">"You can only view your own attendance"</span>);
+        }
+    }
+
+    <span class="com">// ── STEP 2: Verify employee exists ───────────────────────────</span>
+    Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+
+    <span class="com">// ── STEP 3: Fetch all attendance rows in the range ───────────</span>
+    List&lt;Attendance&gt; attendances = attendanceRepository
+            .findByEmployeeIdAndAttendanceDateBetween(
+                    employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+
+    <span class="com">// ── STEP 4: Compute stats with Java streams ──────────────────</span>
+    <span class="kw">long</span> totalWorkingDays = attendances.size();
+    <span class="kw">long</span> absentDays = attendances.stream()
+            .filter(a -&gt; a.getAttendanceStatus() == AttendanceStatus.ABSENT)
+            .count();
+    <span class="kw">double</span> attendancePercentage = totalWorkingDays == 0
+            ? 0
+            : ((<span class="kw">double</span>) (totalWorkingDays - absentDays) / totalWorkingDays) * 100;
+
+    <span class="com">// ── STEP 5: Build the response DTO ───────────────────────────</span>
+    <span class="kw">return</span> AttendanceSummaryDto.builder()
+            .employeeId(employeeId)
+            .employeeName(employee.getName())
+            .totalWorkingDays(totalWorkingDays)
+            .absentDays(absentDays)
+            .attendancePercentage(attendancePercentage)
+            .build();
+}</pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>The self-or-admin pattern.</strong> When a URL has an explicit employeeId
+      parameter, we need to verify the caller is authorised to see that ID's data. ADMINs
+      see anyone; WORKERs only see their own. This is the third time we've seen this
+      exact pattern (Employee, here, soon Salary). Standard defense-in-depth.
+    </div>
+
+    <h3>Why the division cast to <code>double</code>?</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">The cast that matters</span><span class="lang">Java</span></div>
+<pre>((<span class="kw">double</span>) (totalWorkingDays - absentDays) / totalWorkingDays) * <span class="num2">100</span></pre>
+    </div>
+
+    <p>
+      Without the cast, Java would do integer division: <code>13 / 15 = 0</code> (truncated).
+      The cast forces floating-point division: <code>13.0 / 15.0 = 0.8666...</code>. Crucial
+      for a percentage. The guard against division-by-zero (<code>totalWorkingDays == 0 ? 0 : ...</code>)
+      is the other essential bit — a worker with no attendance rows shouldn't crash the query.
+    </p>
+
+    <!-- ─── getMyAttendanceSummary ─── -->
+    <h2><span class="h2-emoji">8️⃣</span> <code>getMyAttendanceSummary()</code></h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">AttendanceServiceImpl.getMyAttendanceSummary()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> AttendanceSummaryDto getMyAttendanceSummary(DateRangeDto dateRangeDto) {
+    Long employeeId = CurrentUserUtil.getEmployeeId();
+    <span class="kw">if</span> (employeeId == <span class="kw">null</span>) {
+        <span class="kw">throw new</span> RuntimeException(<span class="str">"Access denied"</span>);
+    }
+
+    Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+    List&lt;Attendance&gt; attendances = attendanceRepository
+            .findByEmployeeIdAndAttendanceDateBetween(
+                    employeeId, dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+
+    <span class="kw">long</span> totalWorkingDays = attendances.size();
+    <span class="kw">long</span> absentDays = attendances.stream()
+            .filter(a -&gt; a.getAttendanceStatus() == AttendanceStatus.ABSENT)
+            .count();
+    <span class="kw">double</span> attendancePercentage = totalWorkingDays == 0 ? 0
+            : ((<span class="kw">double</span>) (totalWorkingDays - absentDays) / totalWorkingDays) * <span class="num2">100</span>;
+
+    <span class="kw">return</span> AttendanceSummaryDto.builder()
+            .employeeId(employeeId)
+            .employeeName(employee.getName())
+            .totalWorkingDays(totalWorkingDays)
+            .absentDays(absentDays)
+            .attendancePercentage(attendancePercentage)
+            .build();
+}</pre>
+    </div>
+
+    <p>
+      Basically identical to <code>getAttendanceSummaryByEmployee</code> but with no
+      employeeId parameter — it's always read from the JWT. The duplication is mild but
+      could be refactored into a private helper accepting the resolved ID.
+    </p>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Mom marks today's roll call</h5>
+      <ol>
+        <li>For each worker, frontend posts: <code>{ "employeeId": X, "attendanceDate": "2026-05-15", "status": "PRESENT" }</code>.</li>
+        <li>Service finds the employee, checks existsBy → false → inserts.</li>
+        <li>Returns the response DTO. Frontend ticks the row green in the UI.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Mom accidentally tries to mark Prema present twice</h5>
+      <ol>
+        <li>Second POST for same (employeeId=5, date=2026-05-15).</li>
+        <li>existsByEmployeeIdAndAttendanceDate → true.</li>
+        <li>Service throws <code>DuplicateResourceException("Attendance is already marked for Prema on 2026-05-15")</code>.</li>
+        <li>GlobalExceptionHandler → 409 Conflict with the message.</li>
+        <li>Frontend shows the friendly error to Mom. No duplicate row created.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Prema views her May calendar</h5>
+      <ol>
+        <li>Frontend posts to <code>/api/attendance/my-list</code> with pagination.</li>
+        <li>Service reads <code>employeeId=5</code> from JWT.</li>
+        <li>Repository query loads Prema's rows in a single SQL (thanks to @EntityGraph).</li>
+        <li>Each row mapped to AttendanceListResponseDto.</li>
+        <li>Frontend renders the calendar with green/red dots per day.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Dad pulls Prema's May summary</h5>
+      <ol>
+        <li>Dad on admin → "Prema's profile" → "Attendance summary for May".</li>
+        <li>Frontend posts <code>POST /api/attendance/employee/5/summary</code> with body <code>{ "fromDate": "2026-05-01", "toDate": "2026-05-15" }</code>.</li>
+        <li>Service: role=ADMIN → permission check passes.</li>
+        <li>Repository returns 15 rows. 2 are ABSENT.</li>
+        <li>Computes percentage: <code>(15-2)/15 × 100 = 86.67</code>.</li>
+        <li>Returns summary DTO: Prema · 15 working days · 2 absent · 86.67%.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Ravi tries to view Prema's summary</h5>
+      <ol>
+        <li>Ravi (WORKER, employeeId=8) calls <code>POST /api/attendance/employee/5/summary</code>.</li>
+        <li>SecurityConfig allows the URL pattern for both ADMIN and WORKER.</li>
+        <li>Service: role=WORKER → check caller(8).equals(5)? No.</li>
+        <li>Throws <code>AccessDeniedException("You can only view your own attendance")</code>.</li>
+        <li>Returns 403 Forbidden. Defense-in-depth at the service layer.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common attendance-service mistakes</h5>
+      <div class="item">
+        <div class="bad">Forgetting the cast to <code>double</code> in the percentage calc</div>
+        <div class="good"><code>(long) / (long)</code> gives integer division — <code>13/15 = 0</code>. Always cast at least one operand to <code>double</code>.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Skipping the division-by-zero check</div>
+        <div class="good">If a worker has zero rows in the range, dividing by 0 throws ArithmeticException for integers or produces <code>NaN</code> for doubles — either way, broken response. The ternary guard handles it.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Counting absent days with a second DB query</div>
+        <div class="good">We already fetched all rows. Java streams filter them locally — no extra round-trip. <code>.stream().filter(...).count()</code> is fast in-memory.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Not validating the employeeId belongs to a real worker before computing</div>
+        <div class="good">The <code>findById(...).orElseThrow(...)</code> catches typos like "employeeId=999". Without it, the summary would silently return zero counts as if the worker exists with no attendance.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Omitting the role check in <code>getAttendanceSummaryByEmployee</code></div>
+        <div class="good">SecurityConfig allows WORKERs to call this endpoint (so they can view their own summary). Without the in-service check, a worker could pass any employeeId. The check narrows access to "self only for WORKERs".</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why isn't <code>markAttendance</code> annotated with <code>@Transactional</code>?</div>
+        <div class="a">
+          Single-write operations are wrapped in their own transaction by Spring Data
+          automatically. <code>@Transactional</code> matters when one method does multiple
+          writes that need to be atomic — like the cascade-delete in EmployeeService.
+          Single inserts work fine without it.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why count absent days in Java instead of in SQL?</div>
+        <div class="a">
+          We already have the list of rows in memory (we needed them for the total count
+          anyway). Counting absentees in Java is one stream operation. Going back to the DB
+          for a separate count would mean two queries instead of one — slower, more complex.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does the summary use <code>Double</code> for percentage but <code>Long</code> for counts?</div>
+        <div class="a">
+          Counts are integers (you can't have 1.5 absent days). Percentages aren't (86.67%
+          would round badly as an integer). The types reflect the natural domain. Java
+          <code>Long</code> and <code>Double</code> serialize cleanly to JSON via Jackson.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Should the percentage be rounded?</div>
+        <div class="a">
+          The service returns a raw double like 86.6666... The frontend handles formatting
+          ("86.67%"). Doing rounding in the backend would lose precision for any further
+          computations on the value. Format only at the display layer.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is the duplicate check done in both the service AND the DB?</div>
+        <div class="a">
+          Defense in depth. The service check (<code>existsBy...</code>) gives a friendly
+          error message early. The DB UNIQUE constraint is the last line of defense — catches
+          races, bypasses, and any path that skips the service. Both layers matter.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">If two requests arrive at exactly the same time to mark Prema, what happens?</div>
+        <div class="a">
+          One wins, one loses. Both pass the existsBy check (they read at the same moment).
+          Both try to INSERT. The DB UNIQUE constraint fails the second one with
+          <code>DataIntegrityViolationException</code>. GlobalExceptionHandler (Chapter 09)
+          translates it into the friendly "Attendance is already marked..." message. So the
+          worst case is one user sees an error and retries — no data corruption.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>Service done. Next chapter — the controller exposing it over HTTP.</p>
+
+    <div class="chapnav">
+      <a href="32-attendance-repository-and-dtos.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 32 · Attendance Repo &amp; DTOs</span></a>
+      <a href="34-attendance-controller.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 34 · AttendanceController</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 33 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

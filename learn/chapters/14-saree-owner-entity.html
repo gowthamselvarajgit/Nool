@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 14 · SareeOwner.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 14 · The Client Entity</span>
+    <h1>
+      <span class="gradient">SareeOwner.java</span> —<br/>
+      The client profile, with their negotiated rate
+    </h1>
+    <p class="subtitle">
+      One row per client of my parents' workshop — Rahul, and the others. The most interesting
+      field here is <code>polishRatePerSaree</code> — each client has their own rate, set
+      individually based on their relationship with my parents.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🧵</div>
+      <div class="fmeta">
+        <h3>SareeOwner.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/owner/SareeOwner.java</span>
+        <div class="ftags"><span>Entity</span><span>Client</span><span>Per-owner rate</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What this represents ──────── -->
+    <h2><span class="h2-emoji">🧠</span> What This Entity Represents</h2>
+    <p>
+      A <code>SareeOwner</code> is one of my parents' clients — the cloth traders and shop
+      owners who bring sarees to the workshop. The class is structurally similar to Employee
+      (Chapter 13): a User link for login + business-specific fields. But the business fields
+      reflect a different role.
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Employee (worker)</th><th>SareeOwner (client)</th></tr></thead>
+      <tbody>
+        <tr><td>Earns money <em>from</em> the workshop</td><td>Pays money <em>to</em> the workshop</td></tr>
+        <tr><td><code>polishingRate</code> = ₹ paid per saree polished</td><td><code>polishRatePerSaree</code> = ₹ charged per saree returned</td></tr>
+        <tr><td>Status: ACTIVE / LEFT</td><td>Status: ACTIVE / INACTIVE</td></tr>
+        <tr><td>Has joining date</td><td>No joining date (we don't track when they became a client)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>The workshop's profit per saree</strong> is essentially
+      <em>SareeOwner.polishRatePerSaree − Employee.polishingRate</em>. If Rahul pays ₹65 and
+      Prema earns ₹30, the workshop keeps ₹35 per saree. That's why both rates are first-class
+      data, not global constants.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/owner/SareeOwner.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.owner;
+
+<span class="kw">import</span> com.nool.backend.auth.entity.User;
+<span class="kw">import</span> com.nool.backend.enums.OwnerStatus;     <span class="com">// ACTIVE / INACTIVE</span>
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"saree_owner"</span>)              <span class="com">// SQL table (note: singular, by historical choice)</span>
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> SareeOwner {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"owner_id"</span>)
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── OWNER NAME (business name) ────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"owner_name"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> String ownerName;                <span class="com">// "Rahul Textiles", "Sharma Sarees"</span>
+
+    <span class="com">// ── MOBILE NUMBER (same as User's, for quick contact lookup) ──</span>
+    <span class="ann">@Column</span>(name = <span class="str">"mobile_number"</span>,
+            unique = <span class="kw">true</span>, nullable = <span class="kw">false</span>, length = <span class="num2">15</span>)
+    <span class="kw">private</span> String mobileNumber;
+
+    <span class="com">// ── STATUS ────────────────────────────────────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)
+    <span class="ann">@Column</span>(name = <span class="str">"status"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> OwnerStatus status;                <span class="com">// ACTIVE = current client; INACTIVE = no longer</span>
+
+    <span class="com">// ── POLISH RATE PER SAREE ★ ───────────────────────────────────</span>
+    <span class="com">// Rate (in INR) the owner pays the workshop per returned saree.</span>
+    <span class="com">// Different owners can negotiate different rates and the rate may change over time.</span>
+    <span class="ann">@Column</span>(name = <span class="str">"polish_rate_per_saree"</span>, nullable = <span class="kw">false</span>)
+    <span class="ann">@lombok.Builder.Default</span>                     <span class="com">// preserve the default value when using builder()</span>
+    <span class="kw">private</span> Double polishRatePerSaree = <span class="num2">70.0</span>;  <span class="com">// fallback default ₹70</span>
+    <span class="com">// ★ The single most important business field on this entity.
+    //   Owner Payable = (sareesReturned × this rate). Each owner has
+    //   their own negotiated price.</span>
+
+    <span class="com">// ── LOGIN LINK ────────────────────────────────────────────────</span>
+    <span class="ann">@OneToOne</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"user_id"</span>, unique = <span class="kw">true</span>)
+    <span class="kw">private</span> User user;
+    <span class="com">// Unlike Employee, no explicit nullable=false here either — same pattern.
+    // The FK column "user_id" on saree_owner points at users.user_id.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate() {
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>owner_id (PK)</td><td>Auto-generated row ID</td><td><code>1</code></td></tr>
+        <tr><td><code>ownerName</code></td><td>String</td><td>owner_name</td><td>Business / shop name</td><td><code>"Rahul Textiles"</code></td></tr>
+        <tr><td><code>mobileNumber</code></td><td>String</td><td>mobile_number (UNIQUE)</td><td>10-digit Indian mobile</td><td><code>"9000000001"</code></td></tr>
+        <tr><td><code>status</code></td><td>OwnerStatus</td><td>status</td><td>ACTIVE or INACTIVE</td><td><code>ACTIVE</code></td></tr>
+        <tr><td><code>polishRatePerSaree</code></td><td>Double</td><td>polish_rate_per_saree</td><td>₹ this owner pays per saree returned</td><td><code>65.0</code></td></tr>
+        <tr><td><code>user</code></td><td>User</td><td>user_id (FK, UNIQUE)</td><td>Their login row</td><td>FK → users(user_id)</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When added as a client</td><td><code>2026-05-15T10:32:11</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Last edit (rate change, status flip)</td><td><code>2026-11-15T14:00:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> saree_owner (
+    owner_id              <span class="sk">BIGINT</span>       <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    owner_name            <span class="sk">VARCHAR</span>(255)  <span class="sk">NOT NULL</span>,
+    mobile_number         <span class="sk">VARCHAR</span>(15)   <span class="sk">NOT NULL</span> <span class="sk">UNIQUE</span>,
+    status                <span class="sk">VARCHAR</span>(20)   <span class="sk">NOT NULL</span>,        <span class="sc">-- enum as text</span>
+    polish_rate_per_saree <span class="sk">DOUBLE</span>        <span class="sk">NOT NULL</span>,
+    user_id               <span class="sk">BIGINT</span>        <span class="sk">UNIQUE</span>,
+    created_at            <span class="sk">DATETIME</span>(6)   <span class="sk">NOT NULL</span>,
+    updated_at            <span class="sk">DATETIME</span>(6),
+    <span class="sk">PRIMARY KEY</span> (owner_id),
+    <span class="sk">FOREIGN KEY</span> (user_id) <span class="sk">REFERENCES</span> users(user_id)
+);
+
+<span class="sc">-- Dad adds Rahul as a new client (with his negotiated rate):</span>
+<span class="sk">INSERT INTO</span> saree_owner
+    (owner_name, mobile_number, status, polish_rate_per_saree,
+     user_id, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="ss">'Rahul Textiles'</span>, <span class="ss">'9000000001'</span>, <span class="ss">'ACTIVE'</span>, <span class="num2">65.0</span>, <span class="num2">2</span>,
+     <span class="ss">'2026-05-15 10:32:11'</span>, <span class="ss">'2026-05-15 10:32:11'</span>);
+
+<span class="sc">-- Six months later, after consistent business, Dad gives Rahul a better rate:</span>
+<span class="sk">UPDATE</span> saree_owner
+   <span class="sk">SET</span> polish_rate_per_saree = <span class="num2">62.0</span>,
+       updated_at            = <span class="ss">'2026-11-15 14:00:00'</span>
+ <span class="sk">WHERE</span> owner_id = <span class="num2">1</span>;
+
+<span class="sc">-- Dad needs Rahul's mobile to call him:</span>
+<span class="sk">SELECT</span> owner_name, mobile_number <span class="sk">FROM</span> saree_owner <span class="sk">WHERE</span> owner_id = <span class="num2">1</span>;</pre>
+    </div>
+
+    <!-- ──────── Why per-owner rate ──────── -->
+    <h2><span class="h2-emoji">💰</span> Why Each Owner Has Their Own Rate</h2>
+    <p>
+      Real businesses in India work on relationship-based pricing — not menu prices. My parents
+      have been at this for years, and their pricing reflects every client's history:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Client type</th><th>Typical rate</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Long-time client (10+ years)</td><td>₹62 / saree</td><td>Loyalty discount, bulk volume</td></tr>
+        <tr><td>Established client</td><td>₹65 / saree</td><td>Reliable monthly business (Rahul)</td></tr>
+        <tr><td>Standard client</td><td>₹70 / saree</td><td>The fallback default rate</td></tr>
+        <tr><td>Premium fabric handling</td><td>₹75 / saree</td><td>Extra care, higher-end sarees</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      The fallback rate of <strong>₹70</strong> matches the
+      <code>nool.rate-per-saree=70.0</code> setting from <code>application.properties</code>
+      (Chapter 06). If somehow an owner is created without a rate (shouldn't happen — the
+      column is <code>nullable=false</code>), the application can fall back to that default
+      in downstream calculations.
+    </div>
+
+    <!-- ──────── Owner Payable formula ──────── -->
+    <h2><span class="h2-emoji">🧮</span> How <code>polishRatePerSaree</code> Drives Money</h2>
+
+    <div class="formula">
+      <div class="label">Owner Payable for a period</div>
+      <div class="eq">
+        <span class="var">totalPayable</span> <span class="op">=</span>
+        sareesReturnedInPeriod <span class="op">×</span>
+        <span class="var">owner.polishRatePerSaree</span>
+      </div>
+    </div>
+
+    <p>Example with Rahul:</p>
+    <ul>
+      <li>Returned sarees this week: 80</li>
+      <li>Rahul's rate: ₹65/saree</li>
+      <li>Total payable: <strong>80 × ₹65 = ₹5,200</strong></li>
+      <li>Already paid (one UPI of ₹3,000 earlier): ₹3,000</li>
+      <li>Pending: <strong>₹5,200 − ₹3,000 = ₹2,200</strong></li>
+    </ul>
+
+    <p>
+      This calculation happens inside <code>OwnerPaymentServiceImpl</code> (Chapter 48). The
+      service queries <code>saree_ledger</code> for RETURN entries in the period, multiplies
+      the count by the rate, then subtracts the SUM of <code>owner_payment</code> rows in the
+      same period to get the pending amount.
+    </p>
+
+    <!-- ──────── Builder.Default reminder ──────── -->
+    <h2><span class="h2-emoji">⚠️</span> The Tiny but Important <code>@Builder.Default</code></h2>
+    <p>
+      One small annotation that's easy to miss but matters a lot:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">The line that preserves the default</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Column</span>(name = <span class="str">"polish_rate_per_saree"</span>, nullable = <span class="kw">false</span>)
+<span class="ann">@lombok.Builder.Default</span>
+<span class="kw">private</span> Double polishRatePerSaree = <span class="num2">70.0</span>;</pre>
+    </div>
+
+    <p>
+      Without <code>@Builder.Default</code>, calling
+      <code>SareeOwner.builder().ownerName("...").mobileNumber("...").build()</code> would
+      create an owner with <code>polishRatePerSaree = null</code> — and the INSERT would
+      then fail because the column is <code>nullable=false</code>. With the annotation,
+      Lombok's builder respects the field's default (<code>70.0</code>) when the caller
+      doesn't explicitly set it.
+    </p>
+
+    <p>The general rule: <strong>any field with a default value AND a non-null DB column needs <code>@Builder.Default</code></strong>.</p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad adds Rahul as a new client</h5>
+      <ol>
+        <li>Dad clicks "Add Owner". Form fields:
+          <ul>
+            <li>Owner name: Rahul Textiles</li>
+            <li>Mobile: 9000000001</li>
+            <li>Password: rahul123</li>
+            <li>Polish rate: ₹65 (negotiated lower than the ₹70 default)</li>
+          </ul>
+        </li>
+        <li>The owner-service code (Chapter 42):
+          <ul>
+            <li>Creates a <code>User</code> row with role <code>SAREE_OWNER</code>, hashed password.</li>
+            <li>Creates a <code>SareeOwner</code> row with status ACTIVE and the negotiated rate.</li>
+            <li>Creates a <code>UserProfile</code> linking them (Chapter 12).</li>
+          </ul>
+        </li>
+        <li>The owner's <code>@PrePersist</code> stamps creation timestamps.</li>
+        <li>Rahul can now log in from his phone and see his own dashboard.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Computing how much Rahul owes</h5>
+      <p>It's Friday afternoon. Dad wants to know what Rahul owes for this week.</p>
+      <ol>
+        <li>Service queries: <code>SELECT SUM(quantity) FROM saree_ledger WHERE owner_id=1 AND entry_type='RETURN' AND entry_date BETWEEN '2026-05-11' AND '2026-05-15'</code> → returns 80.</li>
+        <li>Service multiplies by Rahul's rate: <code>80 × Rahul.polishRatePerSaree (65.0) = ₹5,200</code>.</li>
+        <li>Service queries: <code>SELECT SUM(amount_paid) FROM owner_payment WHERE owner_id=1 AND payment_date BETWEEN ...</code> → returns ₹3,000.</li>
+        <li>Pending = <code>₹5,200 − ₹3,000 = ₹2,200</code>.</li>
+        <li>Dashboard shows: "Rahul Textiles · Pending ₹2,200".</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Two clients, two different rates</h5>
+      <p>Same day, two clients pick up sarees:</p>
+      <ul>
+        <li>Rahul (rate ₹65) picks up 50 returned sarees → owes <strong>₹3,250</strong></li>
+        <li>Mrs. Sharma (rate ₹75) picks up 30 returned sarees → owes <strong>₹2,250</strong></li>
+      </ul>
+      <p>Each calculation uses <em>that specific owner's</em> rate. The same Java code path serves both — only the rate field differs.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: A client stops doing business</h5>
+      <p>Mr. Khan, an old client, has stopped bringing sarees over the past year. Dad marks him as INACTIVE:</p>
+      <div class="sqlbox">
+<pre><span class="sk">UPDATE</span> saree_owner
+   <span class="sk">SET</span> status = <span class="ss">'INACTIVE'</span>,
+       updated_at = <span class="ss">'2026-05-15 17:30:00'</span>
+ <span class="sk">WHERE</span> owner_id = <span class="num2">7</span>;</pre>
+      </div>
+      <p>
+        His ledger history stays in the DB forever (audit, tax). He disappears from the
+        "Active clients" dropdown so Dad can't accidentally record a transaction against
+        him. If he ever comes back, Dad just flips status to ACTIVE again.
+      </p>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around SareeOwner.java</h5>
+
+      <div class="item">
+        <div class="bad">Pulling the rate from <code>application.properties</code> (the global ₹70 default)</div>
+        <div class="good">Each owner has their OWN rate. Use <code>owner.getPolishRatePerSaree()</code>. The <code>nool.rate-per-saree=70.0</code> setting is purely a fallback for owners with no explicit rate — not the primary source.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Builder.Default</code> on <code>polishRatePerSaree</code></div>
+        <div class="good">Without it, the builder would produce <code>null</code> for the rate, and the INSERT would fail with a NOT NULL violation.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-deleting an owner who has ledger history</div>
+        <div class="good">Use <code>status = INACTIVE</code> instead. Hard delete breaks the FK from <code>saree_ledger.owner_id</code> and <code>owner_payment.owner_id</code> — historical transactions get orphaned or cascade-destroyed.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Retroactively recomputing old invoices after a rate change</div>
+        <div class="good">Old <code>owner_payment</code> rows were collected at the old rate. Don't go back and adjust them. New transactions use the new rate; old ones stay as historical fact.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Allowing two owners to share a mobile number</div>
+        <div class="good">The <code>unique = true</code> on <code>mobile_number</code> blocks this at the DB level. If two owners share a phone, login lookup becomes ambiguous.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about SareeOwner.java</h5>
+
+      <div class="qa">
+        <div class="q">Why is the polish rate per-owner instead of per-saree-type or global?</div>
+        <div class="a">
+          Real business pricing is relationship-based. Long-term clients get loyalty discounts;
+          new clients pay the standard rate; volume buyers negotiate. Storing the rate on the
+          owner gives my parents the flexibility to negotiate individually — and the dashboard
+          automatically uses each owner's rate in calculations without any code changes.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens to old ledger entries if I change an owner's rate?</div>
+        <div class="a">
+          Ledger entries themselves don't change — they just record quantities and dates. But
+          when we recompute <code>totalPayable</code> for that owner, the new rate is multiplied
+          against the count of returned sarees, including older ones in the same period. If we
+          wanted historical pricing to be locked in, we'd need to copy the rate onto each
+          ledger row — but that's not what NOOL does today. The simpler "current rate" model
+          is enough for my parents' workflow.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why use <code>Double</code> instead of <code>BigDecimal</code> for money?</div>
+        <div class="a">
+          Yes, <code>BigDecimal</code> is technically safer because it avoids floating-point
+          rounding. But polish rates are always clean whole-rupee values (₹62, ₹65, ₹70, ₹75),
+          and totals come from multiplying integer saree counts. Real-world precision is fine.
+          If NOOL ever supports cents/paise or international currencies, switching to
+          <code>BigDecimal</code> would be the right move.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is the table called <code>saree_owner</code> (singular) when other tables are plural?</div>
+        <div class="a">
+          Honestly, a historical inconsistency. The convention across NOOL leans plural
+          (<code>users</code>, <code>employees</code>, <code>policies</code>), but
+          <code>saree_owner</code> ended up singular. It's a small naming quirk we accepted
+          rather than risk a migration. A future cleanup pass would rename it to
+          <code>saree_owners</code>.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could I let the polish rate be NULL and just fall back to the global default?</div>
+        <div class="a">
+          That's how the <code>nool.rate-per-saree</code> setting is designed — it's a fallback.
+          But the column itself is <code>nullable=false</code> because every owner SHOULD have
+          an explicit rate at creation time. The default of <code>70.0</code> exists for the
+          builder pattern when callers don't specify a rate. So in practice we always have a
+          rate; the fallback config is just a safety net.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could a SareeOwner ever exist without a User?</div>
+        <div class="a">
+          The current schema allows it — the FK on <code>user_id</code> doesn't have an
+          explicit <code>nullable=false</code> on this side. So technically you could create a
+          SareeOwner without a login row, for an offline-only client. The service code,
+          however, always creates both together (User + SareeOwner + UserProfile in one
+          transaction). Without a User, the client can't log in to see their own data — but
+          their inventory still works because the admin operates everything.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between Employee.LEFT and SareeOwner.INACTIVE?</div>
+        <div class="a">
+          Semantically the same — both mean "no longer active". The different word choices
+          match how my parents naturally talk about each: a worker "left the job" but a client
+          "isn't buying anymore". Domain language over technical uniformity. Both serve the
+          same purpose: a soft-delete flag that preserves history.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With Employee (worker) and SareeOwner (client) covered, we now have the two business
+      sides. The next chapter is the <strong>most important entity in NOOL</strong> — the
+      one that tracks every saree's journey through the workshop:
+      <code>SareeLedgerEntry.java</code>, the append-only inventory ledger. This is where
+      the magic happens.
+    </p>
+
+    <div class="chapnav">
+      <a href="13-employee-entity.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 13 · Employee.java</span>
+      </a>
+      <a href="15-saree-ledger-entry.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 15 · SareeLedgerEntry ⭐</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 14 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

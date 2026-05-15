@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 16 · Attendance.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 16 · Daily Roll Call</span>
+    <h1>
+      <span class="gradient">Attendance.java</span> —<br/>
+      Who came to work today
+    </h1>
+    <p class="subtitle">
+      The simplest worker-data entity in NOOL — one row per (employee, date) pair, marking
+      whether they showed up. Important detail: a unique constraint at the database level
+      prevents the same worker being marked twice on the same day.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📍</div>
+      <div class="fmeta">
+        <h3>Attendance.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/employee/Attendance.java</span>
+        <div class="ftags"><span>Entity</span><span>Daily roll call</span><span>UNIQUE constraint</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What this entity is for ──────── -->
+    <h2><span class="h2-emoji">🧠</span> What This Entity Tracks</h2>
+    <p>
+      Every morning my mom opens NOOL and ticks who's at the workshop today. Each tick (or
+      cross) becomes one row in the <code>attendance</code> table. That's it. Simple in
+      concept — but the design has one important guarantee: <strong>you cannot mark the same
+      worker present (or absent) twice on the same date</strong>.
+    </p>
+
+    <div class="callout brain">
+      <strong>The DB enforces this, not just the code.</strong> A UNIQUE constraint on
+      (<code>employee_id</code>, <code>attendance_date</code>) means MySQL itself refuses to
+      insert a duplicate. Even if a bug in the service layer tries, the database is the last
+      line of defense. We saw the friendly error message back in Chapter 09 — <em>"Attendance
+      is already marked for this employee on this date."</em>
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/employee/Attendance.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.employee;
+
+<span class="kw">import</span> com.nool.backend.enums.AttendanceStatus;     <span class="com">// PRESENT or ABSENT</span>
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(
+    name = <span class="str">"attendance"</span>,
+    uniqueConstraints = {                                      <span class="com">// ★ THE key design point</span>
+        <span class="ann">@UniqueConstraint</span>(columnNames = {<span class="str">"employee_id"</span>, <span class="str">"attendance_date"</span>})
+    }
+)
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> Attendance {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"attendance_id"</span>)
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── THE DATE (day-precision, no time) ─────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"attendance_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate attendanceDate;
+    <span class="com">// LocalDate (not LocalDateTime) — only the day matters.</span>
+
+    <span class="com">// ── PRESENT / ABSENT ──────────────────────────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)
+    <span class="ann">@Column</span>(name = <span class="str">"attendance_status"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> AttendanceStatus attendanceStatus;
+    <span class="com">// Stored as text — "PRESENT" or "ABSENT".</span>
+
+    <span class="com">// ── REMARKS (optional note) ───────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"remarks"</span>)
+    <span class="kw">private</span> String remarks;
+    <span class="com">// "Half day for doctor appointment", "Festival leave", etc.</span>
+
+    <span class="com">// ── EMPLOYEE LINK ─────────────────────────────────────────────</span>
+    <span class="ann">@ManyToOne</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"employee_id"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Employee employee;
+    <span class="com">// Many attendance rows belong to one employee — across days.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>attendance_id (PK)</td><td>Unique row ID</td><td><code>142</code></td></tr>
+        <tr><td><code>attendanceDate</code></td><td>LocalDate</td><td>attendance_date</td><td>The work day</td><td><code>2026-05-15</code></td></tr>
+        <tr><td><code>attendanceStatus</code></td><td>AttendanceStatus</td><td>attendance_status</td><td>PRESENT or ABSENT</td><td><code>PRESENT</code></td></tr>
+        <tr><td><code>remarks</code></td><td>String</td><td>remarks</td><td>Optional note</td><td><code>"Festival leave"</code></td></tr>
+        <tr><td><code>employee</code></td><td>Employee</td><td>employee_id (FK)</td><td>Which worker</td><td>FK → employees(employee_id)</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When the row was inserted</td><td><code>2026-05-15T09:15:00</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Last edit (e.g., changed PRESENT to ABSENT)</td><td><code>2026-05-15T09:30:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> attendance (
+    attendance_id     <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    employee_id       <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span>,
+    attendance_date   <span class="sk">DATE</span>        <span class="sk">NOT NULL</span>,
+    attendance_status <span class="sk">VARCHAR</span>(20) <span class="sk">NOT NULL</span>,        <span class="sc">-- PRESENT or ABSENT</span>
+    remarks           <span class="sk">VARCHAR</span>(255),
+    created_at        <span class="sk">DATETIME</span>(6) <span class="sk">NOT NULL</span>,
+    updated_at        <span class="sk">DATETIME</span>(6),
+
+    <span class="sk">PRIMARY KEY</span> (attendance_id),
+    <span class="sk">UNIQUE KEY</span> uk_attendance_emp_date (employee_id, attendance_date), <span class="sc">-- ★ THE GUARD</span>
+    <span class="sk">FOREIGN KEY</span> (employee_id) <span class="sk">REFERENCES</span> employees(employee_id)
+);
+
+<span class="sc">-- Mom marks Prema present today:</span>
+<span class="sk">INSERT INTO</span> attendance
+    (employee_id, attendance_date, attendance_status, remarks, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">5</span>, <span class="ss">'2026-05-15'</span>, <span class="ss">'PRESENT'</span>, <span class="kw">NULL</span>,
+     <span class="ss">'2026-05-15 09:15:00'</span>, <span class="ss">'2026-05-15 09:15:00'</span>);
+
+<span class="sc">-- Mom tries to mark Prema present AGAIN for the same date (by mistake):</span>
+<span class="sk">INSERT INTO</span> attendance
+    (employee_id, attendance_date, attendance_status, ...)
+<span class="sk">VALUES</span> (<span class="num2">5</span>, <span class="ss">'2026-05-15'</span>, <span class="ss">'PRESENT'</span>, ...);
+<span class="sc">-- ERROR 1062: Duplicate entry '5-2026-05-15' for key 'uk_attendance_emp_date'</span>
+<span class="sc">-- → GlobalExceptionHandler turns this into a friendly 409 message.</span>
+
+<span class="sc">-- Mom changes Prema's status from PRESENT to ABSENT (she went home sick):</span>
+<span class="sk">UPDATE</span> attendance
+   <span class="sk">SET</span> attendance_status = <span class="ss">'ABSENT'</span>,
+       remarks           = <span class="ss">'Went home sick at 11 AM'</span>,
+       updated_at        = <span class="ss">'2026-05-15 11:30:00'</span>      <span class="sc">-- auto by @PreUpdate</span>
+ <span class="sk">WHERE</span> attendance_id = <span class="num2">142</span>;</pre>
+    </div>
+
+    <!-- ──────── The UNIQUE constraint deep-dive ──────── -->
+    <h2><span class="h2-emoji">🔐</span> The UNIQUE Constraint — Why It's So Important</h2>
+    <p>
+      The line that makes this entity safe is this one in the <code>@Table</code> annotation:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">The critical declaration</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Table</span>(
+    name = <span class="str">"attendance"</span>,
+    uniqueConstraints = {
+        <span class="ann">@UniqueConstraint</span>(columnNames = {<span class="str">"employee_id"</span>, <span class="str">"attendance_date"</span>})
+    }
+)</pre>
+    </div>
+
+    <p>It says: <em>"the combination of <code>employee_id</code> + <code>attendance_date</code> must be unique across the entire table."</em></p>
+
+    <h3>Without it, what could go wrong?</h3>
+
+    <table class="ftable">
+      <thead><tr><th>Without the constraint</th><th>With the constraint</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Two rows for Prema on May 15 (one PRESENT, one ABSENT) — which is correct?</td>
+          <td>Cannot happen. Second INSERT fails immediately.</td>
+        </tr>
+        <tr>
+          <td>Salary calculation double-counts working days.</td>
+          <td>Salary calculation is correct by construction.</td>
+        </tr>
+        <tr>
+          <td>Attendance calendar shows confusing duplicates.</td>
+          <td>Clean one row per day per worker.</td>
+        </tr>
+        <tr>
+          <td>The bug only shows up much later when totals don't match.</td>
+          <td>The error message at insertion time tells the user exactly what's wrong.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>Defense in depth:</strong> Service code <em>should</em> check before insert
+      ("is there already a row for this employee + date?"), but bugs happen. The DB-level
+      constraint is the safety net that catches what the application code might miss. Two
+      layers of protection — exactly what you want for important data.
+    </div>
+
+    <!-- ──────── Why ManyToOne and not LAZY ──────── -->
+    <h2><span class="h2-emoji">⚙️</span> A Subtle Detail — The <code>@ManyToOne</code> Fetch Strategy</h2>
+    <p>
+      Notice the employee link doesn't have <code>fetch = FetchType.LAZY</code>:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Default fetch behavior</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ManyToOne</span>                                <span class="com">// default fetch = EAGER for ManyToOne</span>
+<span class="ann">@JoinColumn</span>(name = <span class="str">"employee_id"</span>, nullable = <span class="kw">false</span>)
+<span class="kw">private</span> Employee employee;</pre>
+    </div>
+
+    <p>
+      In JPA, <code>@ManyToOne</code> defaults to <code>FetchType.EAGER</code> — meaning every
+      time we load an Attendance row, Hibernate also JOINs in the full Employee row.
+    </p>
+
+    <div class="callout warn">
+      <strong>Is this a bug?</strong> Not necessarily. Attendance rows are almost always
+      displayed alongside the employee name (calendar views, lists). EAGER loading saves
+      separate queries. But if a hot path ever loads many Attendance rows just to count them,
+      adding <code>fetch = FetchType.LAZY</code> would improve performance. NOOL accepts the
+      EAGER default for simplicity at the current scale.
+    </div>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Mom marks the morning roll call</h5>
+      <ol>
+        <li>9:15 AM. Mom logs in, opens Admin → Attendance → today.</li>
+        <li>The page lists all active workers with a PRESENT/ABSENT toggle.</li>
+        <li>She ticks PRESENT for Prema and Ravi, ABSENT for Suresh (he called in sick).</li>
+        <li>She clicks Save.</li>
+        <li>Frontend sends three POST requests to <code>/api/attendance</code>.</li>
+        <li>For each one:
+          <ul>
+            <li>Service checks: does a row already exist for (employee, today)? No.</li>
+            <li>Inserts a new Attendance row.</li>
+            <li><code>@PrePersist</code> stamps timestamps.</li>
+          </ul>
+        </li>
+        <li>Three new rows in the <code>attendance</code> table for 2026-05-15.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Mom accidentally tries to mark Prema again</h5>
+      <ol>
+        <li>A few minutes later, Mom returns to the attendance page (browser tab was still open).</li>
+        <li>She doesn't realize she already saved, and clicks Save again for Prema.</li>
+        <li>Backend attempts another INSERT for (employee_id=5, attendance_date=2026-05-15).</li>
+        <li>UNIQUE constraint rejects: <code>ERROR 1062: Duplicate entry '5-2026-05-15'</code>.</li>
+        <li>Hibernate throws <code>DataIntegrityViolationException</code>.</li>
+        <li><code>GlobalExceptionHandler.handleDataIntegrityViolation</code> sees "duplicate entry" + "attendance_date" in the cause.</li>
+        <li>Returns HTTP 409 with message: <em>"Attendance is already marked for this employee on this date."</em></li>
+        <li>Frontend shows the toast. Mom realizes her mistake — no duplicate row created.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Prema goes home sick at 11 AM</h5>
+      <ol>
+        <li>Prema came in at 9 AM (marked PRESENT) but feels unwell at 11 AM and leaves.</li>
+        <li>Mom opens attendance, finds Prema's row, changes status to ABSENT, adds remark "Went home sick at 11 AM".</li>
+        <li>Backend issues <code>UPDATE attendance SET attendance_status='ABSENT', remarks='...', updated_at=NOW() WHERE attendance_id=142</code>.</li>
+        <li><code>@PreUpdate</code> sets <code>updatedAt</code>. Created_at stays unchanged.</li>
+        <li>The audit log now shows: created at 09:15 with PRESENT, updated at 11:30 with ABSENT.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around Attendance.java</h5>
+
+      <div class="item">
+        <div class="bad">Skipping the UNIQUE constraint because "the service code already checks"</div>
+        <div class="good">Service code can have bugs. Constraints in the database are the last line of defense. Both layers should exist — defense in depth.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using <code>LocalDateTime</code> for <code>attendance_date</code></div>
+        <div class="good">Attendance is a day-precision concept. <code>LocalDate</code> matches that exactly and avoids weird "9:15 AM" vs "10:32 AM" comparisons that break the UNIQUE constraint.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-deleting an attendance row to "fix a mistake"</div>
+        <div class="good">UPDATE the status instead. Deleting destroys the audit trail. If Prema's PRESENT was wrong, change it to ABSENT — don't erase the row.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding extra status values (HALF_DAY, LEAVE, HOLIDAY) without updating the enum</div>
+        <div class="good">If you need new statuses, add them to <code>AttendanceStatus</code> in <code>enums/</code>. The DB column is wide enough (VARCHAR 20), so no migration needed. The frontend's <code>friendlyStatus()</code> helper already has display labels for several extra values, ready for when you add them.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing the employee's NAME on each attendance row (denormalization for "speed")</div>
+        <div class="good">Use the FK to <code>employees</code> and JOIN. Denormalization makes name changes a nightmare ("Prema gets married and updates her name — now we have to UPDATE all 200 attendance rows?"). Normalize. Trust the JOIN.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about Attendance.java</h5>
+
+      <div class="qa">
+        <div class="q">Why a UNIQUE constraint on (employee_id, attendance_date)?</div>
+        <div class="a">
+          To make it physically impossible for a worker to be marked twice on the same day.
+          The application code does check before inserting, but constraints in the database
+          are the last line of defense — they catch bugs the service might miss. Defense in
+          depth. The friendly error message you saw in Chapter 09 comes from translating the
+          resulting DataIntegrityViolationException.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why <code>LocalDate</code> not <code>LocalDateTime</code>?</div>
+        <div class="a">
+          Because attendance is a day-precision concept. We care that Prema was present on
+          May 15 — not at what hour. Using LocalDateTime would mean two rows at 9:15 AM and
+          10:00 AM would both pass the UNIQUE constraint (different timestamps), which is
+          wrong. <code>LocalDate</code> guarantees comparisons are by day, exactly what we want.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is the <code>@ManyToOne</code> not LAZY-fetched here?</div>
+        <div class="a">
+          JPA's default for <code>@ManyToOne</code> is EAGER. We accept this default because
+          attendance rows are almost always rendered alongside the employee's name, so eager
+          loading saves separate round-trips. For pure-count queries (e.g., "how many present
+          days in May?"), LAZY would be faster, but the simpler default code is fine at our
+          scale.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">If the AttendanceStatus enum only has PRESENT and ABSENT, what about half-days, leaves, holidays?</div>
+        <div class="a">
+          The enum is deliberately minimal because my parents' workflow is binary. The frontend's
+          <code>friendlyStatus()</code> helper has display labels for HALF_DAY, LEAVE, HOLIDAY,
+          WEEKEND etc., so when the business decides to track them, adding new enum values is
+          a one-line change. The DB column is already wide enough.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How does the calendar view in the worker dashboard query this table?</div>
+        <div class="a">
+          Typically: <code>SELECT attendance_date, attendance_status FROM attendance WHERE
+          employee_id = ? AND attendance_date BETWEEN start_of_month AND end_of_month</code>.
+          The frontend renders each date as a green dot (PRESENT) or red dot (ABSENT). Days
+          with no row are rendered as neutral (not yet marked).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Can attendance for a future date be marked?</div>
+        <div class="a">
+          The entity itself doesn't prevent it — <code>LocalDate</code> happily accepts any
+          date. Whether future dates are allowed is a business-rule decision made in the
+          service layer. NOOL currently doesn't block future dates because there's no harm
+          (you'd just be guessing). If you wanted to enforce "no future attendance", you'd
+          add a check in <code>AttendanceServiceImpl</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Attendance tells us <em>whether</em> a worker showed up. The next entity tells us
+      <em>how much they did</em>: <code>EmployeeDailyWork</code> — fresh + re-polish counts
+      per day, which drive the salary calculation.
+    </p>
+
+    <div class="chapnav">
+      <a href="15-saree-ledger-entry.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 15 · SareeLedgerEntry</span>
+      </a>
+      <a href="17-employee-daily-work.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 17 · EmployeeDailyWork</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 16 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

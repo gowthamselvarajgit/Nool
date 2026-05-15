@@ -545,10 +545,12 @@ export const ownerPaymentService = {
   },
 
   // Backend: GET /owner-payments/owners-summary → list of {ownerId, ownerName, totalAmountPayable, totalAmountPaid, pendingAmount}
+  // cache: 'no-store' — never reuse a stale response after a fresh return is recorded.
   getAllOwnersSummary: async () => {
     const response = await fetch(`${API_BASE_URL}/owner-payments/owners-summary`, {
       method: 'GET',
       headers: headers(),
+      cache: 'no-store',
     });
     return handleResponse(response);
   },

@@ -214,14 +214,16 @@ public class SareeInventoryServiceImpl implements SareeInventoryService {
         List<SareeOwner> owners = sareeOwnerRepository.findAll();
 
         // Single aggregate query: rows of (ownerId, type, sum)
+        // Match the enum by .name() so we work whether Hibernate hands back the
+        // enum or the underlying String for Object[] projections.
         Map<Long, long[]> totalsByOwner = new HashMap<>();
         for (Object[] row : sareeLedgerRepository.aggregateAllOwnersByType()) {
             Long ownerId = (Long) row[0];
-            LedgerEntryType type = (LedgerEntryType) row[1];
+            String typeName = row[1] == null ? "" : row[1].toString();
             long sum = ((Number) row[2]).longValue();
             long[] totals = totalsByOwner.computeIfAbsent(ownerId, k -> new long[2]);
-            if (type == LedgerEntryType.RECEIPT) totals[0] = sum;
-            else totals[1] = sum;
+            if (LedgerEntryType.RECEIPT.name().equals(typeName)) totals[0] = sum;
+            else if (LedgerEntryType.RETURN.name().equals(typeName)) totals[1] = sum;
         }
 
         List<OwnerInventorySummaryDto> result = new ArrayList<>(owners.size());

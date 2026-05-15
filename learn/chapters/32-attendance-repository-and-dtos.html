@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 32 · AttendanceRepository + DTOs · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 32 · Attendance Module — The Foundation</span>
+    <h1>
+      Attendance <span class="gradient">Repository &amp; DTOs</span>
+    </h1>
+    <p class="subtitle">
+      Five files together — one repository with eleven query methods, plus four DTOs that
+      cover marking attendance, listing it, and summarising attendance stats. The richest
+      repository in NOOL so far.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📍</div>
+      <div class="fmeta">
+        <h3>5 files in the attendance module</h3>
+        <span class="fpath">backend/.../repository/employee/ + dto/attendance/</span>
+        <div class="ftags"><span>Repository</span><span>4 DTOs</span><span>11 query methods</span><span>JPQL aggregates</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Five Files</h2>
+    <table class="ftable">
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>AttendanceRepository.java</code></td><td>Spring Data interface — many specialised queries on the <code>attendance</code> table</td></tr>
+        <tr><td><code>AttendanceRequestDto.java</code></td><td>Body of "Mark Attendance" — employeeId, date, status</td></tr>
+        <tr><td><code>AttendanceResponseDto.java</code></td><td>Returned by single-row endpoints (one attendance entry)</td></tr>
+        <tr><td><code>AttendanceListResponseDto.java</code></td><td>Returned in paginated list responses</td></tr>
+        <tr><td><code>AttendanceSummaryDto.java</code></td><td>Returned by summary endpoints — total/absent/percentage</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── 1. Repository ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> <code>AttendanceRepository.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">repository/employee/AttendanceRepository.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.repository.employee;
+
+<span class="kw">import</span> com.nool.backend.entity.employee.Attendance;
+<span class="kw">import</span> com.nool.backend.enums.AttendanceStatus;
+<span class="kw">import</span> org.springframework.data.domain.Page;
+<span class="kw">import</span> org.springframework.data.domain.Pageable;
+<span class="kw">import</span> org.springframework.data.jpa.repository.*;
+<span class="kw">import</span> org.springframework.stereotype.Repository;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.util.List;
+
+<span class="ann">@Repository</span>
+<span class="kw">public interface</span> AttendanceRepository <span class="kw">extends</span> JpaRepository&lt;Attendance, Long&gt; {
+
+    <span class="com">// ── A. Lookups by date ───────────────────────────────────────</span>
+    List&lt;Attendance&gt; findByAttendanceDate(LocalDate attendanceDate);
+    <span class="kw">long</span> countByAttendanceDateAndAttendanceStatus(LocalDate attendanceDate,
+                                                  AttendanceStatus attendanceStatus);
+
+    <span class="com">// ── B. Per-employee date-range lookups ───────────────────────</span>
+    List&lt;Attendance&gt; findByEmployeeIdAndAttendanceDateBetween(Long employeeId,
+                                                                LocalDate fromDate,
+                                                                LocalDate toDate);
+
+    <span class="com">// ── C. Duplicate-prevention check ────────────────────────────</span>
+    <span class="kw">boolean</span> existsByEmployeeIdAndAttendanceDate(Long employeeId, LocalDate attendanceDate);
+
+    <span class="com">// ── D. Worker's own paginated history (with eager employee load) ─</span>
+    <span class="ann">@EntityGraph</span>(attributePaths = <span class="str">"employee"</span>)
+    Page&lt;Attendance&gt; findByEmployeeId(Long employeeId, Pageable pageable);
+
+    <span class="com">// ── E. Custom JPQL — count present/absent days for one employee ─</span>
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT COUNT(a)
+           FROM Attendance a
+           WHERE a.employee.id = :employeeId
+             AND a.attendanceStatus = :status
+           """</span>)
+    <span class="kw">long</span> countPresentDaysByEmployee(Long employeeId, AttendanceStatus status);
+
+    <span class="com">// ── F. Filter by employee + date range + status combo ────────</span>
+    <span class="kw">long</span> countByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(
+            Long employeeId, LocalDate fromDate, LocalDate toDate, AttendanceStatus attendanceStatus);
+
+    List&lt;Attendance&gt; findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus(
+            Long employeeId, LocalDate fromDate, LocalDate toDate, AttendanceStatus attendanceStatus);
+
+    <span class="com">// ── G. Bulk delete for an employee (used in deleteEmployee) ──</span>
+    <span class="ann">@Transactional</span>
+    <span class="ann">@Modifying</span>
+    <span class="ann">@Query</span>(<span class="str">"DELETE FROM Attendance a WHERE a.employee.id = :employeeId"</span>)
+    <span class="kw">int</span> deleteAllByEmployeeId(Long employeeId);
+
+    <span class="com">// ── H. Workshop-wide aggregates for leave-productivity dashboard ─</span>
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT a.employee.id, a.attendanceStatus, COUNT(a)
+           FROM Attendance a
+           WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+           GROUP BY a.employee.id, a.attendanceStatus
+           """</span>)
+    List&lt;Object[]&gt; aggregateByEmployeeAndStatus(LocalDate fromDate, LocalDate toDate);
+
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT COUNT(a)
+           FROM Attendance a
+           WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+             AND a.attendanceStatus = :status
+           """</span>)
+    <span class="kw">long</span> countByDateRangeAndStatus(LocalDate fromDate, LocalDate toDate, AttendanceStatus status);
+
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT a FROM Attendance a
+           WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+             AND a.attendanceStatus = :status
+           """</span>)
+    List&lt;Attendance&gt; findByDateRangeAndStatus(LocalDate fromDate, LocalDate toDate, AttendanceStatus status);
+}</pre>
+    </div>
+
+    <h3>The 11 methods at a glance</h3>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Used in</th><th>What it returns</th></tr></thead>
+      <tbody>
+        <tr><td><code>findByAttendanceDate</code></td><td>"Show me today's roll call"</td><td>List of all rows for one date</td></tr>
+        <tr><td><code>countByAttendanceDateAndAttendanceStatus</code></td><td>"How many PRESENT today?"</td><td>Single count</td></tr>
+        <tr><td><code>findByEmployeeIdAndAttendanceDateBetween</code></td><td>Per-worker attendance summary</td><td>All rows in a worker's range</td></tr>
+        <tr><td><code>existsByEmployeeIdAndAttendanceDate</code></td><td>Duplicate check before insert</td><td>Boolean</td></tr>
+        <tr><td><code>findByEmployeeId(id, pageable)</code></td><td>Worker's <code>/my-list</code> endpoint</td><td>Paginated rows for one worker</td></tr>
+        <tr><td><code>countPresentDaysByEmployee</code></td><td>Total PRESENT/ABSENT lifetime count</td><td>Single count</td></tr>
+        <tr><td><code>countByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus</code></td><td>Range count by status</td><td>Single count</td></tr>
+        <tr><td><code>findByEmployeeIdAndAttendanceDateBetweenAndAttendanceStatus</code></td><td>Range filter by status</td><td>List</td></tr>
+        <tr><td><code>deleteAllByEmployeeId</code></td><td>Used in <code>deleteEmployee()</code> cascade</td><td>Affected row count</td></tr>
+        <tr><td><code>aggregateByEmployeeAndStatus</code></td><td>Admin dashboard leave-productivity</td><td>List of [empId, status, count]</td></tr>
+        <tr><td><code>countByDateRangeAndStatus</code></td><td>Workshop-wide present/absent stat</td><td>Single count</td></tr>
+        <tr><td><code>findByDateRangeAndStatus</code></td><td>All absentees in a range (for grouping)</td><td>List</td></tr>
+      </tbody>
+    </table>
+
+    <h3>A subtle but important annotation — <code>@EntityGraph</code></h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">The line that prevents N+1 queries</span><span class="lang">Java</span></div>
+<pre><span class="ann">@EntityGraph</span>(attributePaths = <span class="str">"employee"</span>)
+Page&lt;Attendance&gt; findByEmployeeId(Long employeeId, Pageable pageable);</pre>
+    </div>
+
+    <p>
+      Without this annotation, fetching a page of 10 attendance rows would cause 10
+      additional queries — one per row to lazy-load the <code>Employee</code> association.
+      <code>@EntityGraph</code> tells Hibernate to JOIN the employee table in the original
+      query. One query instead of 11.
+    </p>
+
+    <div class="callout brain">
+      <strong>The N+1 problem:</strong> a common JPA performance bug. Without
+      <code>@EntityGraph</code> or <code>JOIN FETCH</code>, every lazy reference triggers
+      a separate query. A page of 100 rows with 3 lazy references = 1 + 100×3 = 301 queries.
+      Always check explain plans on list endpoints.
+    </div>
+
+    <h3>Modifying queries — the bulk delete</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">Bulk delete with @Modifying</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Transactional</span>
+<span class="ann">@Modifying</span>
+<span class="ann">@Query</span>(<span class="str">"DELETE FROM Attendance a WHERE a.employee.id = :employeeId"</span>)
+<span class="kw">int</span> deleteAllByEmployeeId(Long employeeId);</pre>
+    </div>
+
+    <table class="ftable">
+      <thead><tr><th>Annotation</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>@Modifying</code></td><td>Marks the @Query as a write (DELETE/UPDATE/INSERT). Without it, JPA assumes SELECT and throws.</td></tr>
+        <tr><td><code>@Transactional</code></td><td>Required for write queries. The transaction is auto-committed on success.</td></tr>
+        <tr><td>Return type <code>int</code></td><td>Number of rows actually deleted. Useful for logging or sanity checks.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Aggregate queries — returning <code>List&lt;Object[]&gt;</code></h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">Grouped aggregate</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Query</span>(<span class="str">"""
+       SELECT a.employee.id, a.attendanceStatus, COUNT(a)
+       FROM Attendance a
+       WHERE a.attendanceDate BETWEEN :fromDate AND :toDate
+       GROUP BY a.employee.id, a.attendanceStatus
+       """</span>)
+List&lt;Object[]&gt; aggregateByEmployeeAndStatus(LocalDate fromDate, LocalDate toDate);</pre>
+    </div>
+
+    <p>
+      Each <code>Object[]</code> in the result list contains 3 elements:
+      [0]=employeeId (Long), [1]=AttendanceStatus, [2]=count (Long). The service typically
+      iterates and groups these into a structured result.
+    </p>
+
+    <div class="callout info">
+      <strong>Why Object[] and not a custom class?</strong> JPA returns raw column arrays
+      for grouped aggregates by default. NOOL accepts this simpler form rather than
+      defining a separate projection class. The service immediately maps these to
+      domain DTOs — only the repo layer sees the raw arrays.
+    </div>
+
+    <!-- ─── 2. AttendanceRequestDto ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>AttendanceRequestDto.java</code> — Marking Attendance</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/attendance/AttendanceRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.attendance;
+
+<span class="kw">import</span> com.nool.backend.enums.AttendanceStatus;
+<span class="kw">import</span> jakarta.validation.constraints.NotNull;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> AttendanceRequestDto {
+    <span class="ann">@NotNull</span>(message = <span class="str">"Employee id is required"</span>)
+    <span class="kw">private</span> Long employeeId;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Attendance date is required"</span>)
+    <span class="kw">private</span> LocalDate attendanceDate;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Attendance status is required"</span>)
+    <span class="kw">private</span> AttendanceStatus status;
+}</pre>
+    </div>
+
+    <p>Three required fields. All <code>@NotNull</code>. Sample request body:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample POST /api/attendance body</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"employeeId"</span>:     <span class="num2">5</span>,
+  <span class="str">"attendanceDate"</span>: <span class="str">"2026-05-15"</span>,
+  <span class="str">"status"</span>:         <span class="str">"PRESENT"</span>
+}</pre>
+    </div>
+
+    <!-- ─── 3. AttendanceResponseDto ─── -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>AttendanceResponseDto.java</code> — Single-Row Response</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/attendance/AttendanceResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.attendance;
+
+<span class="kw">import</span> com.nool.backend.enums.AttendanceStatus;
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> AttendanceResponseDto {
+    <span class="kw">private</span> Long              attendanceId;
+    <span class="kw">private</span> Long              employeeId;
+    <span class="kw">private</span> String            employeeName;     <span class="com">// included so frontend doesn't need a separate Employee lookup</span>
+    <span class="kw">private</span> LocalDate         attendanceDate;
+    <span class="kw">private</span> AttendanceStatus  status;
+}</pre>
+    </div>
+
+    <p>
+      Notice <code>employeeName</code> is included even though only <code>employeeId</code>
+      is the actual data. This is a deliberate "flattening" — the frontend renders
+      "Prema · PRESENT" without making a second API call to translate ID 5 into "Prema".
+      One request, all the info needed for display.
+    </p>
+
+    <!-- ─── 4. AttendanceListResponseDto ─── -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>AttendanceListResponseDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/attendance/AttendanceListResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.attendance;
+
+<span class="kw">import</span> com.nool.backend.enums.AttendanceStatus;
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> AttendanceListResponseDto {
+    <span class="kw">private</span> Long              attendanceId;
+    <span class="kw">private</span> Long              employeeId;
+    <span class="kw">private</span> String            employeeName;
+    <span class="kw">private</span> LocalDate         attendanceDate;
+    <span class="kw">private</span> AttendanceStatus  status;
+}</pre>
+    </div>
+
+    <p>
+      Same fields as <code>AttendanceResponseDto</code> — by design. As discussed in
+      Chapter 29, separate DTOs for single-row vs list-row allow them to diverge later
+      without breaking existing consumers.
+    </p>
+
+    <!-- ─── 5. AttendanceSummaryDto ─── -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>AttendanceSummaryDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/attendance/AttendanceSummaryDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.attendance;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> AttendanceSummaryDto {
+    <span class="kw">private</span> Long    employeeId;
+    <span class="kw">private</span> String  employeeName;
+    <span class="kw">private</span> Long    totalWorkingDays;       <span class="com">// rows in the range</span>
+    <span class="kw">private</span> Long    absentDays;             <span class="com">// rows where status = ABSENT</span>
+    <span class="kw">private</span> Double  attendancePercentage;   <span class="com">// (totalWorkingDays - absentDays) / totalWorkingDays * 100</span>
+}</pre>
+    </div>
+
+    <p>The "summary" view of attendance — aggregated stats over a date range. Sample response:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample summary response for Prema, May 1-15</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"employeeId"</span>:           <span class="num2">5</span>,
+  <span class="str">"employeeName"</span>:         <span class="str">"Prema"</span>,
+  <span class="str">"totalWorkingDays"</span>:     <span class="num2">15</span>,
+  <span class="str">"absentDays"</span>:           <span class="num2">2</span>,
+  <span class="str">"attendancePercentage"</span>: <span class="num2">86.67</span>
+}</pre>
+    </div>
+
+    <h3>How attendancePercentage is computed</h3>
+    <div class="formula">
+      <div class="label">Attendance percentage</div>
+      <div class="eq">
+        <span class="var">percentage</span> = (totalWorkingDays − absentDays) ÷ totalWorkingDays × 100
+      </div>
+    </div>
+
+    <p>With 15 working days and 2 absences: <code>(15 − 2) / 15 × 100 = 86.67%</code>.</p>
+
+    <div class="callout warn">
+      <strong>"Total working days" here means days the worker has any attendance row.</strong>
+      If Prema was hired on May 5 but the query asks about May 1-15, she only has 11 rows
+      (May 5-15), not 15. So "totalWorkingDays" is really "rows that exist in this range for
+      this worker", not "calendar days in the range". The terminology could be confusing —
+      a clearer rename would be <code>recordedDays</code>.
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Mom marks Prema's attendance for today</h5>
+      <ol>
+        <li>Frontend posts <code>{ "employeeId": 5, "attendanceDate": "2026-05-15", "status": "PRESENT" }</code>.</li>
+        <li>Validation passes (all three @NotNull pass).</li>
+        <li>Service calls <code>existsByEmployeeIdAndAttendanceDate(5, '2026-05-15')</code>.</li>
+        <li>Returns false → safe to insert.</li>
+        <li>Insert the row. DB also enforces the UNIQUE constraint as a backstop.</li>
+        <li>Response: <code>{ "attendanceId": 142, "employeeId": 5, "employeeName": "Prema", "attendanceDate": "2026-05-15", "status": "PRESENT" }</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Computing Prema's May summary</h5>
+      <ol>
+        <li>Service queries <code>findByEmployeeIdAndAttendanceDateBetween(5, '2026-05-01', '2026-05-15')</code>.</li>
+        <li>Returns 15 Attendance rows.</li>
+        <li>Stream filters: 2 with status=ABSENT.</li>
+        <li>Computes percentage: (15-2)/15 * 100 = 86.67.</li>
+        <li>Returns the AttendanceSummaryDto.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Admin dashboard aggregate query</h5>
+      <ol>
+        <li>Admin dashboard service calls <code>aggregateByEmployeeAndStatus('2026-05-01', '2026-05-15')</code>.</li>
+        <li>Single SQL: <code>SELECT employee_id, attendance_status, COUNT(*) ... GROUP BY ...</code>.</li>
+        <li>Returns: <code>[[5, PRESENT, 13], [5, ABSENT, 2], [8, PRESENT, 14], [8, ABSENT, 1], ...]</code>.</li>
+        <li>Service groups by employee, computes percentages per worker.</li>
+        <li>Renders the "Workforce Productivity" table on Dad's dashboard.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Cascade delete a worker</h5>
+      <ol>
+        <li>Admin hard-deletes employee 5 (Prema).</li>
+        <li>EmployeeServiceImpl.deleteEmployee calls <code>attendanceRepository.deleteAllByEmployeeId(5)</code>.</li>
+        <li>Single DELETE query runs: <code>DELETE FROM attendance WHERE employee_id = 5</code>.</li>
+        <li>Returns count: 47 (Prema's lifetime attendance rows wiped).</li>
+        <li>FK constraint now satisfied — the parent Employee row can be deleted next.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common attendance-repo / DTO mistakes</h5>
+      <div class="item">
+        <div class="bad">Forgetting <code>@EntityGraph</code> on paginated list queries</div>
+        <div class="good">Lazy-loaded associations trigger N+1 queries when rendered. Either add <code>@EntityGraph</code> or use <code>JOIN FETCH</code> in the JPQL.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Skipping the application-level <code>existsBy</code> check and relying only on the DB UNIQUE constraint</div>
+        <div class="good">Defense in depth: check first in the service for a clean user-facing message; the DB constraint catches anything that slips through. Both layers matter.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting <code>@Modifying</code> on DELETE / UPDATE @Query methods</div>
+        <div class="good">Without it, Spring Data thinks it's a SELECT and throws at startup. Always pair <code>@Modifying</code> with <code>@Transactional</code> for write queries.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Storing the computed attendancePercentage in the DB</div>
+        <div class="good">Compute on demand. Storing derived values risks drift. The summary endpoint recomputes every time it's called — cheap and always accurate.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Returning the Attendance entity directly in a list response</div>
+        <div class="good">Use AttendanceListResponseDto. Entities lazy-load the Employee and bring its internal fields — DTOs let you precisely control what the frontend sees.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why does this repo have eleven methods when EmployeeRepository had five?</div>
+        <div class="a">
+          Attendance is queried in many different shapes — by date, by employee, by date range,
+          by status, by combinations of all of these. The repo declares one method per shape
+          so services don't have to filter in Java. Each method translates directly to an
+          efficient SQL query.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What does <code>@EntityGraph(attributePaths = "employee")</code> actually do?</div>
+        <div class="a">
+          It modifies the generated SQL to add a JOIN to the <code>employees</code> table
+          and eagerly load the Employee association along with each Attendance row. Without
+          this, accessing <code>attendance.getEmployee().getName()</code> later would trigger
+          a separate SELECT per row — the classic N+1 problem.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does the summary DTO not have a "PRESENT days" field?</div>
+        <div class="a">
+          Because it's derivable: <code>presentDays = totalWorkingDays − absentDays</code>.
+          Including both is redundant. The percentage already encodes the same info more
+          compactly. If the frontend wants the explicit count, it computes it locally.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What's the difference between method-name queries and <code>@Query</code> ones here?</div>
+        <div class="a">
+          Method-name parsing handles simple cases (<code>existsBy</code>, <code>findBy</code>
+          with up to a couple of fields). <code>@Query</code> is used for grouped aggregates,
+          COUNT with multiple conditions, and DELETE statements — places where the method name
+          would become unreadable or where the parser doesn't support the SQL construct.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is <code>deleteAllByEmployeeId</code> a custom JPQL DELETE instead of using <code>deleteByEmployeeId</code>?</div>
+        <div class="a">
+          Spring Data's auto-derived <code>deleteByX</code> methods load the rows first, then
+          delete them one-by-one — slow for large sets. The custom <code>@Modifying @Query</code>
+          executes one bulk DELETE directly. For deleting a worker's 1000+ attendance rows,
+          the bulk version is dramatically faster.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>Repository and DTOs done. Next chapter implements the service that uses them — marking attendance, listing, and computing summaries.</p>
+
+    <div class="chapnav">
+      <a href="31-employee-controller.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 31 · EmployeeController</span></a>
+      <a href="33-attendance-service.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 33 · AttendanceService + Impl</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 32 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

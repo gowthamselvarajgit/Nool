@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 10 · Common DTOs · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 10 · Reusable Request/Response Shapes</span>
+    <h1>
+      Common <span class="gradient">DTOs</span> —<br/>
+      Pagination, dates, generic wrappers
+    </h1>
+    <p class="subtitle">
+      Across NOOL's backend, many endpoints share the same input/output shapes — "give me page 2
+      of 20 employees", "summarize my work between these two dates", etc. Rather than copy-paste
+      the same fields into every controller, we define them <em>once</em> in five small DTOs
+      and reuse them everywhere.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📨</div>
+      <div class="fmeta">
+        <h3>5 common DTOs</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/dto/common/</span>
+        <div class="ftags"><span>DTO</span><span>Pagination</span><span>Validation</span><span>Generics</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What is a DTO ──────── -->
+    <h2><span class="h2-emoji">🤔</span> Quick Refresher — What's a DTO?</h2>
+    <p>
+      DTO stands for <strong>Data Transfer Object</strong>. It's a plain class whose only job
+      is to <em>carry data</em> between layers (controller ↔ service, frontend ↔ backend),
+      with optional validation annotations on the fields.
+    </p>
+
+    <table class="ftable">
+      <thead>
+        <tr><th></th><th>Entity</th><th>DTO</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>What it represents</td><td>A database table</td><td>The shape of data sent over HTTP</td></tr>
+        <tr><td>Annotations</td><td><code>@Entity</code>, <code>@Column</code>, <code>@ManyToOne</code></td><td><code>@NotNull</code>, <code>@Min</code>, <code>@Pattern</code></td></tr>
+        <tr><td>Has DB relationships?</td><td>Yes (lazy/eager loading, FKs)</td><td>No — just plain fields</td></tr>
+        <tr><td>Used by</td><td>Repository + Service layers</td><td>Controller layer + view/frontend</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>Why we separate them:</strong> if the frontend posts JSON directly into an entity,
+      it can accidentally set fields it shouldn't (like <code>id</code> or <code>createdAt</code>).
+      DTOs are a safety boundary — they expose only what the API meant to expose.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- DTO 1: ApiResponseDto -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">1️⃣</span> <code>ApiResponseDto&lt;T&gt;</code> — The Generic Wrapper</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/common/ApiResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.common;
+
+<span class="kw">import</span> lombok.AllArgsConstructor;
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> lombok.NoArgsConstructor;
+
+<span class="ann">@Data</span>
+<span class="ann">@Builder</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="kw">public class</span> ApiResponseDto&lt;T&gt; {       <span class="com">// ★ generic — T is the actual payload type</span>
+    <span class="kw">private boolean</span> success;             <span class="com">// true = OK, false = error</span>
+    <span class="kw">private</span> String  message;             <span class="com">// human-readable status text</span>
+    <span class="kw">private</span> T       data;                <span class="com">// the actual response payload</span>
+}</pre>
+    </div>
+
+    <h3>How the generic <code>&lt;T&gt;</code> works</h3>
+    <p>
+      The <code>&lt;T&gt;</code> is a <strong>type parameter</strong>. You decide what T means
+      when you use the class. Examples:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Using ApiResponseDto with different T types</span><span class="lang">Java</span></div>
+<pre><span class="com">// T = Long — return a single ID</span>
+ApiResponseDto&lt;Long&gt; response1 = ApiResponseDto.&lt;Long&gt;builder()
+    .success(<span class="kw">true</span>)
+    .message(<span class="str">"Employee created"</span>)
+    .data(<span class="num2">42L</span>)
+    .build();
+
+<span class="com">// T = EmployeeResponseDto — return one employee object</span>
+ApiResponseDto&lt;EmployeeResponseDto&gt; response2 = ApiResponseDto.&lt;EmployeeResponseDto&gt;builder()
+    .success(<span class="kw">true</span>)
+    .message(<span class="str">"Found"</span>)
+    .data(employeeDto)
+    .build();
+
+<span class="com">// T = List&lt;String&gt; — return a list of strings</span>
+ApiResponseDto&lt;List&lt;String&gt;&gt; response3 = ApiResponseDto.&lt;List&lt;String&gt;&gt;builder()
+    .success(<span class="kw">true</span>)
+    .message(<span class="str">"OK"</span>)
+    .data(List.of(<span class="str">"alpha"</span>, <span class="str">"beta"</span>))
+    .build();</pre>
+    </div>
+
+    <h3>JSON shape</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">What the frontend sees</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"success"</span>: <span class="kw">true</span>,
+  <span class="str">"message"</span>: <span class="str">"Employee created"</span>,
+  <span class="str">"data"</span>:    <span class="num2">42</span>
+}</pre>
+    </div>
+
+    <p>
+      <strong>Used by:</strong> mainly the auth and admin user services where the response is
+      a simple confirmation. Other endpoints (like inventory, attendance) return the data
+      object directly without the wrapper — Spring serializes whatever the controller returns.
+      Both styles coexist in NOOL.
+    </p>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- DTO 2: PaginationRequestDto -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>PaginationRequestDto</code> — "Give me page N of M"</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/common/PaginationRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.common;
+
+<span class="kw">import</span> jakarta.validation.constraints.Min;
+<span class="kw">import</span> jakarta.validation.constraints.NotBlank;
+<span class="kw">import</span> lombok.Data;
+
+<span class="ann">@Data</span>     <span class="com">// Lombok: getters, setters, toString, equals, hashCode</span>
+<span class="kw">public class</span> PaginationRequestDto {
+
+    <span class="ann">@Min</span>(value = <span class="num2">0</span>, message = <span class="str">"Page number must be zero or greater"</span>)
+    <span class="kw">private int</span> page = <span class="num2">0</span>;             <span class="com">// page index, ZERO-based (page 0 = first page)</span>
+
+    <span class="ann">@Min</span>(value = <span class="num2">1</span>, message = <span class="str">"Page size must be at least 1"</span>)
+    <span class="kw">private int</span> size = <span class="num2">10</span>;            <span class="com">// how many rows per page (default 10)</span>
+
+    <span class="kw">private</span> String sortBy = <span class="str">"createdAt"</span>;       <span class="com">// which column to sort by</span>
+    <span class="kw">private</span> String sortingDirection = <span class="str">"DESC"</span>;  <span class="com">// "ASC" or "DESC"</span>
+    <span class="kw">private</span> String searchKeyword = <span class="str">""</span>;        <span class="com">// optional search text</span>
+}</pre>
+    </div>
+
+    <h3>How the frontend uses it</h3>
+    <p>
+      Almost every list-fetching endpoint in NOOL accepts this DTO. For example, the
+      <code>employeeService.getList()</code> in <code>api.js</code> sends a body like:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample POST /api/employees/list request body</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"page"</span>: <span class="num2">2</span>,
+  <span class="str">"size"</span>: <span class="num2">10</span>,
+  <span class="str">"sortBy"</span>: <span class="str">"createdAt"</span>,
+  <span class="str">"sortingDirection"</span>: <span class="str">"DESC"</span>,
+  <span class="str">"searchKeyword"</span>: <span class="str">"Prema"</span>
+}</pre>
+    </div>
+
+    <p>
+      The backend uses these values to build a Spring Data <code>Pageable</code>:
+      <code>PageRequest.of(2, 10, Sort.by(DESC, "createdAt"))</code>. Spring Data then
+      generates SQL like:
+    </p>
+
+    <div class="sqlbox">
+<pre><span class="sk">SELECT</span> * <span class="sk">FROM</span> employees
+<span class="sk">WHERE</span>  employee_name <span class="sk">LIKE</span> <span class="ss">'%Prema%'</span>
+<span class="sk">ORDER BY</span> created_at <span class="sk">DESC</span>
+<span class="sk">LIMIT</span> <span class="num2">10</span> <span class="sk">OFFSET</span> <span class="num2">20</span>;  <span class="sc">-- page 2 × size 10 = skip 20</span></pre>
+    </div>
+
+    <h3>Why zero-indexed pages?</h3>
+    <div class="callout info">
+      Spring Data's convention: page 0 = first page. So "show me the first page" → <code>page=0</code>,
+      "second page" → <code>page=1</code>. The React UI shows them as "Page 1", "Page 2" to users,
+      but converts to 0-based when posting. A common +1/-1 trip.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- DTO 3: PaginationResponseDto -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>PaginationResponseDto&lt;T&gt;</code> — "Here's page N of M"</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/common/PaginationResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.common;
+
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.util.List;
+
+<span class="ann">@Data</span>
+<span class="ann">@Builder</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="kw">public class</span> PaginationResponseDto&lt;T&gt; {     <span class="com">// ★ generic again — T is the row type</span>
+    <span class="kw">private</span> List&lt;T&gt; content;                  <span class="com">// the actual rows of this page</span>
+    <span class="kw">private int</span>     page;                     <span class="com">// which page this is (0-based)</span>
+    <span class="kw">private int</span>     size;                     <span class="com">// page size used</span>
+    <span class="kw">private long</span>    totalElements;            <span class="com">// total rows across ALL pages</span>
+    <span class="kw">private int</span>     totalPages;               <span class="com">// total page count</span>
+    <span class="kw">private boolean</span> last;                     <span class="com">// is this the last page?</span>
+}</pre>
+    </div>
+
+    <h3>JSON shape</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample response: 47 employees total, 10 per page, showing page 2</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"content"</span>: [
+    { <span class="str">"employeeId"</span>: <span class="num2">21</span>, <span class="str">"employeeName"</span>: <span class="str">"Prema"</span>, <span class="com">...</span> },
+    { <span class="str">"employeeId"</span>: <span class="num2">22</span>, <span class="str">"employeeName"</span>: <span class="str">"Ravi"</span>, <span class="com">...</span> },
+    <span class="com">// ... 8 more rows</span>
+  ],
+  <span class="str">"page"</span>:          <span class="num2">2</span>,
+  <span class="str">"size"</span>:          <span class="num2">10</span>,
+  <span class="str">"totalElements"</span>: <span class="num2">47</span>,
+  <span class="str">"totalPages"</span>:    <span class="num2">5</span>,
+  <span class="str">"last"</span>:          <span class="kw">false</span>
+}</pre>
+    </div>
+
+    <p>
+      The frontend uses these numbers to draw the "Page 3 of 5 · 47 results" footer and to
+      enable/disable the Next/Previous buttons (e.g., disable Next if <code>last == true</code>).
+    </p>
+
+    <h3>Why a custom DTO instead of returning Spring's <code>Page&lt;T&gt;</code> directly?</h3>
+    <div class="callout brain">
+      Spring Data has its own <code>Page&lt;T&gt;</code> class that serializes with many more
+      fields (<code>pageable</code>, <code>sort</code>, <code>numberOfElements</code>, etc.).
+      Returning it directly leaks Spring-specific structure to the frontend and clutters the
+      response. NOOL's DTO exposes only the 6 fields the frontend actually needs — cleaner
+      and contract-stable.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- DTO 4: DateRangeDto -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>DateRangeDto</code> — "Between these two dates"</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/common/DateRangeDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.common;
+
+<span class="kw">import</span> jakarta.validation.constraints.NotNull;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> DateRangeDto {
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"From date is required"</span>)
+    <span class="kw">private</span> LocalDate fromDate;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"To date is required"</span>)
+    <span class="kw">private</span> LocalDate toDate;
+}</pre>
+    </div>
+
+    <h3>Where it's used</h3>
+    <p>Many summary/report endpoints take a date range. For example:</p>
+    <ul>
+      <li><code>POST /api/attendance/employee/{id}/summary</code> — attendance summary for one worker in a range</li>
+      <li><code>POST /api/salary-payments/summary</code> — what salary was earned vs. paid in a range</li>
+      <li><code>POST /api/admin/dashboard/revenue</code> — workshop revenue in a range</li>
+      <li><code>POST /api/inventory/owner/{id}/summary</code> — sarees received/returned in a range</li>
+    </ul>
+
+    <p>Sample request body:</p>
+    <div class="codewrap">
+      <div class="head"><span class="path">A date-range query</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"fromDate"</span>: <span class="str">"2026-05-01"</span>,
+  <span class="str">"toDate"</span>:   <span class="str">"2026-05-15"</span>
+}</pre>
+    </div>
+
+    <h3>Why <code>LocalDate</code> and not <code>LocalDateTime</code>?</h3>
+    <p>
+      Business dates in NOOL are <strong>day-precision</strong>, not minute-precision. "Worked on
+      May 5" means the whole day, no hour-of-day. <code>LocalDate</code> matches that exactly
+      and avoids timezone complications.
+    </p>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- DTO 5: MonthYearRequestDto -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>MonthYearRequestDto</code> — "For this month"</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/common/MonthYearRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.common;
+
+<span class="kw">import</span> jakarta.validation.constraints.Max;
+<span class="kw">import</span> jakarta.validation.constraints.Min;
+<span class="kw">import</span> jakarta.validation.constraints.NotNull;
+<span class="kw">import</span> lombok.Data;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> MonthYearRequestDto {
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Month is required"</span>)
+    <span class="ann">@Min</span>(<span class="num2">1</span>)
+    <span class="ann">@Max</span>(<span class="num2">12</span>)
+    <span class="kw">private</span> Integer month;        <span class="com">// 1 = Jan, 12 = Dec</span>
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Year is required"</span>)
+    <span class="kw">private</span> Integer year;         <span class="com">// e.g., 2026</span>
+}</pre>
+    </div>
+
+    <h3>Where it's used</h3>
+    <p>
+      For endpoints that report on a specific calendar month. The main one is
+      <code>POST /api/admin/dashboard/revenue/month</code> — used by the admin dashboard to
+      show "May 2026 revenue".
+    </p>
+
+    <p>Sample request:</p>
+    <div class="codewrap">
+      <div class="head"><span class="path">Asking for May 2026</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"month"</span>: <span class="num2">5</span>,
+  <span class="str">"year"</span>:  <span class="num2">2026</span>
+}</pre>
+    </div>
+
+    <h3>Why not just send a date string?</h3>
+    <div class="callout info">
+      Sending <code>"2026-05"</code> would require us to write our own parser (since
+      <code>LocalDate</code> needs a day). Two integers are simpler, easier to validate, and
+      easier to reason about (1 ≤ month ≤ 12 is a clean rule). The frontend already has the
+      values as numbers from the date picker — no string conversion needed.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- All 5 at a glance -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">📋</span> All 5 Common DTOs at a Glance</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>DTO</th><th>Fields</th><th>Used by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>ApiResponseDto&lt;T&gt;</code></td>
+          <td>success, message, data</td>
+          <td>Generic wrapper for confirmation responses</td>
+        </tr>
+        <tr>
+          <td><code>PaginationRequestDto</code></td>
+          <td>page, size, sortBy, sortingDirection, searchKeyword</td>
+          <td>Every list endpoint (POST .../list)</td>
+        </tr>
+        <tr>
+          <td><code>PaginationResponseDto&lt;T&gt;</code></td>
+          <td>content, page, size, totalElements, totalPages, last</td>
+          <td>The response of every list endpoint</td>
+        </tr>
+        <tr>
+          <td><code>DateRangeDto</code></td>
+          <td>fromDate, toDate</td>
+          <td>Every summary/report endpoint with a date filter</td>
+        </tr>
+        <tr>
+          <td><code>MonthYearRequestDto</code></td>
+          <td>month (1-12), year</td>
+          <td>Month-specific reports (monthly revenue, etc.)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Pagination scenario ──────── -->
+    <h2><span class="h2-emoji">🎬</span> A Real Pagination Round-Trip</h2>
+
+    <div class="scenario">
+      <h5>Mom views page 3 of the workers list with search "Pre"</h5>
+      <ol>
+        <li>Mom is on Admin Dashboard → Employees. She types "Pre" in the search box and clicks page 3.</li>
+        <li>Frontend's <code>employeeService.getList(2, 10, "Pre")</code> posts to <code>/api/employees/list</code>:</li>
+      </ol>
+      <div class="codewrap">
+        <div class="head"><span class="path">Request body</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"page"</span>: <span class="num2">2</span>,                    <span class="sc">// 0-based — actually the third page</span>
+  <span class="str">"size"</span>: <span class="num2">10</span>,
+  <span class="str">"sortBy"</span>: <span class="str">"createdAt"</span>,
+  <span class="str">"sortingDirection"</span>: <span class="str">"DESC"</span>,
+  <span class="str">"searchKeyword"</span>: <span class="str">"Pre"</span>
+}</pre>
+      </div>
+
+      <ol start="3">
+        <li>Spring auto-binds the JSON into a <code>PaginationRequestDto</code> instance.</li>
+        <li><code>@Valid</code> kicks in: page ≥ 0? size ≥ 1? Both pass.</li>
+        <li>Service builds a <code>PageRequest</code>, issues a SQL query against <code>employees</code> with LIKE + ORDER BY + LIMIT + OFFSET.</li>
+        <li>Service maps each Employee entity to an EmployeeResponseDto.</li>
+        <li>Service builds a <code>PaginationResponseDto&lt;EmployeeResponseDto&gt;</code> with content + totals + last flag.</li>
+        <li>Response JSON goes back. Frontend draws the table + the pagination footer.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common DTO mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Sending a JPA entity as the response (e.g., returning <code>Employee</code> directly)</div>
+        <div class="good">Always map to a DTO first. Entities leak lazy-loaded fields, internal timestamps, and FK relationships that frontend has no business knowing about.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using 1-based pagination on the backend</div>
+        <div class="good">Spring Data is 0-based. Match that on the API to avoid converting in two places. The UI can show 1-based labels to users; the API stays 0-based.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Reusing <code>PaginationRequestDto</code> as a path variable / query string</div>
+        <div class="good">It's designed for JSON POST bodies (<code>@RequestBody</code>). For GET-with-query-params, use individual <code>@RequestParam</code>s or a custom DTO.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Valid</code> on the controller method parameter</div>
+        <div class="good">Without <code>@Valid</code>, the <code>@Min</code> / <code>@NotNull</code> annotations on the DTO don't run. Negative page numbers slip through, sorting crashes. Always annotate <code>@Valid @RequestBody PaginationRequestDto dto</code>.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Defaulting <code>sortBy</code> to a non-existent column</div>
+        <div class="good">The default is <code>"createdAt"</code> — which every entity in NOOL has. If a specific entity doesn't, the controller must override the default before calling the service, or the SQL will throw at runtime.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about common DTOs</h5>
+
+      <div class="qa">
+        <div class="q">Why use generics on <code>ApiResponseDto&lt;T&gt;</code> and <code>PaginationResponseDto&lt;T&gt;</code>?</div>
+        <div class="a">
+          Generics let one class serve many response shapes safely. Without them, I'd either
+          write <code>ApiResponseEmployee</code>, <code>ApiResponseOwner</code>, etc. (boilerplate
+          explosion), or use <code>Object data</code> (losing type safety). Generics give us
+          both reuse and compile-time checks.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>page</code> zero-indexed and not one-indexed?</div>
+        <div class="a">
+          Spring Data's <code>Pageable</code> is zero-indexed — page 0 is the first page. The
+          backend just follows that convention. The UI converts to 1-indexed when displaying
+          ("Page 1 of 5"), but the wire format stays 0-based to avoid double-conversion bugs.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does <code>@Data</code> from Lombok generate?</div>
+        <div class="a">
+          It's a meta-annotation that combines <code>@Getter</code>, <code>@Setter</code>,
+          <code>@ToString</code>, <code>@EqualsAndHashCode</code>, and
+          <code>@RequiredArgsConstructor</code>. For a plain data DTO with no special needs,
+          <code>@Data</code> is the shortest way to get all the standard behaviors.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could you replace <code>PaginationResponseDto</code> with Spring's <code>Page&lt;T&gt;</code>?</div>
+        <div class="a">
+          You could — Spring Data's Page serializes to JSON automatically. But it includes
+          extra fields (<code>pageable</code>, <code>sort</code>, <code>empty</code>,
+          <code>first</code>, etc.) that we don't need, and it ties the API contract to
+          Spring's internal class structure. The custom DTO is cleaner and more stable.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How does <code>@NotNull</code> on <code>fromDate</code> get enforced?</div>
+        <div class="a">
+          Two pieces. (1) The Spring Boot validation starter (in <code>pom.xml</code>) brings in
+          Hibernate Validator, which knows how to evaluate <code>@NotNull</code>. (2) The
+          controller method must annotate the parameter with <code>@Valid</code>. When the
+          frontend posts a request without <code>fromDate</code>, validation fails, the controller
+          method never runs, and <code>MethodArgumentNotValidException</code> is thrown — caught
+          by the GlobalExceptionHandler (Chapter 09) and returned as a 400.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why have these DTOs in a <code>dto/common/</code> sub-folder?</div>
+        <div class="a">
+          To signal that they're <em>cross-cutting</em> — not tied to any one domain. Compare
+          with <code>dto/employee/</code> (only employee-related DTOs) or <code>dto/payment/</code>
+          (only payment-related). Putting common DTOs in their own folder makes the import
+          patterns clean and signals intent: <em>"any module can use these"</em>.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With foundational types (enums, exceptions, common DTOs) all in place, the next phase
+      starts: <strong>the entities</strong>. We'll go through every JPA entity one by one,
+      starting with <code>User.java</code> — the foundation of everything that involves
+      logging in.
+    </p>
+
+    <div class="chapnav">
+      <a href="09-exceptions.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 09 · Exceptions &amp; Handler</span>
+      </a>
+      <a href="11-user-entity.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 11 · User.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 10 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

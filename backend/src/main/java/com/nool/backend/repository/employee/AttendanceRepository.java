@@ -29,6 +29,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     boolean existsByEmployeeIdAndAttendanceDate(Long employeeId, LocalDate attendanceDate);
 
+    java.util.Optional<Attendance> findByEmployeeIdAndAttendanceDate(
+            Long employeeId, LocalDate attendanceDate);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "employee")
     Page<Attendance> findByEmployeeId(Long employeeId, Pageable pageable);
 

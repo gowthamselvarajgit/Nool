@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 35 · EmployeeDailyWorkRepository + DTOs · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 35 · Daily Work Module — The Foundation</span>
+    <h1>
+      Daily Work <span class="gradient">Repository &amp; DTOs</span>
+    </h1>
+    <p class="subtitle">
+      Five files together — one repository (11 query methods including aggregates) plus four
+      DTOs. These files capture the heart of every worker's productivity tracking: <em>how
+      many fresh and re-polish sarees did each worker produce on each day?</em>
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📝</div>
+      <div class="fmeta">
+        <h3>5 files in the daily-work module</h3>
+        <span class="fpath">backend/.../repository/employee/ + dto/dailywork/</span>
+        <div class="ftags"><span>Repository</span><span>4 DTOs</span><span>Aggregates</span><span>Earnings calc</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> Where This Module Fits</h2>
+    <p>
+      Recall from earlier chapters: <strong>Attendance</strong> answered <em>"did Prema show
+      up today?"</em>. <strong>Daily Work</strong> answers <em>"what did she produce while she
+      was here?"</em> — two numbers per day: <code>freshCount</code> (brand-new sarees polished)
+      and <code>rePolishCount</code> (touch-up polishes). Multiplied by her per-saree polish
+      rate, this is the entire input to the salary formula. So this module is on the critical
+      path from "Prema polishes" → "Prema gets paid".
+    </p>
+
+    <div class="callout brain">
+      <strong>The whole salary system depends on these rows being accurate.</strong> If
+      Dad mis-types Prema's count by 1, her salary changes by ₹30. If he forgets to log a
+      day entirely, she loses that day's earnings. The repository methods we'll see below
+      include defensive aggregates (<code>COALESCE(SUM(...), 0)</code>) precisely because
+      "Sum of nothing" is a real case we need to handle gracefully.
+    </div>
+
+    <h2><span class="h2-emoji">📋</span> The Five Files at a Glance</h2>
+    <table class="ftable">
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>EmployeeDailyWorkRepository.java</code></td><td>JPA repository — 11 query methods including SUM aggregates</td></tr>
+        <tr><td><code>EmployeeDailyWorkRequestDto.java</code></td><td>Body of "log today's work" — employeeId, date, fresh count, repolish count</td></tr>
+        <tr><td><code>EmployeeDailyWorkResponseDto.java</code></td><td>Returned by single-row endpoints, includes computed <code>todayRevenue</code></td></tr>
+        <tr><td><code>EmployeeDailyWorkListDto.java</code></td><td>Returned in paginated lists, includes <code>todayEarning</code> per row</td></tr>
+        <tr><td><code>EmployeeWorkSummaryDto.java</code></td><td>Range summary — total fresh, total repolish, total revenue</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── 1. Repository ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> <code>EmployeeDailyWorkRepository.java</code></h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">repository/employee/EmployeeDailyWorkRepository.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.repository.employee;
+
+<span class="kw">import</span> com.nool.backend.entity.employee.EmployeeDailyWork;
+<span class="kw">import</span> org.springframework.data.domain.Page;
+<span class="kw">import</span> org.springframework.data.domain.Pageable;
+<span class="kw">import</span> org.springframework.data.jpa.repository.*;
+<span class="kw">import</span> org.springframework.stereotype.Repository;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.util.List;
+
+<span class="ann">@Repository</span>
+<span class="kw">public interface</span> EmployeeDailyWorkRepository
+        <span class="kw">extends</span> JpaRepository&lt;EmployeeDailyWork, Long&gt; {
+
+    <span class="com">// ── A. Lookups by employee ──────────────────────────────────</span>
+    List&lt;EmployeeDailyWork&gt; findByEmployeeId(Long employeeId);
+
+    <span class="ann">@EntityGraph</span>(attributePaths = <span class="str">"employee"</span>)
+    Page&lt;EmployeeDailyWork&gt; findByEmployeeId(Long employeeId, Pageable pageable);
+
+    <span class="com">// ── B. Lookups by date ──────────────────────────────────────</span>
+    List&lt;EmployeeDailyWork&gt; findByWorkDate(LocalDate workDate);
+    List&lt;EmployeeDailyWork&gt; findByWorkDateBetween(LocalDate fromDate, LocalDate toDate);
+
+    <span class="com">// ── C. Combined employee + date range ───────────────────────</span>
+    List&lt;EmployeeDailyWork&gt; findByEmployeeIdAndWorkDateBetween(
+            Long employeeId, LocalDate fromDate, LocalDate toDate);
+
+    <span class="com">// ── D. Sum aggregates by date (single-day stats) ────────────</span>
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT COALESCE(SUM(w.freshCount), 0)
+           FROM EmployeeDailyWork w
+           WHERE w.workDate = :workDate
+           """</span>)
+    Long sumFreshWorkByDate(LocalDate workDate);
+
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT COALESCE(SUM(w.rePolishCount), 0)
+           FROM EmployeeDailyWork w
+           WHERE w.workDate = :workDate
+           """</span>)
+    Long sumRePolishWorkByDate(LocalDate workDate);
+
+    <span class="com">// ── E. Sum aggregates by date range ─────────────────────────</span>
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT COALESCE(SUM(w.freshCount), 0)
+           FROM EmployeeDailyWork w
+           WHERE w.workDate BETWEEN :fromDate AND :toDate
+           """</span>)
+    Long sumFreshWorkByDateRange(LocalDate fromDate, LocalDate toDate);
+
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT COALESCE(SUM(w.rePolishCount), 0)
+           FROM EmployeeDailyWork w
+           WHERE w.workDate BETWEEN :fromDate AND :toDate
+           """</span>)
+    Long sumRePolishWorkByDateRange(LocalDate fromDate, LocalDate toDate);
+
+    <span class="com">// ── F. Bulk delete for cascade ──────────────────────────────</span>
+    <span class="ann">@Transactional</span>
+    <span class="ann">@Modifying</span>
+    <span class="ann">@Query</span>(<span class="str">"DELETE FROM EmployeeDailyWork w WHERE w.employee.id = :employeeId"</span>)
+    <span class="kw">int</span> deleteAllByEmployeeId(Long employeeId);
+
+    <span class="com">// ── G. Per-employee aggregate for a date range ──────────────</span>
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT w.employee.id,
+                  COALESCE(SUM(w.freshCount), 0),
+                  COALESCE(SUM(w.rePolishCount), 0),
+                  COUNT(DISTINCT w.workDate)
+           FROM EmployeeDailyWork w
+           WHERE w.workDate BETWEEN :fromDate AND :toDate
+           GROUP BY w.employee.id
+           """</span>)
+    List&lt;Object[]&gt; aggregateByEmployee(LocalDate fromDate, LocalDate toDate);
+
+    <span class="com">// ── H. All-time aggregate per employee ──────────────────────</span>
+    <span class="ann">@Query</span>(<span class="str">"""
+           SELECT w.employee.id,
+                  COALESCE(SUM(w.freshCount), 0),
+                  COALESCE(SUM(w.rePolishCount), 0)
+           FROM EmployeeDailyWork w
+           GROUP BY w.employee.id
+           """</span>)
+    List&lt;Object[]&gt; aggregateByAllEmployees();
+}</pre>
+    </div>
+
+    <h3>The 11 methods grouped by intent</h3>
+    <table class="ftable">
+      <thead><tr><th>Group</th><th>Methods</th><th>Used in</th></tr></thead>
+      <tbody>
+        <tr><td><strong>A. By employee</strong></td><td>findByEmployeeId (List + Page)</td><td>Worker dashboard, "my-list" endpoint</td></tr>
+        <tr><td><strong>B. By date</strong></td><td>findByWorkDate, findByWorkDateBetween</td><td>Daily snapshot, range reports</td></tr>
+        <tr><td><strong>C. Combined</strong></td><td>findByEmployeeIdAndWorkDateBetween</td><td>Worker summary endpoint</td></tr>
+        <tr><td><strong>D. Single-day sums</strong></td><td>sumFreshWorkByDate, sumRePolishWorkByDate</td><td>"Total polishing yesterday" stat cards</td></tr>
+        <tr><td><strong>E. Range sums</strong></td><td>sumFreshWorkByDateRange, sumRePolishWorkByDateRange</td><td>Admin revenue dashboard</td></tr>
+        <tr><td><strong>F. Bulk delete</strong></td><td>deleteAllByEmployeeId</td><td>EmployeeService.deleteEmployee cascade</td></tr>
+        <tr><td><strong>G. Range aggregate per employee</strong></td><td>aggregateByEmployee</td><td>Leave-productivity dashboard</td></tr>
+        <tr><td><strong>H. All-time aggregate</strong></td><td>aggregateByAllEmployees</td><td>"Total polishing per worker, ever"</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Why every SUM uses <code>COALESCE</code></h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">A typical SUM in this repo</span><span class="lang">JPQL</span></div>
+<pre>SELECT <span class="kw">COALESCE</span>(<span class="kw">SUM</span>(w.freshCount), 0)
+FROM EmployeeDailyWork w
+WHERE w.workDate = :workDate</pre>
+    </div>
+
+    <p>
+      <strong>The problem:</strong> If there are no matching rows (e.g., a date with no
+      polishing done), SQL's <code>SUM</code> returns <code>NULL</code>, not 0. JPA returns
+      that null to Java as <code>null Long</code>, which then NullPointerExceptions the moment
+      anything tries to use it for arithmetic.
+    </p>
+
+    <p>
+      <strong>The fix:</strong> <code>COALESCE(SUM(...), 0)</code> says: "if SUM is null, give
+      me 0 instead". Now the Java code can safely do
+      <code>repository.sumFreshWorkByDate(today) * rate</code> without any null guard.
+    </p>
+
+    <div class="callout brain">
+      <strong>Defensive aggregation pattern.</strong> Anywhere you SUM across rows that
+      might be empty, wrap in COALESCE. The alternative (handling null in Java) clutters
+      every call site. Put the safety in the query and call sites stay clean.
+    </div>
+
+    <h3>The aggregate query that returns <code>Object[]</code></h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">Per-employee aggregate for a date range</span><span class="lang">JPQL</span></div>
+<pre>SELECT w.employee.id,                                  <span class="com">// Object[0] = Long  empId</span>
+       <span class="kw">COALESCE</span>(<span class="kw">SUM</span>(w.freshCount), 0),                <span class="com">// Object[1] = Long  totalFresh</span>
+       <span class="kw">COALESCE</span>(<span class="kw">SUM</span>(w.rePolishCount), 0),             <span class="com">// Object[2] = Long  totalRepolish</span>
+       <span class="kw">COUNT</span>(<span class="kw">DISTINCT</span> w.workDate)                     <span class="com">// Object[3] = Long  distinctWorkdays</span>
+FROM EmployeeDailyWork w
+WHERE w.workDate BETWEEN :fromDate AND :toDate
+GROUP BY w.employee.id</pre>
+    </div>
+
+    <p>The four columns in the SELECT come back as a <code>List&lt;Object[]&gt;</code> — each row's array has 4 elements in the order shown. Callers iterate and cast:</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">How a caller reads the result</span><span class="lang">Java</span></div>
+<pre>List&lt;Object[]&gt; rows = repo.aggregateByEmployee(fromDate, toDate);
+<span class="kw">for</span> (Object[] row : rows) {
+    Long empId           = (Long) row[<span class="num2">0</span>];
+    Long totalFresh      = (Long) row[<span class="num2">1</span>];
+    Long totalRepolish   = (Long) row[<span class="num2">2</span>];
+    Long distinctWorkdays = (Long) row[<span class="num2">3</span>];
+    <span class="com">// build a per-employee summary DTO</span>
+}</pre>
+    </div>
+
+    <p>
+      Slightly verbose but pragmatic. The alternative — defining a projection interface or
+      record — works too but adds a new class for a one-use shape. NOOL accepts the
+      Object[] pattern here.
+    </p>
+
+    <h3>Why <code>COUNT(DISTINCT w.workDate)</code> matters</h3>
+    <p>
+      Notice the aggregate doesn't just count rows — it counts <strong>distinct work dates</strong>.
+      Why? Because in the (rare) edge case where a worker has multiple rows for one day
+      (which shouldn't happen due to the UNIQUE constraint, but defensive code never hurts),
+      a plain <code>COUNT(*)</code> would inflate the workday count. <code>DISTINCT workDate</code>
+      gives the true number of unique working days. Belt and braces.
+    </p>
+
+    <!-- ─── 2. RequestDto ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>EmployeeDailyWorkRequestDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/dailywork/EmployeeDailyWorkRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.dailywork;
+
+<span class="kw">import</span> jakarta.validation.constraints.NotNull;
+<span class="kw">import</span> jakarta.validation.constraints.PositiveOrZero;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> EmployeeDailyWorkRequestDto {
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Employee id is required"</span>)
+    <span class="kw">private</span> Long employeeId;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Word date is required"</span>)
+    <span class="kw">private</span> LocalDate workDate;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Fresh saree count is required"</span>)
+    <span class="ann">@PositiveOrZero</span>(message = <span class="str">"Fresh saree count cannot be negative"</span>)
+    <span class="kw">private</span> Integer freshCount;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Re-polish saree count is required"</span>)
+    <span class="ann">@PositiveOrZero</span>(message = <span class="str">"Re-polish saree count cannot be negative"</span>)
+    <span class="kw">private</span> Integer rePolishCount;
+}</pre>
+    </div>
+
+    <table class="ftable">
+      <thead><tr><th>Field</th><th>Validation</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>employeeId</code></td><td>@NotNull</td><td>Must point at a worker</td></tr>
+        <tr><td><code>workDate</code></td><td>@NotNull</td><td>Need to know which day</td></tr>
+        <tr><td><code>freshCount</code></td><td>@NotNull, @PositiveOrZero</td><td>Cannot be null or negative — but ZERO is valid (worker only did re-polish)</td></tr>
+        <tr><td><code>rePolishCount</code></td><td>@NotNull, @PositiveOrZero</td><td>Same as fresh — zero is valid</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Why <code>@PositiveOrZero</code> and not <code>@Positive</code>?</h3>
+    <div class="callout info">
+      A worker might have done only fresh-polish on a given day (zero re-polish), or vice
+      versa. <code>@PositiveOrZero</code> allows zero; <code>@Positive</code> would reject it,
+      forcing Dad to skip entry entirely. Allowing zero gives Dad a way to mark "Prema worked
+      today but did zero re-polish" without leaving an ambiguous gap.
+    </div>
+
+    <p>
+      Sample request body — Prema's typical Tuesday:
+    </p>
+    <div class="codewrap">
+      <div class="head"><span class="path">POST /api/employee-daily-working body</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"employeeId"</span>:    <span class="num2">5</span>,
+  <span class="str">"workDate"</span>:      <span class="str">"2026-05-15"</span>,
+  <span class="str">"freshCount"</span>:    <span class="num2">8</span>,
+  <span class="str">"rePolishCount"</span>: <span class="num2">2</span>
+}</pre>
+    </div>
+
+    <!-- ─── 3. ResponseDto ─── -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>EmployeeDailyWorkResponseDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/dailywork/EmployeeDailyWorkResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.dailywork;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> EmployeeDailyWorkResponseDto {
+    <span class="kw">private</span> Long      workId;
+    <span class="kw">private</span> Long      employeeId;
+    <span class="kw">private</span> String    employeeName;        <span class="com">// flattened from Employee join</span>
+    <span class="kw">private</span> LocalDate workDate;
+    <span class="kw">private</span> Integer   freshCount;
+    <span class="kw">private</span> Integer   rePolishCount;
+    <span class="kw">private</span> Double    todayRevenue;        <span class="com">// ★ computed field</span>
+}</pre>
+    </div>
+
+    <h3>The interesting bit — <code>todayRevenue</code></h3>
+    <p>
+      Unlike most response DTOs which just expose stored fields, this one includes a
+      <strong>computed value</strong>: <code>todayRevenue</code>. The service calculates it
+      at response time using the worker's polish rate.
+    </p>
+
+    <div class="formula">
+      <div class="label">todayRevenue computation in the service</div>
+      <div class="eq">
+        <span class="var">todayRevenue</span> = freshCount × employee.polishRate
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <strong>An interesting quirk — only freshCount is in the formula!</strong> Looking at
+      the actual service code (Chapter 36), the revenue is computed as
+      <code>freshCount * polishRate</code>, NOT <code>(freshCount + rePolishCount) * polishRate</code>.
+      That might be intentional (re-polish doesn't earn revenue because the saree was already
+      paid for), or it might be a subtle bug. Either way, the design choice currently treats
+      <code>rePolishCount</code> as informational-only for revenue purposes. This is worth
+      flagging in a code review.
+    </div>
+
+    <p>Sample response:</p>
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample response</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"workId"</span>:        <span class="num2">89</span>,
+  <span class="str">"employeeId"</span>:    <span class="num2">5</span>,
+  <span class="str">"employeeName"</span>:  <span class="str">"Prema"</span>,
+  <span class="str">"workDate"</span>:      <span class="str">"2026-05-15"</span>,
+  <span class="str">"freshCount"</span>:    <span class="num2">8</span>,
+  <span class="str">"rePolishCount"</span>: <span class="num2">2</span>,
+  <span class="str">"todayRevenue"</span>:  <span class="num2">240.0</span>          <span class="sc">// 8 × ₹30</span>
+}</pre>
+    </div>
+
+    <!-- ─── 4. ListDto ─── -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>EmployeeDailyWorkListDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/dailywork/EmployeeDailyWorkListDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.dailywork;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> EmployeeDailyWorkListDto {
+    <span class="kw">private</span> Long      workId;
+    <span class="kw">private</span> Long      employeeId;
+    <span class="kw">private</span> String    employeeName;
+    <span class="kw">private</span> LocalDate workDate;
+    <span class="kw">private</span> Integer   freshCount;
+    <span class="kw">private</span> Integer   rePolishCount;
+    <span class="kw">private</span> Double    todayEarning;        <span class="com">// ★ note: "Earning" here, "Revenue" in ResponseDto</span>
+}</pre>
+    </div>
+
+    <h3>A subtle naming inconsistency</h3>
+    <div class="callout warn">
+      Notice the field is <code>todayEarning</code> here, but <code>todayRevenue</code> in
+      the ResponseDto. Same value, two different names. This is a small inconsistency in
+      the codebase — the two DTOs were written at different times. In practice the frontend
+      handles both, but a cleanup would unify them. Worth flagging.
+    </div>
+
+    <!-- ─── 5. SummaryDto ─── -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>EmployeeWorkSummaryDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/dailywork/EmployeeWorkSummaryDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.dailywork;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> EmployeeWorkSummaryDto {
+    <span class="kw">private</span> Long    employeeId;
+    <span class="kw">private</span> String  employeeName;
+    <span class="kw">private</span> Long    totalWorkDays;       <span class="com">// rows in the range</span>
+    <span class="kw">private</span> Long    totalFreshCount;     <span class="com">// SUM of freshCount</span>
+    <span class="kw">private</span> Long    totalRePolishCount;  <span class="com">// SUM of rePolishCount</span>
+    <span class="kw">private</span> Double  totalRevenue;        <span class="com">// totalFreshCount × polishRate</span>
+}</pre>
+    </div>
+
+    <p>Sample response:</p>
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample summary for Prema, May 1-15</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"employeeId"</span>:         <span class="num2">5</span>,
+  <span class="str">"employeeName"</span>:       <span class="str">"Prema"</span>,
+  <span class="str">"totalWorkDays"</span>:      <span class="num2">13</span>,
+  <span class="str">"totalFreshCount"</span>:    <span class="num2">104</span>,
+  <span class="str">"totalRePolishCount"</span>: <span class="num2">26</span>,
+  <span class="str">"totalRevenue"</span>:        <span class="num2">3120.0</span>      <span class="sc">// 104 × ₹30 — only fresh counts toward revenue</span>
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad logs Prema's Friday work</h5>
+      <ol>
+        <li>End of day. Dad asks Prema "how many today?". She says "10 fresh, 2 re-polish".</li>
+        <li>Frontend posts <code>{ "employeeId": 5, "workDate": "2026-05-15", "freshCount": 10, "rePolishCount": 2 }</code>.</li>
+        <li>Validation passes (all four @NotNull pass; both counts are ≥ 0).</li>
+        <li>Service inserts a row. UNIQUE constraint on (employee_id, work_date) ensures no duplicate.</li>
+        <li>Response includes <code>todayRevenue: 300.0</code> (10 × ₹30).</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Prema views her own daily-work history</h5>
+      <ol>
+        <li>Frontend POST <code>/api/employee-daily-working/my-list</code> with pagination.</li>
+        <li>Service uses <code>findByEmployeeId(5, pageable)</code> — the @EntityGraph variant — to load rows + employee in one query.</li>
+        <li>Each row mapped to ListDto with the computed <code>todayEarning</code>.</li>
+        <li>Frontend renders a paginated table.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Workshop-wide stats for Diwali week</h5>
+      <ol>
+        <li>Admin dashboard service calls <code>sumFreshWorkByDateRange('2026-10-19', '2026-10-25')</code>.</li>
+        <li>SQL runs: <code>SELECT COALESCE(SUM(fresh_saree_count), 0) FROM employee_daily_work WHERE work_date BETWEEN ...</code>.</li>
+        <li>Returns: 540 (workshop-wide total fresh sarees in Diwali week).</li>
+        <li>Same with re-polish. Dashboard cards display both.</li>
+        <li>Even if no work was logged in that range, COALESCE saves us from a NullPointerException.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Generating a per-employee productivity report</h5>
+      <ol>
+        <li>Admin → Leave-productivity dashboard for May 1-15.</li>
+        <li>Service calls <code>aggregateByEmployee('2026-05-01', '2026-05-15')</code>.</li>
+        <li>SQL returns one row per worker: <code>[5, 104, 26, 13]</code>, <code>[8, 96, 14, 12]</code>, ...</li>
+        <li>Service casts each Object[] to typed values, builds a summary DTO per worker.</li>
+        <li>Dashboard renders a sortable table — Prema 104 fresh, Ravi 96 fresh, etc.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Cascade-delete when removing a worker</h5>
+      <ol>
+        <li>Admin hard-deletes employee 5.</li>
+        <li>EmployeeServiceImpl.deleteEmployee calls <code>dailyWorkRepository.deleteAllByEmployeeId(5)</code>.</li>
+        <li>Single SQL: <code>DELETE FROM employee_daily_work WHERE employee_id = 5</code>.</li>
+        <li>All of Prema's daily-work history vanishes — required before the parent Employee row can be deleted.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common daily-work-repo / DTO mistakes</h5>
+      <div class="item">
+        <div class="bad">Forgetting <code>COALESCE</code> on SUM queries</div>
+        <div class="good">A SUM over empty rows returns NULL → JPA gives you a null Long → NullPointerException in callers. <code>COALESCE(SUM(...), 0)</code> defends against this at the query level.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Using <code>@Positive</code> instead of <code>@PositiveOrZero</code> on counts</div>
+        <div class="good">Zero is a valid count. A worker might have done only re-polish (zero fresh) or vice-versa. <code>@Positive</code> would force Dad to fudge the numbers.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Computing revenue as <code>(fresh + rePolish) × rate</code> in the response DTO</div>
+        <div class="good">Current code only multiplies <code>freshCount × rate</code>. If your business rule is different, change BOTH the response DTO computation AND the summary computation — they must agree.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Using <code>COUNT(*)</code> instead of <code>COUNT(DISTINCT workDate)</code></div>
+        <div class="good">If two rows ever existed for one (employee, date), COUNT(*) double-counts the workday. DISTINCT workDate is defensive — same result usually, but safe if the UNIQUE constraint ever lapses.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting <code>@EntityGraph</code> on the paginated <code>findByEmployeeId</code></div>
+        <div class="good">Without it, every row triggers a separate query to load the Employee — classic N+1. The annotation forces a single JOIN.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Returning the entity directly from a list endpoint</div>
+        <div class="good">List DTOs include the computed <code>todayEarning</code> — not stored on the entity. Mapping in the service is the right place to compute it.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why does this repo have BOTH single-day SUM methods and date-range SUM methods?</div>
+        <div class="a">
+          Different dashboards need different aggregates. The single-day version powers "today's
+          total polishing" cards on the admin home; the range version powers monthly / weekly
+          revenue charts. Separating them lets each query be optimised individually. Both use
+          COALESCE for the same null-safety reason.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why return <code>Object[]</code> from aggregate queries instead of a projection class?</div>
+        <div class="a">
+          Pragmatism. Defining a typed projection class (record or interface) makes the call
+          site cleaner but adds a new class for a one-use shape. Object[] keeps the API
+          minimal — the service immediately maps the array into a domain DTO. The trade-off:
+          slightly less type-safe at the JPA boundary, but only one place needs to know the
+          ordering.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">If a worker submits 0 fresh and 0 repolish, should a row be inserted?</div>
+        <div class="a">
+          Technically yes — the validation allows it. In practice, Dad wouldn't normally do
+          this; it's just informational. The salary calculation would credit zero earnings
+          for that day. If you wanted to forbid all-zero rows, you'd add a custom validator
+          (<code>@AssertTrue</code> on a derived "is non-zero" method).
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What does <code>@EntityGraph(attributePaths = "employee")</code> actually generate?</div>
+        <div class="a">
+          A LEFT OUTER JOIN to the employees table in the same SQL that retrieves the
+          EmployeeDailyWork rows. The associated Employee object is fully loaded for every
+          returned row — no lazy loading later. For paginated list endpoints that render
+          the worker's name, this avoids N+1 queries.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is <code>todayRevenue</code> a <code>Double</code> and not <code>BigDecimal</code>?</div>
+        <div class="a">
+          Consistency with the rest of NOOL — polishRate is Double, owner rates are Double,
+          salary amounts are Double. For whole-rupee values multiplied by integer counts, the
+          precision loss is negligible. If we ever support paise-level precision or multi-currency,
+          switching to BigDecimal would be a project-wide migration.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>Repo and DTOs done. Next chapter implements the service — adding daily work entries, listing them, and computing summaries with the revenue formula.</p>
+
+    <div class="chapnav">
+      <a href="34-attendance-controller.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 34 · AttendanceController</span></a>
+      <a href="36-daily-work-service.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 36 · DailyWorkService + Impl</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 35 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

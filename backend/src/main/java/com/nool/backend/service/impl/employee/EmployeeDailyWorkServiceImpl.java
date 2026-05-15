@@ -8,9 +8,13 @@ import com.nool.backend.dto.dailywork.EmployeeDailyWorkListDto;
 import com.nool.backend.dto.dailywork.EmployeeDailyWorkRequestDto;
 import com.nool.backend.dto.dailywork.EmployeeDailyWorkResponseDto;
 import com.nool.backend.dto.dailywork.EmployeeWorkSummaryDto;
+import com.nool.backend.entity.employee.Attendance;
 import com.nool.backend.entity.employee.Employee;
 import com.nool.backend.entity.employee.EmployeeDailyWork;
+import com.nool.backend.enums.AttendanceStatus;
+import com.nool.backend.exception.BadRequestException;
 import com.nool.backend.exception.ResourceNotFoundException;
+import com.nool.backend.repository.employee.AttendanceRepository;
 import com.nool.backend.repository.employee.EmployeeDailyWorkRepository;
 import com.nool.backend.repository.employee.EmployeeRepository;
 import com.nool.backend.service.employee.EmployeeDailyWorkService;
@@ -28,6 +32,7 @@ import java.util.stream.Collectors;
 public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
     private final EmployeeDailyWorkRepository employeeDailyWorkRepository;
     private final EmployeeRepository employeeRepository;
+    private final AttendanceRepository attendanceRepository;
 
     private EmployeeDailyWorkListDto mapToListDto(EmployeeDailyWork employeeDailyWork) {
         return EmployeeDailyWorkListDto.builder()
@@ -45,6 +50,23 @@ public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {
     @Override
     public EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {
         Employee employee = employeeRepository.findById(requestDto.getEmployeeId()).orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+        // Hard constraint: daily work can only be recorded for a date on which the
+        // employee was marked PRESENT. We don't pay for sarees polished on a day
+        // the employee never came in.
+        Attendance attendance = attendanceRepository
+                .findByEmployeeIdAndAttendanceDate(employee.getId(), requestDto.getWorkDate())
+                .orElseThrow(() -> new BadRequestException(
+                        "Cannot record work for " + employee.getName() + " on " + requestDto.getWorkDate() +
+                        " — attendance has not been marked yet. Mark attendance first, then record the work."));
+
+        if (attendance.getAttendanceStatus() != AttendanceStatus.PRESENT) {
+            throw new BadRequestException(
+                    "Cannot record work for " + employee.getName() + " on " + requestDto.getWorkDate() +
+                    " — attendance is marked " + attendance.getAttendanceStatus() +
+                    ". Daily work can only be saved for PRESENT days.");
+        }
+
         EmployeeDailyWork employeeDailyWork = EmployeeDailyWork.builder()
                 .employee(employee)
                 .workDate(requestDto.getWorkDate())

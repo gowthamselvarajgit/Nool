@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 36 · EmployeeDailyWorkService + Impl · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  /* Line-by-line walkthrough styling */
+  .lbl { margin: 18px 0; }
+  .lbl .step {
+    background: white; border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 18px; margin: 10px 0;
+    box-shadow: var(--shadow-sm);
+  }
+  .lbl .step .step-num {
+    display: inline-block;
+    background: var(--primary); color: white;
+    min-width: 28px; height: 28px; border-radius: 14px;
+    text-align: center; line-height: 28px; padding: 0 8px;
+    font-weight: 700; font-size: 12px;
+    margin-right: 10px; vertical-align: middle;
+  }
+  .lbl .step .step-code {
+    display: inline-block;
+    background: var(--code-bg); color: var(--code-ink);
+    padding: 3px 10px; border-radius: 6px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 13px;
+    margin: 4px 0;
+    vertical-align: middle;
+  }
+  .lbl .step .step-body { margin-top: 8px; font-size: 14.5px; color: var(--ink-soft); line-height: 1.65; }
+  .lbl .step .step-body strong { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 36 · The Daily Work Brain · LINE-BY-LINE</span>
+    <h1>
+      <span class="gradient">EmployeeDailyWorkService</span> &amp; Impl
+    </h1>
+    <p class="subtitle">
+      Five methods that turn raw polish counts into earnings. This chapter walks through
+      <strong>every single line</strong> of the implementation — not just summaries, but
+      each line explained explicitly so nothing is left to guesswork.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">⚒️</div>
+      <div class="fmeta">
+        <h3>EmployeeDailyWorkService.java + EmployeeDailyWorkServiceImpl.java</h3>
+        <span class="fpath">backend/.../service/employee/ + service/impl/employee/</span>
+        <div class="ftags"><span>@Service</span><span>5 methods</span><span>Earnings calc</span><span>Self-or-admin</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> What This Service Does</h2>
+    <p>
+      When Dad clicks "Add Daily Work" for Prema, this is the file that runs. It validates
+      the worker exists, inserts the row, computes today's earnings, and sends back the
+      response. It also powers the worker's "my history" page and the per-worker summary
+      reports. Five public methods and one private helper.
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>What it does</th><th>Who can call</th></tr></thead>
+      <tbody>
+        <tr><td><code>addDailyWork(dto)</code></td><td>Log one (employee, date, fresh, repolish) row</td><td>ADMIN</td></tr>
+        <tr><td><code>getDailyWorkList(pagination)</code></td><td>Admin view of all daily-work rows</td><td>ADMIN</td></tr>
+        <tr><td><code>getMyDailyWorkList(pagination)</code></td><td>Worker views own history</td><td>ADMIN or WORKER (self via JWT)</td></tr>
+        <tr><td><code>getEmployeeWorkSummary(id, range)</code></td><td>Totals for one worker over a date range</td><td>ADMIN; WORKER for own id only</td></tr>
+        <tr><td><code>getMyWorkSummary(range)</code></td><td>Worker's own totals</td><td>WORKER (delegates to the method above)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 1. The interface -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">1️⃣</span> The Interface — <code>EmployeeDailyWorkService.java</code></h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">service/employee/EmployeeDailyWorkService.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.service.employee;
+
+<span class="kw">import</span> com.nool.backend.dto.common.DateRangeDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationResponseDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeDailyWorkListDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeDailyWorkRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeDailyWorkResponseDto;
+<span class="kw">import</span> com.nool.backend.dto.dailywork.EmployeeWorkSummaryDto;
+
+<span class="kw">public interface</span> EmployeeDailyWorkService {
+    EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto);
+
+    PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getDailyWorkList(PaginationRequestDto paginationRequestDto);
+    PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getMyDailyWorkList(PaginationRequestDto paginationRequestDto);
+
+    EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto);
+    EmployeeWorkSummaryDto getMyWorkSummary(DateRangeDto dateRangeDto);
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">package com.nool.backend.service.employee;</span>
+        <div class="step-body">
+          Declares which package this interface lives in. The folder structure on disk must
+          match: <code>backend/src/main/java/com/nool/backend/service/employee/</code>. Spring's
+          component scan starts from <code>com.nool.backend</code>, so this package is included
+          automatically — no manual registration needed.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">import ... DateRangeDto, PaginationRequestDto, PaginationResponseDto;</span>
+        <div class="step-body">
+          The three <strong>common</strong> DTOs we've seen many times. <code>DateRangeDto</code>
+          is the body for summary endpoints (fromDate + toDate). <code>PaginationRequestDto</code>
+          is the input for list endpoints (page, size, sortBy, etc.). <code>PaginationResponseDto&lt;T&gt;</code>
+          is the generic response wrapper holding the content list plus paging metadata.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-code">import ... EmployeeDailyWorkListDto, RequestDto, ResponseDto, WorkSummaryDto;</span>
+        <div class="step-body">
+          The four module-specific DTOs from Chapter 35. <strong>RequestDto</strong> for create
+          payloads, <strong>ResponseDto</strong> for a single-row create response (includes
+          computed <code>todayRevenue</code>), <strong>ListDto</strong> for paginated rows
+          (includes per-row <code>todayEarning</code>), and <strong>SummaryDto</strong> for
+          range aggregates.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-code">public interface EmployeeDailyWorkService {</span>
+        <div class="step-body">
+          The interface declaration. Marking it <code>public</code> lets controllers in
+          other packages depend on it. Spring's DI wires the interface to its implementation
+          automatically — controllers reference the interface, never the impl directly. This
+          makes mocking easier in tests.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-code">EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto);</span>
+        <div class="step-body">
+          The write endpoint contract. Takes the validated request DTO, returns the response
+          DTO with the new row's ID and computed revenue. No <code>throws</code> declarations —
+          runtime exceptions (like ResourceNotFoundException) propagate up to the
+          GlobalExceptionHandler from Chapter 09.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">6</span>
+        <span class="step-code">PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getDailyWorkList(...);</span>
+        <div class="step-body">
+          Admin browse endpoint. Returns a typed page of list DTOs. The generic
+          <code>&lt;EmployeeDailyWorkListDto&gt;</code> tells callers exactly what the
+          <code>content</code> list inside the response holds — strong compile-time type safety.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">7</span>
+        <span class="step-code">PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getMyDailyWorkList(...);</span>
+        <div class="step-body">
+          The worker variant. Same return type, but the implementation will filter rows to
+          just the caller's own data — the <code>employeeId</code> is read from the JWT, not
+          from the request body. So workers can never accidentally request someone else's
+          rows.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">8</span>
+        <span class="step-code">EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto);</span>
+        <div class="step-body">
+          Per-employee summary. Two parameters: the employee ID (typically from the URL path)
+          and the date range (from the request body). Implementation runs a self-or-admin
+          check so workers can only request their own summary.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">9</span>
+        <span class="step-code">EmployeeWorkSummaryDto getMyWorkSummary(DateRangeDto dateRangeDto);</span>
+        <div class="step-body">
+          The "my" variant. Takes only the date range — the employee ID is inferred from
+          the JWT. Returns the same summary shape.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 2. Impl class header + helper -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">2️⃣</span> Implementation — Class Header + Private Helper</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeDailyWorkServiceImpl.java — top</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.service.impl.employee;
+
+<span class="com">// imports omitted for brevity</span>
+
+<span class="ann">@Service</span>
+<span class="ann">@RequiredArgsConstructor</span>
+<span class="kw">public class</span> EmployeeDailyWorkServiceImpl <span class="kw">implements</span> EmployeeDailyWorkService {
+
+    <span class="kw">private final</span> EmployeeDailyWorkRepository employeeDailyWorkRepository;
+    <span class="kw">private final</span> EmployeeRepository          employeeRepository;
+
+    <span class="kw">private</span> EmployeeDailyWorkListDto mapToListDto(EmployeeDailyWork employeeDailyWork) {
+        <span class="kw">return</span> EmployeeDailyWorkListDto.builder()
+                .workId(employeeDailyWork.getId())
+                .employeeId(employeeDailyWork.getEmployee().getId())
+                .employeeName(employeeDailyWork.getEmployee().getName())
+                .workDate(employeeDailyWork.getWorkDate())
+                .freshCount(employeeDailyWork.getFreshCount())
+                .rePolishCount(employeeDailyWork.getRePolishCount())
+                .todayEarning(
+                    employeeDailyWork.getFreshCount() *
+                    employeeDailyWork.getEmployee().getPolishRate()
+                )
+                .build();
+    }
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">@Service</span>
+        <div class="step-body">
+          Marks this class as a Spring-managed service bean. At startup, Spring's component
+          scan finds it, instantiates a singleton, and makes it available for injection
+          wherever <code>EmployeeDailyWorkService</code> is needed. Functionally identical
+          to <code>@Component</code> — <code>@Service</code> is a semantic label saying "this
+          contains business logic".
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">@RequiredArgsConstructor</span>
+        <div class="step-body">
+          Lombok annotation. Generates a constructor that takes every <code>final</code> field
+          as a parameter. Spring then uses that constructor for dependency injection. The
+          equivalent hand-written constructor would be ~6 lines — Lombok saves us that
+          boilerplate.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-code">public class EmployeeDailyWorkServiceImpl implements EmployeeDailyWorkService {</span>
+        <div class="step-body">
+          The class declaration. <code>implements EmployeeDailyWorkService</code> ties this
+          impl to the interface. The compiler enforces that every interface method appears
+          here — if a name or signature drifts, compilation fails immediately.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-code">private final EmployeeDailyWorkRepository employeeDailyWorkRepository;</span>
+        <div class="step-body">
+          The repository for the <code>employee_daily_work</code> table — defined in
+          Chapter 35. <code>private final</code>: not exposed outside this class, set
+          exactly once by the generated constructor. Spring injects the singleton repository
+          bean at startup.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-code">private final EmployeeRepository employeeRepository;</span>
+        <div class="step-body">
+          The repository for the <code>employees</code> table. Needed because adding a
+          daily-work entry requires looking up the worker first (to verify they exist and
+          to read their <code>polishRate</code> for earnings computation).
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">6</span>
+        <span class="step-code">private EmployeeDailyWorkListDto mapToListDto(EmployeeDailyWork employeeDailyWork) {</span>
+        <div class="step-body">
+          A private helper method. Takes one JPA entity, returns the list-row DTO. Marked
+          <code>private</code> because nothing outside this class should call it. Used in
+          two places (<code>getDailyWorkList</code> and <code>getMyDailyWorkList</code>);
+          extracting it avoids copy-pasting the same builder twice.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">7</span>
+        <span class="step-code">return EmployeeDailyWorkListDto.builder()</span>
+        <div class="step-body">
+          Begin building a DTO using Lombok's generated builder. The builder pattern lets us
+          chain <code>.field(value)</code> calls in any order and end with
+          <code>.build()</code> — much cleaner than a positional constructor with 7 args.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">8</span>
+        <span class="step-code">.workId(employeeDailyWork.getId())</span>
+        <div class="step-body">
+          Copy the entity's primary key (the auto-generated <code>work_id</code>) into the
+          DTO's <code>workId</code> field. <code>.getId()</code> is Lombok's auto-generated
+          getter on the entity.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">9</span>
+        <span class="step-code">.employeeId(employeeDailyWork.getEmployee().getId())</span>
+        <div class="step-body">
+          Flatten the relationship. The entity has a full <code>Employee</code> object via
+          its <code>@ManyToOne</code>; we extract just the ID and put it as a plain Long on
+          the DTO. The frontend doesn't need the whole Employee object — only the ID for
+          internal linking.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">10</span>
+        <span class="step-code">.employeeName(employeeDailyWork.getEmployee().getName())</span>
+        <div class="step-body">
+          Flatten the name too. This is a deliberate denormalization — the frontend renders
+          "Prema · 8 + 2 sarees" in the list without a second API call to translate IDs to
+          names. One request, all the display data ready to go.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">11</span>
+        <span class="step-code">.workDate(employeeDailyWork.getWorkDate())</span>
+        <div class="step-body">
+          Copy the business date as-is. <code>LocalDate</code> serializes cleanly to a
+          <code>"YYYY-MM-DD"</code> string in the response JSON.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">12-13</span>
+        <span class="step-code">.freshCount(...).rePolishCount(...)</span>
+        <div class="step-body">
+          Copy the two counts straight through. Both are <code>Integer</code> on entity and
+          DTO; no transformation needed.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">14-17</span>
+        <span class="step-code">.todayEarning(employeeDailyWork.getFreshCount() * employeeDailyWork.getEmployee().getPolishRate())</span>
+        <div class="step-body">
+          <strong>The crucial computed field.</strong> Multiplies fresh count by the worker's
+          per-saree rate to compute today's earnings. <strong>Notice the formula uses ONLY
+          freshCount</strong>, not <code>(fresh + rePolish)</code>. This is a subtle
+          business-rule quirk flagged in Chapter 35. If you ever interpret "earnings" as
+          including re-polish work, this is one of three places that needs updating to
+          stay consistent.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">18</span>
+        <span class="step-code">.build();</span>
+        <div class="step-body">
+          Finalise the builder and return the immutable DTO instance.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 3. addDailyWork -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>addDailyWork()</code> — Logging Today's Work</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeDailyWorkServiceImpl.addDailyWork()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {
+    Employee employee = employeeRepository.findById(requestDto.getEmployeeId())
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+
+    EmployeeDailyWork employeeDailyWork = EmployeeDailyWork.builder()
+            .employee(employee)
+            .workDate(requestDto.getWorkDate())
+            .freshCount(requestDto.getFreshCount())
+            .rePolishCount(requestDto.getRePolishCount())
+            .build();
+
+    EmployeeDailyWork saved = employeeDailyWorkRepository.save(employeeDailyWork);
+    <span class="kw">double</span>  todayEarning = saved.getFreshCount() * employee.getPolishRate();
+
+    <span class="kw">return</span> EmployeeDailyWorkResponseDto.builder()
+            .workId(saved.getId())
+            .employeeId(employee.getId())
+            .employeeName(employee.getName())
+            .workDate(saved.getWorkDate())
+            .freshCount(saved.getFreshCount())
+            .rePolishCount(saved.getRePolishCount())
+            .todayRevenue(todayEarning)
+            .build();
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">@Override</span>
+        <div class="step-body">
+          Tells the compiler this method overrides one declared in the interface. If we ever
+          rename the method or change its signature without updating the interface, compilation
+          fails — a safety net against typos. Strictly optional but always recommended.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">public EmployeeDailyWorkResponseDto addDailyWork(EmployeeDailyWorkRequestDto requestDto) {</span>
+        <div class="step-body">
+          The method signature. By the time this runs, Spring has already deserialized the JSON
+          body into <code>requestDto</code>, and the controller's <code>@Valid</code> has
+          verified all four required fields. So we can trust the DTO is structurally valid.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3-4</span>
+        <span class="step-code">Employee employee = employeeRepository.findById(requestDto.getEmployeeId())<br/>&nbsp;&nbsp;&nbsp;.orElseThrow(() -&gt; new ResourceNotFoundException("Employee not found"));</span>
+        <div class="step-body">
+          <strong>Step 1: verify the employee exists.</strong> <code>findById</code> returns
+          <code>Optional&lt;Employee&gt;</code> — present if found, empty if not.
+          <code>.orElseThrow(...)</code> means: if empty, throw the custom exception. The
+          exception is caught by GlobalExceptionHandler and returned as HTTP 404. Without
+          this guard, line 6 below would NPE on a missing worker.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-code">EmployeeDailyWork employeeDailyWork = EmployeeDailyWork.builder()</span>
+        <div class="step-body">
+          <strong>Step 2: build the entity.</strong> Start the Lombok builder for the entity.
+          This is just an in-memory object so far — no DB write yet.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">6</span>
+        <span class="step-code">.employee(employee)</span>
+        <div class="step-body">
+          Set the <code>@ManyToOne</code> relationship. Pass the full <code>Employee</code>
+          object we just loaded. Hibernate will use its ID to populate the
+          <code>employee_id</code> foreign key column during INSERT.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">7</span>
+        <span class="step-code">.workDate(requestDto.getWorkDate())</span>
+        <div class="step-body">
+          Copy the business date from the request. This is when the work was DONE — not when
+          the row is being inserted. Dad might log Friday's work on Saturday morning;
+          <code>workDate</code> stores Friday's date so reports remain accurate.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">8-9</span>
+        <span class="step-code">.freshCount(requestDto.getFreshCount()).rePolishCount(requestDto.getRePolishCount())</span>
+        <div class="step-body">
+          Copy the two integer counts. Validation has already ensured both are non-negative
+          (the DTO uses <code>@PositiveOrZero</code>). Zero is allowed because a worker might
+          have done only one kind of polish on a given day.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">10</span>
+        <span class="step-code">.build();</span>
+        <div class="step-body">
+          Finalise. We now hold a fully-constructed but unsaved entity. Its <code>id</code> is
+          still <code>null</code> — Hibernate assigns it on insert.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">11</span>
+        <span class="step-code">EmployeeDailyWork saved = employeeDailyWorkRepository.save(employeeDailyWork);</span>
+        <div class="step-body">
+          <strong>Step 3: persist the row.</strong> Spring Data delegates to Hibernate, which
+          builds <code>INSERT INTO employee_daily_work (...) VALUES (...)</code> and executes
+          it. <strong>This is where the UNIQUE constraint on (employee_id, work_date) is
+          tested</strong>: a duplicate triggers a <code>DataIntegrityViolationException</code>,
+          translated by GlobalExceptionHandler into "A daily work entry already exists"
+          (HTTP 409). The <code>@PrePersist</code> hook on the entity also stamps
+          <code>created_at</code> and <code>updated_at</code>. The returned <code>saved</code>
+          carries the DB-assigned <code>id</code>.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">12</span>
+        <span class="step-code">double todayEarning = saved.getFreshCount() * employee.getPolishRate();</span>
+        <div class="step-body">
+          <strong>Step 4: compute today's earnings.</strong> Multiply fresh count by the
+          worker's per-saree rate. <code>employee.getPolishRate()</code> reads from the
+          already-loaded Employee — no extra DB query. <strong>Same quirk as the mapper</strong>:
+          only <code>freshCount</code> is in the product, not <code>fresh + rePolish</code>.
+          The local variable is named <code>todayEarning</code>, but the response DTO field
+          is named <code>todayRevenue</code> — a mild naming inconsistency between this
+          method and the list mapper.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">13-21</span>
+        <span class="step-code">return EmployeeDailyWorkResponseDto.builder().workId(...)....build();</span>
+        <div class="step-body">
+          <strong>Step 5: build and return the response.</strong> Eight chained builder calls.
+          <code>workId</code> from the saved row's ID, <code>employeeId</code> and
+          <code>employeeName</code> from the loaded employee (flattened denormalization),
+          <code>workDate</code>/<code>freshCount</code>/<code>rePolishCount</code> from the
+          saved row, and finally <code>todayRevenue</code> = the value we just computed.
+          Spring serializes the result to JSON.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 4. getDailyWorkList -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>getDailyWorkList()</code> — Admin Paginated Browse</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeDailyWorkServiceImpl.getDailyWorkList()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getDailyWorkList(PaginationRequestDto paginationRequestDto) {
+
+    PageRequest pageRequest = PageRequest.of(
+            paginationRequestDto.getPage(),
+            paginationRequestDto.getSize(),
+            Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+            paginationRequestDto.getSortBy());
+
+    Page&lt;EmployeeDailyWork&gt; page = employeeDailyWorkRepository.findAll(pageRequest);
+
+    List&lt;EmployeeDailyWorkListDto&gt; content = page
+            .getContent()
+            .stream()
+            .map(<span class="kw">this</span>::mapToListDto)
+            .collect(Collectors.toList());
+
+    <span class="kw">return</span> PaginationResponseDto.&lt;EmployeeDailyWorkListDto&gt;builder()
+            .content(content)
+            .page(page.getNumber())
+            .size(page.getSize())
+            .totalElements(page.getTotalElements())
+            .totalPages(page.getTotalPages())
+            .last(page.isLast())
+            .build();
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">@Override</span>
+        <div class="step-body">
+          Marks this as implementing an interface method. Compile-time safety.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">public PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getDailyWorkList(PaginationRequestDto paginationRequestDto) {</span>
+        <div class="step-body">
+          Method signature. Takes the pagination DTO (page index, size, sort field, direction,
+          search keyword). Returns a typed page of list DTOs.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3-7</span>
+        <span class="step-code">PageRequest pageRequest = PageRequest.of(page, size, Sort.Direction.valueOf(direction), sortBy);</span>
+        <div class="step-body">
+          <strong>Step 1: build the Spring Data PageRequest.</strong> Four arguments:
+          zero-based page number, page size, sort direction (parsed from the string in the
+          DTO via <code>Sort.Direction.valueOf("ASC" | "DESC")</code>), and the column name
+          to sort by. Spring Data will translate this into <code>LIMIT</code>,
+          <code>OFFSET</code>, and <code>ORDER BY</code> clauses in the generated SQL.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">8</span>
+        <span class="step-code">Page&lt;EmployeeDailyWork&gt; page = employeeDailyWorkRepository.findAll(pageRequest);</span>
+        <div class="step-body">
+          <strong>Step 2: query.</strong> Spring Data's inherited <code>findAll(Pageable)</code>
+          fires one SQL: <code>SELECT * FROM employee_daily_work ORDER BY ... LIMIT ? OFFSET ?</code>
+          plus a second <code>SELECT COUNT(*) FROM employee_daily_work</code> for total
+          counts. The returned <code>Page</code> object holds both the rows and the metadata
+          (current page, total elements, total pages, etc.).
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">9-13</span>
+        <span class="step-code">List&lt;...&gt; content = page.getContent().stream().map(this::mapToListDto).collect(...);</span>
+        <div class="step-body">
+          <strong>Step 3: convert entities to DTOs.</strong> <code>page.getContent()</code>
+          returns a <code>List&lt;EmployeeDailyWork&gt;</code> — the actual rows on this page.
+          <code>.stream()</code> opens a stream for functional processing.
+          <code>.map(this::mapToListDto)</code> applies our private helper to each entity
+          (method reference shorthand for <code>w -&gt; mapToListDto(w)</code>).
+          <code>.collect(Collectors.toList())</code> gathers the mapped DTOs into a new list.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">14-21</span>
+        <span class="step-code">return PaginationResponseDto.&lt;...&gt;builder().content(content).page(...)...build();</span>
+        <div class="step-body">
+          <strong>Step 4: wrap in the standard pagination response.</strong> The explicit
+          generic <code>.&lt;EmployeeDailyWorkListDto&gt;builder()</code> tells the builder
+          what element type the <code>content</code> field holds. Then we copy six values
+          from the Spring <code>Page</code>: the content list, current page index, page size,
+          total elements (across ALL pages), total page count, and a boolean
+          <code>isLast()</code>. The frontend uses these to draw the pagination footer.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 5. getMyDailyWorkList -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>getMyDailyWorkList()</code> — Worker's Own List</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeDailyWorkServiceImpl.getMyDailyWorkList()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> PaginationResponseDto&lt;EmployeeDailyWorkListDto&gt; getMyDailyWorkList(PaginationRequestDto paginationRequestDto) {
+    Long employeeId = CurrentUserUtil.getEmployeeId();
+    <span class="kw">if</span> (employeeId == <span class="kw">null</span>){
+        <span class="kw">throw new</span> RuntimeException(<span class="str">"Access denied"</span>);
+    }
+
+    PageRequest pageRequest = PageRequest.of(
+            paginationRequestDto.getPage(),
+            paginationRequestDto.getSize(),
+            Sort.Direction.valueOf(paginationRequestDto.getSortingDirection()),
+            paginationRequestDto.getSortBy()
+    );
+
+    Page&lt;EmployeeDailyWork&gt; page = employeeDailyWorkRepository.findByEmployeeId(employeeId, pageRequest);
+    List&lt;EmployeeDailyWorkListDto&gt; content = page.getContent()
+            .stream()
+            .map(<span class="kw">this</span>::mapToListDto)
+            .collect(Collectors.toList());
+
+    <span class="kw">return</span> PaginationResponseDto.&lt;EmployeeDailyWorkListDto&gt;builder()
+            .content(content)
+            .page(page.getNumber())
+            .size(page.getSize())
+            .totalElements(page.getTotalElements())
+            .totalPages(page.getTotalPages())
+            .last(page.isLast())
+            .build();
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">Long employeeId = CurrentUserUtil.getEmployeeId();</span>
+        <div class="step-body">
+          <strong>Resolve the caller's identity.</strong> <code>CurrentUserUtil</code>
+          (Chapter 23) reads the JWT claims from Spring's <code>SecurityContextHolder</code>
+          and returns the <code>employeeId</code> claim — a <code>Long</code> for workers,
+          <code>null</code> for admins (admins don't have an employee record). The key
+          guarantee: the caller cannot lie about this — it comes from the cryptographically
+          signed JWT, not from a request parameter.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2-4</span>
+        <span class="step-code">if (employeeId == null) { throw new RuntimeException("Access denied"); }</span>
+        <div class="step-body">
+          <strong>Guard against non-worker callers.</strong> SecurityConfig allows admins to
+          call this endpoint too, but admins have no employee record so their JWT has
+          <code>employeeId = null</code>. Throwing here surfaces as a 500 via
+          GlobalExceptionHandler — a stricter implementation would throw Spring Security's
+          <code>AccessDeniedException</code> for a cleaner 403, but the current code uses a
+          plain RuntimeException.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">5-10</span>
+        <span class="step-code">PageRequest pageRequest = PageRequest.of(...);</span>
+        <div class="step-body">
+          Same PageRequest construction as the admin method. Zero-based page, size, direction
+          parsed from the DTO's string field, and sort column name.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">11</span>
+        <span class="step-code">Page&lt;EmployeeDailyWork&gt; page = employeeDailyWorkRepository.findByEmployeeId(employeeId, pageRequest);</span>
+        <div class="step-body">
+          <strong>The key difference from getDailyWorkList.</strong> Instead of
+          <code>findAll</code>, we call <code>findByEmployeeId</code> with the JWT-derived ID.
+          This is the <code>@EntityGraph</code>-annotated variant from Chapter 35 — Hibernate
+          JOINs the <code>employees</code> table in the same SQL, so the
+          <code>mapToListDto</code> calls below don't trigger N+1 queries. The worker can
+          never see another worker's rows because the WHERE clause is enforced server-side.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">12-15</span>
+        <span class="step-code">List&lt;...&gt; content = page.getContent().stream().map(this::mapToListDto).collect(...);</span>
+        <div class="step-body">
+          Same entity → DTO mapping pattern as the admin list. The helper computes
+          <code>todayEarning</code> per row using the worker's polish rate.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">16-23</span>
+        <span class="step-code">return PaginationResponseDto.&lt;...&gt;builder()...build();</span>
+        <div class="step-body">
+          Same response-wrapping pattern. Notably, <code>totalElements</code> is now the
+          worker's total row count across all pages, NOT the workshop-wide total — because
+          the WHERE clause was applied before the COUNT.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 6. getEmployeeWorkSummary -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">6️⃣</span> <code>getEmployeeWorkSummary()</code> — The Aggregation</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeDailyWorkServiceImpl.getEmployeeWorkSummary()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> EmployeeWorkSummaryDto getEmployeeWorkSummary(Long employeeId, DateRangeDto dateRangeDto) {
+    String role = CurrentUserUtil.getRole();
+    <span class="kw">if</span> (!<span class="str">"ADMIN"</span>.equals(role)) {
+        Long caller = CurrentUserUtil.getEmployeeId();
+        <span class="kw">if</span> (caller == <span class="kw">null</span> || !caller.equals(employeeId)) {
+            <span class="kw">throw new</span> org.springframework.security.access.AccessDeniedException(
+                    <span class="str">"You can only view your own work records"</span>);
+        }
+    }
+    Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -&gt; <span class="kw">new</span> ResourceNotFoundException(<span class="str">"Employee not found"</span>));
+
+    List&lt;EmployeeDailyWork&gt; works = employeeDailyWorkRepository
+            .findByEmployeeIdAndWorkDateBetween(employeeId,
+                    dateRangeDto.getFromDate(), dateRangeDto.getToDate());
+
+    <span class="kw">long</span> totalWorkDays = works.size();
+    <span class="kw">long</span> totalFresh = works.stream()
+            .mapToLong(EmployeeDailyWork::getFreshCount)
+            .sum();
+
+    <span class="kw">long</span> totalRePolish = works.stream()
+            .mapToLong(EmployeeDailyWork::getRePolishCount)
+            .sum();
+
+    <span class="kw">double</span> totalRevenue = totalFresh * employee.getPolishRate();
+    <span class="kw">return</span> EmployeeWorkSummaryDto.builder()
+            .employeeId(employeeId)
+            .employeeName(employee.getName())
+            .totalWorkDays(totalWorkDays)
+            .totalFreshCount(totalFresh)
+            .totalRePolishCount(totalRePolish)
+            .totalRevenue(totalRevenue)
+            .build();
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">String role = CurrentUserUtil.getRole();</span>
+        <div class="step-body">
+          <strong>Step 1: read the caller's role from the JWT.</strong> Returns "ADMIN",
+          "WORKER", or "SAREE_OWNER". We need this to decide whether to enforce the self-only
+          check below.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">if (!"ADMIN".equals(role)) {</span>
+        <div class="step-body">
+          <strong>Skip the self-check for admins.</strong> Admins can request any worker's
+          summary. Note the safe ordering: <code>"ADMIN".equals(role)</code>, not
+          <code>role.equals("ADMIN")</code> — calling <code>.equals</code> on the literal
+          string means it won't NPE even if <code>role</code> is somehow null.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-code">Long caller = CurrentUserUtil.getEmployeeId();</span>
+        <div class="step-body">
+          For non-admin callers, read the caller's own employee ID from the JWT. This is the
+          worker's own row in the <code>employees</code> table.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">4-7</span>
+        <span class="step-code">if (caller == null || !caller.equals(employeeId)) { throw new AccessDeniedException(...); }</span>
+        <div class="step-body">
+          <strong>The self-or-admin check.</strong> Reject if (a) the JWT has no employeeId
+          (defensive — shouldn't happen for a WORKER) OR (b) the requested
+          <code>employeeId</code> doesn't match the caller's own.
+          <code>AccessDeniedException</code> is Spring Security's standard exception — its
+          filter chain converts it to HTTP 403 Forbidden. SecurityConfig allows WORKERs to
+          call this URL; the in-service check narrows access to "self only".
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">8-9</span>
+        <span class="step-code">Employee employee = employeeRepository.findById(employeeId).orElseThrow(...);</span>
+        <div class="step-body">
+          <strong>Step 2: verify the employee exists.</strong> Even after passing the
+          permission check, we still confirm the row exists. Defensive against an admin
+          requesting a deleted or nonexistent ID. Throws ResourceNotFoundException → 404.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">10-12</span>
+        <span class="step-code">List&lt;EmployeeDailyWork&gt; works = repo.findByEmployeeIdAndWorkDateBetween(employeeId, fromDate, toDate);</span>
+        <div class="step-body">
+          <strong>Step 3: fetch all rows in the range.</strong> One SQL:
+          <code>SELECT * FROM employee_daily_work WHERE employee_id = ? AND work_date BETWEEN ? AND ?</code>.
+          For realistic ranges (a week or a month), this returns at most ~30 rows — safe to
+          process in memory.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">13</span>
+        <span class="step-code">long totalWorkDays = works.size();</span>
+        <div class="step-body">
+          <strong>Step 4a: count the working days.</strong> Each row represents one work
+          day (the UNIQUE constraint on the entity guarantees no duplicates per (employee,
+          date)), so <code>.size()</code> is the number of distinct days. Cast to
+          <code>long</code> to match the DTO field type.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">14-16</span>
+        <span class="step-code">long totalFresh = works.stream().mapToLong(EmployeeDailyWork::getFreshCount).sum();</span>
+        <div class="step-body">
+          <strong>Step 4b: sum the fresh counts.</strong> <code>.stream()</code> opens a stream
+          of entities. <code>.mapToLong(...)</code> extracts the integer count from each and
+          returns a primitive <code>LongStream</code> — no autoboxing overhead. The method
+          reference <code>EmployeeDailyWork::getFreshCount</code> is shorthand for
+          <code>w -&gt; w.getFreshCount()</code>. Finally <code>.sum()</code> is a built-in
+          terminal operation returning a primitive <code>long</code>.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">17-19</span>
+        <span class="step-code">long totalRePolish = works.stream().mapToLong(EmployeeDailyWork::getRePolishCount).sum();</span>
+        <div class="step-body">
+          Same pattern, summing the other count field. Could theoretically be combined with
+          the fresh-sum into one stream pass for efficiency, but with realistic small lists
+          (~30 rows) the duplication is harmless and the code reads more clearly.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">20</span>
+        <span class="step-code">double totalRevenue = totalFresh * employee.getPolishRate();</span>
+        <div class="step-body">
+          <strong>Step 5: compute the total revenue.</strong> <code>totalFresh</code> is a
+          long; <code>polishRate</code> is a Double. Java auto-widens the long to double so
+          the multiplication produces a double. <strong>The same quirk yet again</strong>:
+          only fresh count is in the product. If your business says re-polish should also
+          earn, this is the third location to update for consistency.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">21-28</span>
+        <span class="step-code">return EmployeeWorkSummaryDto.builder()...build();</span>
+        <div class="step-body">
+          <strong>Step 6: build and return the summary DTO.</strong> Six fields:
+          <code>employeeId</code> (the requested ID), <code>employeeName</code> (flattened
+          from the loaded Employee), the three computed totals
+          (<code>totalWorkDays</code>, <code>totalFreshCount</code>,
+          <code>totalRePolishCount</code>), and <code>totalRevenue</code>. We use
+          <code>employee.getName()</code> directly — no separate name query needed because
+          we already have the Employee in memory.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 7. getMyWorkSummary -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">7️⃣</span> <code>getMyWorkSummary()</code> — Worker's Own Summary</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">EmployeeDailyWorkServiceImpl.getMyWorkSummary()</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">public</span> EmployeeWorkSummaryDto getMyWorkSummary(DateRangeDto dateRangeDto) {
+    Long employeeId = CurrentUserUtil.getEmployeeId();
+    <span class="kw">if</span> (employeeId == <span class="kw">null</span>){
+        <span class="kw">throw new</span> RuntimeException(<span class="str">"Access denied"</span>);
+    }
+
+    <span class="kw">return</span> getEmployeeWorkSummary(employeeId, dateRangeDto);
+}</pre>
+    </div>
+
+    <h3>Line-by-line walkthrough</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">Long employeeId = CurrentUserUtil.getEmployeeId();</span>
+        <div class="step-body">
+          Resolve the caller's employee ID from the JWT — same pattern as
+          <code>getMyDailyWorkList</code>.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2-4</span>
+        <span class="step-code">if (employeeId == null){ throw new RuntimeException("Access denied"); }</span>
+        <div class="step-body">
+          Reject non-workers (admins, owners). They shouldn't be hitting the <code>/summary</code>
+          (worker-self) endpoint — they have their own <code>/employee/{id}/summary</code>
+          alternative.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-code">return getEmployeeWorkSummary(employeeId, dateRangeDto);</span>
+        <div class="step-body">
+          <strong>Delegate to the per-employee method.</strong> Pass the JWT-derived ID and
+          the date range. The called method's permission check will see role=WORKER and
+          caller=employeeId, with employeeId == employeeId — trivially passes. This
+          delegation means the actual summary calculation lives in <em>one place only</em>;
+          if we ever change the formula, only <code>getEmployeeWorkSummary</code> needs
+          updating. DRY in action.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- End-to-end scenario -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">🎬</span> End-to-End Scenario — Dad logs Prema's Friday work</h2>
+
+    <div class="scenario">
+      <h5>The full trace through the service</h5>
+      <ol>
+        <li>Frontend POSTs <code>{ "employeeId": 5, "workDate": "2026-05-15", "freshCount": 10, "rePolishCount": 2 }</code> to <code>/api/employee-daily-working</code>.</li>
+        <li>Spring deserializes the JSON into a <code>EmployeeDailyWorkRequestDto</code>. <code>@Valid</code> passes (all fields present, both counts ≥ 0).</li>
+        <li>Controller calls <code>service.addDailyWork(requestDto)</code>.</li>
+        <li><strong>Step 1:</strong> <code>findById(5)</code> returns Prema's Employee row. Her <code>polishRate = 30.0</code>.</li>
+        <li><strong>Step 2:</strong> Build an EmployeeDailyWork entity with employee=Prema, workDate=2026-05-15, freshCount=10, rePolishCount=2.</li>
+        <li><strong>Step 3:</strong> <code>save(entity)</code>. Hibernate runs <code>INSERT INTO employee_daily_work (employee_id, work_date, fresh_saree_count, repolish_saree_count, created_at, updated_at) VALUES (5, '2026-05-15', 10, 2, NOW(), NOW())</code>. The new <code>work_id</code> is, say, 89.</li>
+        <li><strong>Step 4:</strong> <code>todayEarning = 10 * 30.0 = 300.0</code>.</li>
+        <li><strong>Step 5:</strong> Build the response DTO: <code>{ workId: 89, employeeId: 5, employeeName: "Prema", workDate: "2026-05-15", freshCount: 10, rePolishCount: 2, todayRevenue: 300.0 }</code>.</li>
+        <li>Spring serializes to JSON. Controller returns HTTP 200. Frontend updates: "Prema today: 10 + 2 sarees · ₹300".</li>
+      </ol>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- Common mistakes -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <div class="mistakes">
+      <h5>Common mistakes</h5>
+      <div class="item">
+        <div class="bad">Forgetting to load the Employee before saving</div>
+        <div class="good">The entity's <code>@ManyToOne</code> field needs a managed Employee instance, not just an ID. <code>findById</code> ensures Hibernate has the right reference and that the worker actually exists.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Computing earnings as <code>(freshCount + rePolishCount) × rate</code> in only one place</div>
+        <div class="good">If you change the formula, update all three locations together: <code>mapToListDto</code> (line 14-17 of the helper), <code>addDailyWork</code> (line 12), and <code>getEmployeeWorkSummary</code> (line 20). They must agree or the responses will disagree with the summaries.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Throwing <code>RuntimeException("Access denied")</code> for null employeeId</div>
+        <div class="good">A cleaner version throws Spring's <code>AccessDeniedException</code> so the filter chain maps it to HTTP 403, not a 500. The current NOOL code uses RuntimeException — slightly less precise but functional.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Skipping <code>@Valid</code> on the controller parameter</div>
+        <div class="good">Without it, the DTO's <code>@PositiveOrZero</code> validation doesn't fire, and negative counts could slip in — distorting earnings.</div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- Q&A -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why doesn't <code>addDailyWork</code> have <code>@Transactional</code>?</div>
+        <div class="a">
+          Spring Data wraps individual <code>save()</code> calls in their own transaction
+          automatically. <code>@Transactional</code> is needed only when one method coordinates
+          MULTIPLE writes that must commit or roll back together — like
+          <code>EmployeeServiceImpl.createEmployee</code> (Chapter 30), which inserts an
+          Employee, a User, and a UserProfile all together.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What if two requests log Prema for the same day simultaneously?</div>
+        <div class="a">
+          Both reach <code>save()</code>. The first INSERT succeeds. The second hits the
+          UNIQUE constraint on <code>(employee_id, work_date)</code> and throws
+          <code>DataIntegrityViolationException</code>. GlobalExceptionHandler translates it
+          into the friendly "A daily work entry already exists" message. No data corruption.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why <code>mapToLong</code> instead of <code>map + reduce</code>?</div>
+        <div class="a">
+          <code>mapToLong</code> returns a primitive <code>LongStream</code> with
+          <code>.sum()</code> built in — no autoboxing of every value, faster, cleaner. The
+          <code>map + reduce</code> alternative would need <code>.reduce(0L, Long::sum)</code>
+          and box every element.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is the formula only <code>freshCount × rate</code>?</div>
+        <div class="a">
+          Deliberate (or possibly inherited) business rule. The interpretation: re-polish is
+          rework on already-paid sarees, so the workshop doesn't earn fresh revenue from them.
+          Workers may still be paid for re-polish through some other mechanism. If this
+          interpretation is wrong, update all three multiplication sites consistently.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does <code>getMyWorkSummary</code> delegate to <code>getEmployeeWorkSummary</code>?</div>
+        <div class="a">
+          DRY. The calculation lives in one place. The "my" variant just resolves the caller's
+          ID from the JWT and forwards. The permission check inside
+          <code>getEmployeeWorkSummary</code> trivially passes when calling for self.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">If a worker has zero rows in the date range, what does the summary return?</div>
+        <div class="a">
+          <code>findByEmployeeIdAndWorkDateBetween</code> returns an empty list.
+          <code>works.size()</code> is 0. Both stream sums return 0.
+          <code>totalRevenue = 0 × rate = 0.0</code>. The DTO is built with all zeros — no
+          nulls, no exceptions. A clean degenerate case.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>Service done — now truly line-by-line. The final chapter for this module wraps everything with the HTTP-facing controller.</p>
+
+    <div class="chapnav">
+      <a href="35-daily-work-repository-and-dtos.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 35 · Daily Work Repo &amp; DTOs</span></a>
+      <a href="37-daily-work-controller.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 37 · DailyWorkController</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 36 of 85 · <a href="../index.html">Back to table of contents</a> · Rewritten in true line-by-line format</p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

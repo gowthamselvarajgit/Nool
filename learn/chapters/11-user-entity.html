@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 11 · User.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 11 · The First Entity</span>
+    <h1>
+      <span class="gradient">User.java</span> —<br/>
+      The foundation of every login
+    </h1>
+    <p class="subtitle">
+      Every person who logs into NOOL — Mom, Dad, every worker, every saree owner — has exactly
+      one row in the <code>users</code> table. This is the most foundational entity in the
+      project. If something goes wrong here, nothing else works.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🔐</div>
+      <div class="fmeta">
+        <h3>User.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/auth/entity/User.java</span>
+        <div class="ftags"><span>Entity</span><span>Auth</span><span>JPA</span><span>⭐ Foundation</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── Why a separate User class ──────── -->
+    <h2><span class="h2-emoji">🧠</span> Why a Separate "User" Class?</h2>
+    <p>
+      You might wonder — why have a <code>User</code> class at all, when we also have
+      <code>Employee</code> (for workers) and <code>SareeOwner</code> (for clients)? Why not
+      just put a password on each of those?
+    </p>
+
+    <p><strong>Because login data is fundamentally different from business data.</strong></p>
+
+    <table class="ftable">
+      <thead>
+        <tr><th>Login data (User)</th><th>Business data (Employee / SareeOwner)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mobile number, password, role</td><td>Name, joining date, polish rate, status</td></tr>
+        <tr><td>Changes rarely (only on password reset)</td><td>Changes often (rate revisions, status flips)</td></tr>
+        <tr><td>Sensitive (password must be encrypted)</td><td>Routine (just business facts)</td></tr>
+        <tr><td>Same for ALL three roles</td><td>Different per role</td></tr>
+        <tr><td>Used at every API call (auth check)</td><td>Used only on relevant screens</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Splitting them keeps each class focused on <em>one job</em>. <code>User</code> handles
+      authentication; <code>Employee</code> handles "what's this worker's polish rate?". Mixing
+      them would make each class confusingly multi-purpose.
+    </p>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/entity/User.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.entity;
+<span class="com">// ↑ Lives in the auth sub-package, alongside login-related classes
+//   (UserProfile, JwtUtil, etc.).</span>
+
+<span class="kw">import</span> com.nool.backend.enums.Role;            <span class="com">// ADMIN, WORKER, SAREE_OWNER</span>
+<span class="kw">import</span> jakarta.persistence.*;                  <span class="com">// JPA annotations (@Entity, @Column, etc.)</span>
+<span class="kw">import</span> lombok.*;                                <span class="com">// Lombok shortcuts</span>
+<span class="kw">import</span> java.time.LocalDateTime;                 <span class="com">// for createdAt/updatedAt timestamps</span>
+
+<span class="ann">@Entity</span>                       <span class="com">// Tells Hibernate: "manage this as a database table"</span>
+<span class="ann">@Table</span>(name = <span class="str">"users"</span>)        <span class="com">// SQL table name is `users`</span>
+<span class="ann">@Getter</span>                       <span class="com">// Auto-generate getMobileNumber(), getRole(), etc.</span>
+<span class="ann">@Setter</span>                       <span class="com">// Auto-generate setMobileNumber(), setRole(), etc.</span>
+<span class="ann">@NoArgsConstructor</span>            <span class="com">// public User() {} — required by Hibernate for entity hydration</span>
+<span class="ann">@AllArgsConstructor</span>           <span class="com">// constructor with every field — used by the builder</span>
+<span class="ann">@Builder</span>                       <span class="com">// enables User.builder().mobileNumber("X").build() pattern</span>
+<span class="kw">public class</span> User {
+
+    <span class="com">// ── PRIMARY KEY ────────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>                                                <span class="com">// "this is the unique row identifier"</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)  <span class="com">// MySQL auto-increment: 1, 2, 3...</span>
+    <span class="ann">@Column</span>(name = <span class="str">"user_id"</span>)
+    <span class="kw">private</span> Long id;                                    <span class="com">// In Java we call it just `id`; column is user_id</span>
+
+    <span class="com">// ── MOBILE NUMBER (login username) ────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"mobile_number"</span>,
+            nullable = <span class="kw">false</span>,        <span class="com">// must never be NULL in DB</span>
+            unique = <span class="kw">true</span>,          <span class="com">// no two users can share the same mobile</span>
+            length = <span class="num2">15</span>)             <span class="com">// max 15 chars (covers "+91" + 10 digits + buffer)</span>
+    <span class="kw">private</span> String mobileNumber;
+
+    <span class="com">// ── PASSWORD (BCrypt hash, NEVER plain text) ──────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"password"</span>, nullable = <span class="kw">false</span>, length = <span class="num2">100</span>)
+    <span class="kw">private</span> String password;
+    <span class="com">// length=100 is sized for a BCrypt hash (60 chars + room to spare).
+    // The actual plain password from the user is NEVER stored.</span>
+
+    <span class="com">// ── ROLE (ADMIN / WORKER / SAREE_OWNER) ───────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)              <span class="com">// store as "ADMIN" not as 0/1/2</span>
+    <span class="ann">@Column</span>(name = <span class="str">"role"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Role role;
+
+    <span class="com">// ── ACTIVE FLAG (soft delete) ─────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"active_status"</span>, nullable = <span class="kw">false</span>)
+    <span class="ann">@lombok.Builder.Default</span>                    <span class="com">// preserve the default when using builder()</span>
+    <span class="kw">private boolean</span> active = <span class="kw">true</span>;             <span class="com">// false = blocked from logging in</span>
+
+    <span class="com">// ── LINK TO BUSINESS PROFILE (Employee or SareeOwner) ─────────</span>
+    <span class="ann">@OneToOne</span>(mappedBy = <span class="str">"user"</span>, fetch = FetchType.LAZY)
+    <span class="kw">private</span> UserProfile userProfile;
+    <span class="com">// One User has at most one UserProfile, which then points to either an
+    // Employee or a SareeOwner. mappedBy = "user" means UserProfile owns
+    // the FK column; we just navigate from this side. LAZY = don't load
+    // it until someone actually calls user.getUserProfile().</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+    <span class="com">// updatable=false → once set on INSERT, never overwritten by UPDATE</span>
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+    <span class="com">// Refreshed on every UPDATE via @PreUpdate below</span>
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>                                  <span class="com">// fires once, just before the first INSERT</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>                                   <span class="com">// fires before every UPDATE</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>user_id (PK)</td><td>Unique row identifier</td><td><code>1, 2, 847</code></td></tr>
+        <tr><td><code>mobileNumber</code></td><td>String</td><td>mobile_number</td><td>10-digit Indian mobile, used as login username</td><td><code>"9876543210"</code></td></tr>
+        <tr><td><code>password</code></td><td>String</td><td>password</td><td>BCrypt hash (60 chars). NEVER plain text.</td><td><code>"$2a$10$N9qo8uLOick..."</code></td></tr>
+        <tr><td><code>role</code></td><td>Role enum</td><td>role</td><td>One of ADMIN / WORKER / SAREE_OWNER</td><td><code>ADMIN</code></td></tr>
+        <tr><td><code>active</code></td><td>boolean</td><td>active_status</td><td>false → login blocked (soft delete)</td><td><code>true</code></td></tr>
+        <tr><td><code>userProfile</code></td><td>UserProfile</td><td>(no column — reverse side)</td><td>Link to Employee or SareeOwner profile</td><td>Lazy-loaded object</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When this row was first inserted</td><td><code>2026-05-15T10:32:11</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>When this row was last modified</td><td><code>2026-05-15T14:08:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sc">-- Generated by Hibernate from the @Entity class above</span>
+<span class="sk">CREATE TABLE</span> users (
+    user_id        <span class="sk">BIGINT</span>       <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    mobile_number  <span class="sk">VARCHAR</span>(15)  <span class="sk">NOT NULL</span> <span class="sk">UNIQUE</span>,
+    password       <span class="sk">VARCHAR</span>(100) <span class="sk">NOT NULL</span>,
+    role           <span class="sk">VARCHAR</span>(20)  <span class="sk">NOT NULL</span>,        <span class="sc">-- enum stored as text</span>
+    active_status  <span class="sk">BOOLEAN</span>      <span class="sk">NOT NULL</span>,
+    created_at     <span class="sk">DATETIME</span>(6)  <span class="sk">NOT NULL</span>,
+    updated_at     <span class="sk">DATETIME</span>(6),
+    <span class="sk">PRIMARY KEY</span> (user_id)
+);
+
+<span class="sc">-- When admin registers Rahul (a saree owner):</span>
+<span class="sk">INSERT INTO</span> users
+    (mobile_number, password, role, active_status, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="ss">'9000000001'</span>,
+     <span class="ss">'$2a$10$YDg3JL5eFc...VqKw9oP1jB.eXt'</span>,    <span class="sc">-- BCrypt-hashed</span>
+     <span class="ss">'SAREE_OWNER'</span>,
+     <span class="kw">true</span>,
+     <span class="ss">'2026-05-15 10:32:11'</span>,
+     <span class="ss">'2026-05-15 10:32:11'</span>);
+
+<span class="sc">-- Login lookup at /api/auth/login:</span>
+<span class="sk">SELECT</span> * <span class="sk">FROM</span> users <span class="sk">WHERE</span> mobile_number = <span class="ss">'9000000001'</span>;
+
+<span class="sc">-- Admin disables Rahul's account:</span>
+<span class="sk">UPDATE</span> users
+   <span class="sk">SET</span> active_status = <span class="kw">false</span>,
+       updated_at    = <span class="ss">'2026-08-22 16:45:00'</span>     <span class="sc">-- auto-set by @PreUpdate</span>
+ <span class="sk">WHERE</span> user_id = <span class="num2">2</span>;</pre>
+    </div>
+
+    <!-- ──────── Annotation deep-dive ──────── -->
+    <h2><span class="h2-emoji">🔍</span> The Annotations, In Detail</h2>
+
+    <h3><code>@Entity</code></h3>
+    <p>
+      Marks a class as a JPA-managed entity. At startup, Hibernate scans the classpath for
+      <code>@Entity</code> classes and builds an in-memory metamodel of every column, type,
+      relationship, etc. The same metamodel is what generates the CREATE TABLE statement when
+      <code>ddl-auto=update</code> is on.
+    </p>
+
+    <h3><code>@Table(name = "users")</code></h3>
+    <p>
+      Sets the SQL table name. Without it, Hibernate would default to the class name ("User"
+      → table <code>user</code>). We pluralize because that's the SQL convention and "user"
+      is a reserved word in some databases (PostgreSQL, etc.). Always explicit.
+    </p>
+
+    <h3><code>@Id</code> + <code>@GeneratedValue(IDENTITY)</code></h3>
+    <p>
+      <code>@Id</code> says "this is the primary key column".
+      <code>GenerationType.IDENTITY</code> tells JPA to let the database itself generate the
+      value (via MySQL's AUTO_INCREMENT). Inserts simply omit the column; MySQL fills it in.
+    </p>
+
+    <h3><code>@Column</code> properties</h3>
+    <table class="ftable">
+      <thead><tr><th>Property</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>name="..."</code></td><td>The SQL column name (lets us use snake_case in DB and camelCase in Java)</td></tr>
+        <tr><td><code>nullable=false</code></td><td>Maps to <code>NOT NULL</code> in SQL — DB itself refuses NULL values</td></tr>
+        <tr><td><code>unique=true</code></td><td>Adds a UNIQUE constraint — DB refuses duplicates</td></tr>
+        <tr><td><code>length=N</code></td><td>Sets VARCHAR(N) sizing</td></tr>
+        <tr><td><code>updatable=false</code></td><td>Once set, this field is excluded from UPDATE statements</td></tr>
+      </tbody>
+    </table>
+
+    <h3><code>@Enumerated(EnumType.STRING)</code></h3>
+    <p>
+      Tells Hibernate to store the enum's <em>name</em> (e.g., <code>"ADMIN"</code>) as text,
+      not its position (0). Why STRING is safer was covered fully in Chapter 08 — the short
+      version: enum reordering doesn't silently corrupt data.
+    </p>
+
+    <h3><code>@OneToOne(mappedBy = "user", fetch = FetchType.LAZY)</code></h3>
+    <p>This is the most subtle annotation in the file. It has two key pieces:</p>
+    <ul>
+      <li>
+        <strong><code>mappedBy = "user"</code></strong> — tells Hibernate the
+        <em>other side</em> (UserProfile) owns the foreign-key column. <code>UserProfile</code>
+        has <code>@JoinColumn(name = "user_id")</code> pointing at the User table; we navigate
+        backward from User by declaring this side as "mapped by" that field. No extra column
+        appears on the users table.
+      </li>
+      <li>
+        <strong><code>fetch = FetchType.LAZY</code></strong> — don't query the UserProfile
+        table just because someone loaded a User. Only fetch it if and when code calls
+        <code>user.getUserProfile()</code>. Saves an extra JOIN on the very common login lookup.
+      </li>
+    </ul>
+
+    <h3><code>@PrePersist</code> and <code>@PreUpdate</code></h3>
+    <p>
+      JPA lifecycle hooks. <code>@PrePersist</code> runs once, immediately before the very
+      first INSERT. <code>@PreUpdate</code> runs immediately before every subsequent UPDATE.
+      They let me auto-stamp <code>createdAt</code> and <code>updatedAt</code> without
+      remembering to set them in every service method.
+    </p>
+
+    <h3>The Lombok stack</h3>
+    <table class="ftable">
+      <thead><tr><th>Annotation</th><th>What it generates</th></tr></thead>
+      <tbody>
+        <tr><td><code>@Getter @Setter</code></td><td>One getter/setter per non-static field</td></tr>
+        <tr><td><code>@NoArgsConstructor</code></td><td><code>public User() {}</code> — required by Hibernate for reflection-based hydration</td></tr>
+        <tr><td><code>@AllArgsConstructor</code></td><td><code>public User(Long id, String mobileNumber, ...)</code> — required for <code>@Builder</code></td></tr>
+        <tr><td><code>@Builder</code></td><td>Enables the <code>User.builder().mobileNumber("X").role(ADMIN).build()</code> pattern</td></tr>
+        <tr><td><code>@Builder.Default</code> on a field</td><td>Tells the builder to use the field's default value if the caller doesn't set it (vital for the <code>active = true</code> default)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad registers Rahul as a new client</h5>
+      <ol>
+        <li>Dad clicks "Add Owner", types name "Rahul Textiles", mobile <code>9000000001</code>, password <code>rahul123</code>, rate ₹65.</li>
+        <li>The owner-service code:
+          <ul>
+            <li>Creates a <code>User</code> with role <code>SAREE_OWNER</code>, BCrypt-hashes the password.</li>
+            <li>Creates a <code>SareeOwner</code> row with the business data.</li>
+            <li>Creates a <code>UserProfile</code> linking them.</li>
+          </ul>
+        </li>
+        <li>The User's <code>@PrePersist</code> fires — <code>createdAt</code> and <code>updatedAt</code> set to now.</li>
+        <li>Hibernate runs <code>INSERT INTO users (mobile_number, password, role, ...) VALUES (...)</code>.</li>
+        <li>MySQL auto-generates <code>user_id = 2</code>.</li>
+        <li>From now on, Rahul can log in with his mobile + password.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: A worker leaves the workshop</h5>
+      <ol>
+        <li>Suresh, one of the polishers, decides to move to another city.</li>
+        <li>Dad opens NOOL → Employees → Suresh's row → clicks "Mark as Left".</li>
+        <li>The service code does TWO things:
+          <ul>
+            <li>Flips Suresh's <code>Employee.status</code> to LEFT.</li>
+            <li>Flips Suresh's linked <code>User.active</code> to <code>false</code>.</li>
+          </ul>
+        </li>
+        <li>Hibernate runs <code>UPDATE users SET active_status = false, updated_at = NOW() WHERE user_id = 5</code>.</li>
+        <li>If Suresh tries to log in: <code>AuthServiceImpl</code> finds his row, BCrypt confirms the password — but then sees <code>active = false</code> and refuses.</li>
+        <li>All of Suresh's history (attendance, daily-work, salary payments) stays in the DB. Nothing lost.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Rahul logs in</h5>
+      <ol>
+        <li>Rahul opens NOOL on his phone, types mobile <code>9000000001</code> and password <code>rahul123</code>.</li>
+        <li>Backend runs <code>SELECT * FROM users WHERE mobile_number = '9000000001'</code>.</li>
+        <li>Finds the row. Reads the stored hash <code>$2a$10$YDg3JL...</code>.</li>
+        <li><code>BCryptPasswordEncoder.matches("rahul123", "$2a$10$YDg3JL...")</code> → returns <code>true</code>.</li>
+        <li>Checks <code>user.isActive()</code> → also <code>true</code>.</li>
+        <li>Reads <code>user.getRole()</code> → <code>SAREE_OWNER</code>.</li>
+        <li>Lazily loads <code>user.getUserProfile().getOwnerId()</code> → <code>1</code>.</li>
+        <li>Builds a JWT with these values, signs it, returns to Rahul's phone.</li>
+        <li>Rahul lands on the owner dashboard.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around the User entity</h5>
+
+      <div class="item">
+        <div class="bad">Storing the plain password directly in the <code>password</code> field</div>
+        <div class="good">Always run it through <code>passwordEncoder.encode(...)</code> first. The 100-char column length is sized for the BCrypt hash, not the plain password.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-deleting a user with <code>userRepository.delete(...)</code></div>
+        <div class="good">Use <code>user.setActive(false)</code> instead. Hard delete breaks foreign-key relationships from Employee/SareeOwner/UserProfile and can lose audit history.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Builder.Default</code> on the <code>active</code> field</div>
+        <div class="good">Without it, <code>User.builder().build()</code> would create a user with <code>active = false</code> — they could never log in. The annotation preserves the field's default value when used via the builder.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Removing <code>updatable=false</code> from <code>createdAt</code></div>
+        <div class="good">Without it, an UPDATE could silently overwrite the original creation date. Losing creation timestamps destroys audit value.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Setting <code>userProfile</code> to <code>FetchType.EAGER</code></div>
+        <div class="good">Login is the most-frequent operation. Eager-fetching the profile on every User load means an extra JOIN every time. LAZY pays off. Pull profile only when actually needed (e.g., when building the JWT claims).</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing role as a free-text String instead of the <code>Role</code> enum</div>
+        <div class="good">Strings allow typos. The enum gives compile-time spell-checking and a single source of truth for valid values.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about User.java</h5>
+
+      <div class="qa">
+        <div class="q">Why is the password column 100 chars? Passwords are usually shorter than that.</div>
+        <div class="a">
+          Because the column stores the BCrypt <em>hash</em>, not the plain password. BCrypt
+          hashes are exactly 60 characters (60-byte fixed format including version, cost,
+          salt, hash). We sized 100 to leave buffer room in case we ever upgrade to a different
+          hash algorithm with a longer output. Storing plain passwords would be a security
+          disaster.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why <code>@Enumerated(EnumType.STRING)</code> and not ORDINAL?</div>
+        <div class="a">
+          ORDINAL stores the enum's position as an integer (ADMIN=0, WORKER=1, ...). If I ever
+          reorder the enum or insert a new value in the middle, all the historical data
+          silently becomes wrong. STRING stores the name ("ADMIN"), which survives reordering
+          and is human-readable in SQL queries.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>nullable=false</code> on the entity and <code>@NotNull</code> on a DTO?</div>
+        <div class="a">
+          <code>nullable=false</code> is enforced by the <em>database</em> (column-level NOT NULL).
+          <code>@NotNull</code> is enforced by <em>Bean Validation</em> on incoming requests.
+          They serve different layers — entity attributes describe storage rules; DTO
+          attributes describe input rules. Both should exist for any required field, defense
+          in depth.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does Hibernate need <code>@NoArgsConstructor</code>?</div>
+        <div class="a">
+          When Hibernate reads a row from the database, it uses reflection to create the entity
+          object and then sets each field. Reflection-based instantiation requires a no-args
+          constructor. Without it, you'd get cryptic errors at startup. <code>@NoArgsConstructor</code>
+          from Lombok generates it automatically.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens if I forget <code>@PrePersist</code>?</div>
+        <div class="a">
+          <code>createdAt</code> never gets set. The column is <code>nullable=false</code>, so
+          the INSERT throws a SQL error. NOOL's GlobalExceptionHandler would catch it as a
+          DataIntegrityViolationException and return a 500. Adding <code>@PrePersist</code>
+          fixes it permanently. Some teams use the cleaner pattern <code>@CreationTimestamp</code>
+          (Hibernate-specific) instead — does the same thing without writing the method.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">If User has a OneToOne to UserProfile, why don't I see a column for it in <code>users</code>?</div>
+        <div class="a">
+          Because of <code>mappedBy = "user"</code>. That declares this side as the
+          <em>inverse</em> — the FK column lives on the other side (UserProfile.user_id).
+          Without <code>mappedBy</code>, Hibernate would create FK columns on both sides,
+          duplicating the relationship. The <code>mappedBy</code> tells Hibernate "I don't own
+          the column; navigate from there".
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could I use <code>@Data</code> instead of separate <code>@Getter @Setter</code>?</div>
+        <div class="a">
+          You could, but it's not recommended for JPA entities. <code>@Data</code> also
+          generates <code>equals()</code> and <code>hashCode()</code> based on ALL fields,
+          including relationships — which can cause infinite recursion if two entities
+          reference each other (User ↔ UserProfile in our case). Using <code>@Getter @Setter</code>
+          explicitly keeps hashCode/equals at their JVM-default behavior, which is what JPA
+          expects.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      User is the foundation, but a User row alone doesn't know if it represents a worker or a
+      saree owner. That linkage is held by <code>UserProfile</code> — the bridge between auth
+      and business data. That's the next chapter.
+    </p>
+
+    <div class="chapnav">
+      <a href="10-common-dtos.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 10 · Common DTOs</span>
+      </a>
+      <a class="dim next">
+        <span class="arrow next">Coming soon →</span>
+        <span class="title">Ch 12 · UserProfile.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 11 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

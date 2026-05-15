@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 12 · UserProfile.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 12 · The Bridge</span>
+    <h1>
+      <span class="gradient">UserProfile.java</span> —<br/>
+      The bridge between auth and business
+    </h1>
+    <p class="subtitle">
+      A <code>User</code> row knows you can log in. But it doesn't know <em>what</em> you are
+      in the business — a worker? a saree owner? <code>UserProfile</code> is the tiny table
+      that answers that question, linking auth identity to business identity.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🔗</div>
+      <div class="fmeta">
+        <h3>UserProfile.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/auth/entity/UserProfile.java</span>
+        <div class="ftags"><span>Entity</span><span>Bridge</span><span>OneToOne</span><span>Auth</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── The problem ──────── -->
+    <h2><span class="h2-emoji">🤔</span> The Problem UserProfile Solves</h2>
+    <p>
+      We have three entities that represent <em>people</em>:
+    </p>
+    <ul>
+      <li><strong>User</strong> — has login credentials (mobile, password, role)</li>
+      <li><strong>Employee</strong> — has worker business data (name, joining date, polish rate)</li>
+      <li><strong>SareeOwner</strong> — has client business data (name, rate per saree)</li>
+    </ul>
+
+    <p>
+      When the backend looks up a User by mobile during login, it needs to know:
+      <em>which Employee or SareeOwner is this person?</em> Without that answer, the
+      <code>employeeId</code> and <code>ownerId</code> claims in the JWT can't be populated,
+      and the rest of the system can't filter "show me <em>my</em> data".
+    </p>
+
+    <div class="callout brain">
+      <strong>UserProfile is the answer.</strong> One small table with three columns —
+      <code>user_id</code>, <code>employee_id</code>, <code>owner_id</code> — that maps each
+      User to either an Employee row or a SareeOwner row (or neither, for ADMINs).
+    </div>
+
+    <!-- ──────── Why not store IDs on User? ──────── -->
+    <h2><span class="h2-emoji">💭</span> Why Not Just Put These IDs on the User Table?</h2>
+    <p>
+      A fair question. We could have added <code>employee_id</code> and <code>owner_id</code>
+      columns directly to <code>users</code>. Three reasons we didn't:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Reason</th><th>Explanation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Separation of concerns</strong></td>
+          <td>The <code>users</code> table is sacred — it's the authentication record. Adding business-related foreign keys to it would mix two concerns (auth + business mapping) into one table.</td>
+        </tr>
+        <tr>
+          <td><strong>Easier evolution</strong></td>
+          <td>If we later add a fourth role with a different business entity, we just add a column to <code>user_profiles</code> — no migration to the touchier <code>users</code> table.</td>
+        </tr>
+        <tr>
+          <td><strong>Independent lifecycle</strong></td>
+          <td>A profile mapping can be created or modified <em>after</em> the User is set up. Two separate steps with two clean audit trails.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/entity/UserProfile.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.entity;
+
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"user_profiles"</span>)            <span class="com">// SQL table = user_profiles (plural)</span>
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> UserProfile {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"profile_id"</span>)
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── LINK TO THE USER ──────────────────────────────────────────</span>
+    <span class="ann">@OneToOne</span>(optional = <span class="kw">false</span>)                <span class="com">// every profile MUST belong to a user</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"user_id"</span>,
+                nullable = <span class="kw">false</span>,             <span class="com">// FK column cannot be NULL</span>
+                unique   = <span class="kw">true</span>)              <span class="com">// each User has AT MOST one profile</span>
+    <span class="kw">private</span> User user;
+    <span class="com">// ★ This is the FK side of the OneToOne relationship. User.java had
+    //   mappedBy="user" on its side — that means the FK column user_id
+    //   lives HERE, in user_profiles. Hibernate creates a `user_id` column
+    //   referencing users.user_id.</span>
+
+    <span class="com">// ── EMPLOYEE LINK (nullable — only set if this is a WORKER) ───</span>
+    <span class="ann">@Column</span>(name = <span class="str">"employee_id"</span>)
+    <span class="kw">private</span> Long employeeId;
+    <span class="com">// ★ Just a Long, NOT a @ManyToOne to Employee. This is a deliberate
+    //   "loose reference" — we store the ID but don't navigate to the
+    //   Employee object from here. Why? See below ("Why no @ManyToOne?").</span>
+
+    <span class="com">// ── OWNER LINK (nullable — only set if this is a SAREE_OWNER) ─</span>
+    <span class="ann">@Column</span>(name = <span class="str">"owner_id"</span>)
+    <span class="kw">private</span> Long ownerId;
+    <span class="com">// Same pattern as employeeId — just an ID, no @ManyToOne navigation.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Why no @ManyToOne to Employee/SareeOwner ──────── -->
+    <h2><span class="h2-emoji">⚡</span> Why <code>employeeId</code> Is Just a Long (Not a <code>@ManyToOne</code>)</h2>
+    <p>
+      Notice the design choice: <code>employeeId</code> is a plain <code>Long</code>, not a
+      <code>@ManyToOne</code> relationship to the Employee entity. The same for
+      <code>ownerId</code>. This is intentional.
+    </p>
+
+    <h3>The trade-off</h3>
+    <table class="ftable">
+      <thead><tr><th></th><th>Plain Long (what we chose)</th><th>@ManyToOne (alternative)</th></tr></thead>
+      <tbody>
+        <tr><td>Storage</td><td>Just a number in the column</td><td>FK with referential constraint</td></tr>
+        <tr><td>Navigation</td><td>None — code looks up Employee by ID separately</td><td><code>profile.getEmployee().getName()</code></td></tr>
+        <tr><td>Lookup speed</td><td>Same — index lookup either way</td><td>Same</td></tr>
+        <tr><td>Coupling</td><td>Loose — UserProfile doesn't know what an Employee is</td><td>Tight — Hibernate metadata links the two</td></tr>
+        <tr><td>FK validation</td><td>Not enforced at DB level</td><td>Enforced — DB refuses orphan IDs</td></tr>
+        <tr><td>JWT building</td><td>Easy — just <code>profile.getEmployeeId()</code>, no extra DB query</td><td>Would trigger a JOIN or lazy load just to read the ID</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>For UserProfile's job, "plain Long" wins.</strong> The class only exists to
+      answer <em>"what's the employee/owner ID for this user?"</em> during login. We never
+      need to navigate from a profile to the full Employee object. Storing just the ID keeps
+      the design simple, avoids unnecessary JOINs, and lets the auth layer stay independent
+      from the business modules.
+    </div>
+
+    <p>
+      The trade-off: there's no database-level FK constraint, so theoretically the
+      <code>employee_id</code> could point to a non-existent employee. In practice, this is
+      always set by the same service method that creates the Employee, so it's safe — but
+      a stricter implementation would add the FK.
+    </p>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>profile_id (PK)</td><td>Unique row ID</td><td><code>1, 2, 3</code></td></tr>
+        <tr><td><code>user</code></td><td>User</td><td>user_id (FK, UNIQUE)</td><td>Pointer to the auth row</td><td>references <code>users.user_id</code></td></tr>
+        <tr><td><code>employeeId</code></td><td>Long (nullable)</td><td>employee_id</td><td>If user is a WORKER, their Employee row ID</td><td><code>5</code> or <code>null</code></td></tr>
+        <tr><td><code>ownerId</code></td><td>Long (nullable)</td><td>owner_id</td><td>If user is a SAREE_OWNER, their SareeOwner row ID</td><td><code>1</code> or <code>null</code></td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>Audit — when this row was inserted</td><td><code>2026-05-15T10:32:11</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Audit — last edit</td><td><code>2026-05-15T10:32:11</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── The three role patterns ──────── -->
+    <h2><span class="h2-emoji">🎭</span> The Three Role Patterns in UserProfile</h2>
+    <p>
+      A UserProfile row looks slightly different depending on what kind of user it belongs to.
+      Three patterns:
+    </p>
+
+    <h3>Pattern 1 — ADMIN profile</h3>
+    <div class="sqlbox">
+<pre><span class="sc">-- Mom &amp; Dad's profile: just a User link, no business mapping</span>
+profile_id | user_id | employee_id | owner_id
+    1      |    1    |    <span class="ss">NULL</span>     |   <span class="ss">NULL</span></pre>
+    </div>
+    <p>
+      Admins don't have an Employee row or a SareeOwner row — they ARE the business. So
+      both ID fields are NULL.
+    </p>
+
+    <h3>Pattern 2 — WORKER profile</h3>
+    <div class="sqlbox">
+<pre><span class="sc">-- Prema's profile: links User #3 to Employee #5</span>
+profile_id | user_id | employee_id | owner_id
+    2      |    3    |     <span class="num2">5</span>       |   <span class="ss">NULL</span></pre>
+    </div>
+
+    <h3>Pattern 3 — SAREE_OWNER profile</h3>
+    <div class="sqlbox">
+<pre><span class="sc">-- Rahul's profile: links User #2 to SareeOwner #1</span>
+profile_id | user_id | employee_id | owner_id
+    3      |    2    |    <span class="ss">NULL</span>     |    <span class="num2">1</span></pre>
+    </div>
+
+    <div class="callout warn">
+      <strong>Invariant the code enforces:</strong> a profile should have <em>at most one</em>
+      of <code>employee_id</code> / <code>owner_id</code> set. Both being non-null doesn't
+      make business sense (you can't be both a worker AND a client of yourself). This isn't
+      enforced at the DB level — the service code is responsible.
+    </div>
+
+    <!-- ──────── Full DB picture ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> The Three Tables Working Together</h2>
+
+    <div class="sqlbox">
+<pre><span class="sc">-- The schema Hibernate generates:</span>
+<span class="sk">CREATE TABLE</span> user_profiles (
+    profile_id    <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    user_id       <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span> <span class="sk">UNIQUE</span>,
+    employee_id   <span class="sk">BIGINT</span>,                          <span class="sc">-- nullable</span>
+    owner_id      <span class="sk">BIGINT</span>,                          <span class="sc">-- nullable</span>
+    created_at    <span class="sk">DATETIME</span>(6) <span class="sk">NOT NULL</span>,
+    updated_at    <span class="sk">DATETIME</span>(6),
+    <span class="sk">PRIMARY KEY</span> (profile_id),
+    <span class="sk">FOREIGN KEY</span> (user_id) <span class="sk">REFERENCES</span> users(user_id)
+);
+
+<span class="sc">-- A complete picture for the three example users:</span>
+
+<span class="sk">SELECT</span> u.user_id, u.mobile_number, u.role,
+       p.profile_id, p.employee_id, p.owner_id
+<span class="sk">FROM</span>   users u
+<span class="sk">LEFT JOIN</span> user_profiles p <span class="sk">ON</span> p.user_id = u.user_id;
+
+user_id | mobile_number | role        | profile_id | employee_id | owner_id
+   1    | 9876543210    | <span class="ss">ADMIN</span>       |     1      |    <span class="ss">NULL</span>     |   <span class="ss">NULL</span>
+   2    | 9000000001    | <span class="ss">SAREE_OWNER</span> |     3      |    <span class="ss">NULL</span>     |    <span class="num2">1</span>
+   3    | 9000000002    | <span class="ss">WORKER</span>      |     2      |     <span class="num2">5</span>       |   <span class="ss">NULL</span></pre>
+    </div>
+
+    <!-- ──────── How it's used during login ──────── -->
+    <h2><span class="h2-emoji">🔑</span> How It's Used During Login</h2>
+    <p>
+      Inside <code>AuthServiceImpl.login()</code> (we'll deep-dive that file in Chapter 25),
+      after BCrypt confirms the password, this happens:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Excerpt from AuthServiceImpl.login()</span><span class="lang">Java</span></div>
+<pre><span class="com">// Fetch the linked profile via the OneToOne navigation on User</span>
+UserProfile profile = user.getUserProfile();    <span class="com">// LAZY-loaded ONE time here</span>
+
+<span class="com">// Build the JWT claims using the profile's IDs</span>
+Map&lt;String, Object&gt; claims = <span class="kw">new</span> HashMap&lt;&gt;();
+claims.put(<span class="str">"userId"</span>,     user.getId());
+claims.put(<span class="str">"role"</span>,       user.getRole().name());
+claims.put(<span class="str">"employeeId"</span>, profile != <span class="kw">null</span> ? profile.getEmployeeId() : <span class="kw">null</span>);
+claims.put(<span class="str">"ownerId"</span>,    profile != <span class="kw">null</span> ? profile.getOwnerId()    : <span class="kw">null</span>);
+
+<span class="com">// Mint the JWT</span>
+String token = jwtUtil.generateToken(claims, user.getMobileNumber());</pre>
+    </div>
+
+    <p>
+      So whenever any worker or owner makes a request, their JWT already contains their
+      Employee/Owner ID — no extra DB lookup is needed on every request. Endpoints like
+      <code>GET /api/employees/me</code> just read the <code>employeeId</code> claim from the
+      JWT and use it directly.
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad creates a new worker (Prema)</h5>
+      <p>The "Add Employee" flow in fact creates <em>three</em> rows across three tables:</p>
+      <ol>
+        <li>Create a <code>User</code> row: <code>mobile=9000000002, password=&lt;BCrypt hash&gt;, role=WORKER</code>. New ID = 3.</li>
+        <li>Create an <code>Employee</code> row: <code>name=Prema, polishRate=30.0, ...</code>. New ID = 5.</li>
+        <li>Create a <code>UserProfile</code> row: <code>user_id=3, employee_id=5, owner_id=NULL</code>.</li>
+      </ol>
+      <p>Now everything is linked. When Prema logs in later, the JWT will contain <code>employeeId=5</code>.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Dad creates a new client (Rahul)</h5>
+      <ol>
+        <li><code>User</code>: <code>mobile=9000000001, role=SAREE_OWNER</code>. ID = 2.</li>
+        <li><code>SareeOwner</code>: <code>ownerName="Rahul Textiles", polishRatePerSaree=65.0</code>. ID = 1.</li>
+        <li><code>UserProfile</code>: <code>user_id=2, employee_id=NULL, owner_id=1</code>.</li>
+      </ol>
+      <p>When Rahul logs in, the JWT contains <code>ownerId=1</code>. The endpoint <code>POST /api/inventory/my-ledger</code> reads it and fetches only Rahul's ledger entries.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: A worker transitions to a saree owner</h5>
+      <p>Imagine Prema decides to start her own saree-trading business and brings sarees back to my parents' workshop as a client. Two options:</p>
+      <ul>
+        <li><strong>Option A:</strong> Create a separate User + SareeOwner + UserProfile triple for her business identity. She logs in with a different mobile.</li>
+        <li><strong>Option B:</strong> Update her existing UserProfile to fill both <code>employee_id</code> and <code>owner_id</code> (and switch User.role to SAREE_OWNER).</li>
+      </ul>
+      <p>
+        NOOL's current implementation favors Option A — cleaner. Option B is technically
+        possible but would confuse the rest of the system, which assumes profile fields are
+        mutually exclusive.
+      </p>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common UserProfile mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Setting both <code>employeeId</code> and <code>ownerId</code> at the same time</div>
+        <div class="good">The system assumes mutual exclusion. Only one of them should be non-null per row. The code enforces this in service methods; don't bypass.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Creating a UserProfile without a User</div>
+        <div class="good"><code>@OneToOne(optional = false)</code> plus <code>nullable=false</code> on <code>user_id</code> means the FK is mandatory. Trying to save a profile with a null User throws at INSERT time.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting to create a UserProfile when adding an Employee or SareeOwner</div>
+        <div class="good">Without the profile, login still works (User exists), but the JWT won't have <code>employeeId</code>/<code>ownerId</code> claims — every "my data" endpoint will break for that user. The service code must always create all three rows together inside one transaction.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using <code>@ManyToOne</code> to Employee/SareeOwner here (with cascade)</div>
+        <div class="good">Plain Long is intentional — keeps UserProfile decoupled from the business modules. A <code>@ManyToOne</code> would create cascade-delete risks and tight coupling.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding business logic methods (<code>isEmployee()</code>, <code>getEmployee()</code>) to this entity</div>
+        <div class="good">Entities should stay anaemic — plain data, no business behavior. Lookup helpers belong in service classes.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about UserProfile</h5>
+
+      <div class="qa">
+        <div class="q">Why have a bridge table at all? Why not just put <code>employeeId</code> and <code>ownerId</code> on the User entity?</div>
+        <div class="a">
+          Three reasons. (1) Separation of concerns — User is purely an auth entity; business
+          links live elsewhere. (2) Lifecycle independence — a profile can be re-mapped without
+          touching the User row. (3) Easier to extend — if we ever add a fourth role with a
+          different business entity, we add a column to user_profiles, not the touchier users
+          table.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is the OneToOne to User <code>optional = false</code> but the inverse on User isn't?</div>
+        <div class="a">
+          The owning side (UserProfile.user) is mandatory — every profile must link to a User.
+          The inverse side (User.userProfile) is just a navigational helper; it can be null
+          for an admin who has no profile yet, or it could be missing during a partial migration.
+          Marking the owning side as <code>optional=false</code> enforces the data rule at the
+          JPA level. The inverse side stays flexible.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why are <code>employeeId</code> and <code>ownerId</code> plain Long fields instead of <code>@ManyToOne</code>?</div>
+        <div class="a">
+          To keep the auth module decoupled from the business modules. UserProfile only needs
+          to ANSWER "what's the ID?", not navigate to the full entity. Using plain Long avoids
+          unnecessary JOIN/lazy-load complexity, eliminates cascade risks, and lets the
+          business entities evolve independently. The trade-off is no DB-level FK validation,
+          which we accept because service code always sets these IDs correctly.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens if I try to load a User with no UserProfile?</div>
+        <div class="a">
+          <code>user.getUserProfile()</code> returns <code>null</code>. The auth code explicitly
+          handles that case (<code>profile != null ? profile.getEmployeeId() : null</code>),
+          which is right for admins (they have no profile). For workers/owners, it would mean
+          something's broken in the data — but the system fails gracefully (JWT just gets
+          null for those claims).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could you replace UserProfile with a discriminator column on User?</div>
+        <div class="a">
+          You could use JPA's <code>@Inheritance(strategy = JOINED)</code> with subclass
+          entities (AdminUser, WorkerUser, OwnerUser). It's cleaner type-wise but more complex
+          structurally — three tables instead of two, more careful with persist/merge cascading.
+          NOOL's pragmatic flat approach is simpler for a small project and gives the same
+          effective result.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is the table called <code>user_profiles</code> (plural) but you used <code>user_profile</code> in the chapter 04 diagram?</div>
+        <div class="a">
+          The chapter 04 description had a small inaccuracy — the actual table name is
+          plural (<code>user_profiles</code>) as Hibernate generates it from the
+          <code>@Table(name = "user_profiles")</code> annotation here. This is more consistent
+          with the other plural table names (<code>users</code>, <code>employees</code>,
+          <code>policies</code> etc.). It's a small detail but worth getting right.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With User + UserProfile covered, the auth foundation is complete. Next we step into the
+      business-data entities, starting with <strong>Employee.java</strong> — the worker's
+      profile, including the all-important polish rate.
+    </p>
+
+    <div class="chapnav">
+      <a href="11-user-entity.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 11 · User.java</span>
+      </a>
+      <a href="13-employee-entity.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 13 · Employee.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 12 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 28 · AuthController · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 28 · The HTTP Front Door</span>
+    <h1>
+      <span class="gradient">AuthController.java</span>
+    </h1>
+    <p class="subtitle">
+      The HTTP endpoint where login lives. Thin file — barely 30 lines — because the
+      controller's job is just to receive the request, delegate to the service, and return
+      the result. All the real work happens in the service layer we covered in Chapter 25.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🌐</div>
+      <div class="fmeta">
+        <h3>AuthController.java</h3>
+        <span class="fpath">backend/.../auth/controller/AuthController.java</span>
+        <div class="ftags"><span>@RestController</span><span>3 endpoints</span><span>Login flow</span><span>Public</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> What This Controller Exposes</h2>
+    <table class="ftable">
+      <thead><tr><th>Endpoint</th><th>Purpose</th><th>Body</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>POST /api/auth/login</code></td>
+          <td>Authenticate with mobile + password, get a JWT back</td>
+          <td><code>AuthLoginRequestDto</code></td>
+        </tr>
+        <tr>
+          <td><code>POST /api/auth/logout</code></td>
+          <td>Frontend-only operation — backend does nothing</td>
+          <td>(empty)</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/auth/validate</code></td>
+          <td>Verify the current token is still valid</td>
+          <td>(none — token in header)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>Notice how thin this controller is.</strong> The login method body is one
+      line: <code>return authService.login(requestDto);</code>. Controllers in NOOL are
+      deliberately thin — receive HTTP, call service, return result. All the brains live
+      in services.
+    </div>
+
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/controller/AuthController.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.controller;
+
+<span class="kw">import</span> com.nool.backend.auth.dto.AuthLoginResponseDto;
+<span class="kw">import</span> com.nool.backend.auth.dto.AuthLoginRequestDto;
+<span class="kw">import</span> com.nool.backend.auth.service.AuthService;
+<span class="kw">import</span> jakarta.validation.Valid;
+<span class="kw">import</span> lombok.RequiredArgsConstructor;
+<span class="kw">import</span> org.springframework.web.bind.annotation.*;
+
+<span class="ann">@RestController</span>                       <span class="com">// every method returns JSON, not a view name</span>
+<span class="ann">@RequestMapping</span>(<span class="str">"/auth"</span>)            <span class="com">// every URL prefixed: /api/auth/*</span>
+<span class="ann">@RequiredArgsConstructor</span>             <span class="com">// constructor injection of `authService`</span>
+<span class="kw">public class</span> AuthController {
+
+    <span class="kw">private final</span> AuthService authService;
+
+    <span class="com">// ── POST /api/auth/login ──────────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/login"</span>)
+    <span class="kw">public</span> AuthLoginResponseDto login(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> AuthLoginRequestDto requestDto) {
+
+        <span class="kw">return</span> authService.login(requestDto);
+        <span class="com">// One-liner — all the logic is in AuthServiceImpl (Chapter 25).</span>
+    }
+
+    <span class="com">// ── POST /api/auth/logout ─────────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/logout"</span>)
+    <span class="kw">public void</span> logout() {
+        <span class="com">// JWT logout handled on client side.
+        // The frontend deletes the token from localStorage.
+        // Nothing for the server to do.</span>
+    }
+
+    <span class="com">// ── GET /api/auth/validate ────────────────────────────────────</span>
+    <span class="ann">@GetMapping</span>(<span class="str">"/validate"</span>)
+    <span class="kw">public void</span> validateToken() {
+        <span class="com">// JWT already validated by JwtAuthenticationFilter.
+        // If the request reached this method, the token is valid.
+        // (Well — but this endpoint is under /auth/** which the filter SKIPS!)
+        // See note below.</span>
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">⚙️</span> The Three Critical Annotations</h2>
+    <table class="ftable">
+      <thead><tr><th>Annotation</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>@RestController</code></td>
+          <td>Combo of <code>@Controller</code> + <code>@ResponseBody</code>. Every method's return value is serialized to JSON via Jackson (no view templates).</td>
+        </tr>
+        <tr>
+          <td><code>@RequestMapping("/auth")</code></td>
+          <td>Adds <code>/auth</code> in front of every endpoint URL in this class. Combined with the global context-path <code>/api</code>, full URLs become <code>/api/auth/login</code>, etc.</td>
+        </tr>
+        <tr>
+          <td><code>@RequiredArgsConstructor</code></td>
+          <td>Lombok generates a constructor taking all <code>final</code> fields. Spring uses it for dependency injection — no <code>@Autowired</code> needed.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">🔍</span> The Login Method Annotations</h2>
+    <p>Three more annotations stacked on the <code>login</code> method parameter:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Annotation</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>@PostMapping("/login")</code></td>
+          <td>Method handles only POST requests at <code>/api/auth/login</code></td>
+        </tr>
+        <tr>
+          <td><code>@RequestBody</code></td>
+          <td>Tells Spring to deserialize the HTTP request body (JSON) into <code>AuthLoginRequestDto</code></td>
+        </tr>
+        <tr>
+          <td><code>@Valid</code></td>
+          <td>Triggers Bean Validation on the DTO — checks <code>@NotBlank</code>, <code>@Size</code>, etc.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">⚠️</span> An Important Subtlety — Why <code>/validate</code> Is Tricky</h2>
+    <p>
+      The <code>/validate</code> endpoint as written has an interesting quirk worth flagging.
+      Looking at <code>JwtAuthenticationFilter</code> (Chapter 21):
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">From JwtAuthenticationFilter</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Override</span>
+<span class="kw">protected boolean</span> shouldNotFilter(HttpServletRequest request) {
+    <span class="kw">return</span> request.getRequestURI().startsWith(<span class="str">"/api/auth/"</span>);
+}</pre>
+    </div>
+
+    <p>
+      The filter <strong>skips</strong> all <code>/api/auth/*</code> URLs — including
+      <code>/validate</code>! That means the comment "JWT already validated by filter" isn't
+      quite accurate for this endpoint. The filter doesn't run for it.
+    </p>
+
+    <div class="callout warn">
+      <strong>In practice</strong>, the <code>/validate</code> endpoint isn't strictly useful
+      as written — it accepts any request without checking the token. A stricter implementation
+      would either (a) carve <code>/validate</code> out of the <code>shouldNotFilter</code> skip
+      list, or (b) make the controller method actively parse the token. NOOL accepts this
+      because the frontend rarely calls /validate — most validation happens implicitly when
+      any protected endpoint succeeds or fails.
+    </div>
+
+    <h2><span class="h2-emoji">🚪</span> Why <code>/api/auth/*</code> Is Public</h2>
+    <p>From <code>SecurityConfig</code> (Chapter 22):</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">SecurityConfig rule</span><span class="lang">Java</span></div>
+<pre>.requestMatchers(<span class="str">"/auth/**"</span>).permitAll()</pre>
+    </div>
+
+    <p>
+      Login and logout HAVE to be reachable without a token — otherwise no one could ever log
+      in (chicken and egg). So all <code>/auth/*</code> endpoints are explicitly marked as
+      public. The <code>shouldNotFilter</code> in the JWT filter avoids wasting CPU trying
+      to parse non-existent tokens for these requests.
+    </p>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul logs in</h5>
+      <ol>
+        <li>Frontend sends <code>POST http://localhost:8083/api/auth/login</code> with JSON body.</li>
+        <li>Tomcat receives the request. Spring routes it through the filter chain.</li>
+        <li><code>JwtAuthenticationFilter.shouldNotFilter</code> returns true for <code>/api/auth/</code> → SKIP.</li>
+        <li><code>SecurityConfig</code> matches <code>/auth/**</code> → <code>permitAll()</code>.</li>
+        <li>Spring deserializes JSON body into <code>AuthLoginRequestDto</code>.</li>
+        <li><code>@Valid</code> validates: mobile present, length 10-15, password present.</li>
+        <li>Login method runs: <code>return authService.login(requestDto);</code></li>
+        <li>Service does its work (Chapter 25), returns <code>AuthLoginResponseDto</code>.</li>
+        <li>Spring serializes the DTO to JSON, returns HTTP 200.</li>
+        <li>Frontend receives the JSON, stores the token, navigates to dashboard.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Empty password — validation rejects</h5>
+      <ol>
+        <li>Frontend posts <code>{ "mobileNumber": "9876543210", "password": "" }</code>.</li>
+        <li>Body deserialized into DTO. <code>@Valid</code> kicks in.</li>
+        <li><code>@NotBlank</code> on <code>password</code> fails.</li>
+        <li>Spring throws <code>MethodArgumentNotValidException</code> before <code>login()</code> body executes.</li>
+        <li><code>GlobalExceptionHandler.handleValidation</code> catches it, returns HTTP 400 with details.</li>
+        <li>Service never runs — no wasted DB query.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Logout</h5>
+      <ol>
+        <li>User clicks "Logout" in the sidebar.</li>
+        <li>Frontend deletes <code>nool_token</code> from localStorage (this is the actual logout).</li>
+        <li>Optionally, frontend also sends <code>POST /api/auth/logout</code> — a courtesy ping.</li>
+        <li>Controller's <code>logout()</code> method runs. Body is empty. No-op.</li>
+        <li>Returns HTTP 200 with no body.</li>
+        <li>Frontend redirects to <code>/login</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Wrong password</h5>
+      <ol>
+        <li>Frontend posts mobile + wrong password.</li>
+        <li>Validation passes (both fields are present).</li>
+        <li>Service is called.</li>
+        <li>Service throws <code>BadRequestException("Invalid mobile number or password")</code>.</li>
+        <li>GlobalExceptionHandler converts to HTTP 400.</li>
+        <li>Frontend reads error message, shows it in red below the password field.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common AuthController mistakes</h5>
+      <div class="item">
+        <div class="bad">Putting business logic inside the controller</div>
+        <div class="good">Controllers should be thin. Move logic to the service. NOOL's controller is one line — perfect.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting <code>@Valid</code> on the request body</div>
+        <div class="good">Without it, <code>@NotBlank</code> / <code>@Size</code> on the DTO don't run. Bad input slips through.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Returning the entity (e.g., <code>User</code>) directly</div>
+        <div class="good">Return a DTO. Entities leak fields like the BCrypt password hash and internal timestamps.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Wrapping the return value in <code>ResponseEntity.ok(...)</code> unnecessarily</div>
+        <div class="good">Spring auto-converts the DTO return value to 200 OK with JSON body. No need for explicit ResponseEntity unless you need a custom status code.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Adding try/catch blocks inside the controller</div>
+        <div class="good">Let exceptions propagate. GlobalExceptionHandler catches them centrally and returns clean JSON. Try/catch in controllers leads to inconsistent error responses.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why three endpoints when only login does anything?</div>
+        <div class="a">
+          For frontend convenience. <code>/logout</code> exists so the frontend can send a POST
+          after deleting the token (some monitoring tools track logout events). <code>/validate</code>
+          gives the frontend a "check my token" pinger if needed. Both are placeholders that
+          could grow real logic later — e.g., a server-side token blacklist would put the
+          revocation in <code>/logout</code>.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why is the controller's <code>login</code> method just one line?</div>
+        <div class="a">
+          Layered architecture. Controllers handle HTTP concerns (parsing requests, returning
+          responses). Services handle business logic. By keeping the controller thin, the same
+          logic could be reused for, say, a future API key auth or a CLI tool — anything that
+          calls <code>authService.login(...)</code> would get the same behavior.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What's the difference between <code>@Controller</code> and <code>@RestController</code>?</div>
+        <div class="a">
+          <code>@Controller</code> is the traditional MVC controller — returns view names for
+          server-side rendering. <code>@RestController</code> = <code>@Controller</code> +
+          <code>@ResponseBody</code> on every method — returns objects that Jackson serializes
+          to JSON. For REST APIs always use <code>@RestController</code>.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does <code>@RequestBody</code> need <code>@Valid</code>?</div>
+        <div class="a">
+          <code>@RequestBody</code> just tells Spring to deserialize JSON into the parameter.
+          <code>@Valid</code> additionally triggers Bean Validation on that parameter — running
+          all the <code>@NotBlank</code>, <code>@Size</code>, etc. annotations defined on the
+          DTO. Without <code>@Valid</code>, the DTO is populated but validation rules don't run.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What's the full URL for the login endpoint?</div>
+        <div class="a">
+          <code>http://localhost:8083/api/auth/login</code>. Breaking it down: <code>8083</code>
+          is the configured <code>server.port</code>; <code>/api</code> is the configured
+          <code>server.servlet.context-path</code>; <code>/auth</code> from
+          <code>@RequestMapping("/auth")</code> on this class; <code>/login</code> from
+          <code>@PostMapping("/login")</code> on the method.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── Phase 6 complete! ──────── -->
+    <h2><span class="h2-emoji">🎉</span> Phase 6 (Auth Module) Complete</h2>
+    <div class="callout brain">
+      You've now seen the complete login flow, end to end. Login request from the frontend
+      → controller (this file) → service (Chapter 25) → repository (Chapter 24) → database
+      → BCrypt verification → JWT minting (Chapter 20) → response back to the frontend. Every
+      step explained. The auth module is done.
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Auth is complete. Next we enter <strong>Phase 7 — the Employee module</strong>: the
+      first actual business module. It follows the same controller-service-repository-DTO
+      pattern, but for managing workers (Chapter 29-31).
+    </p>
+
+    <div class="chapnav">
+      <a href="27-admin-bootstrap-runner.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 27 · AdminBootstrapRunner</span></a>
+      <a class="dim next"><span class="arrow next">Coming soon →</span><span class="title">Ch 29 · EmployeeRepository + DTOs</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 28 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

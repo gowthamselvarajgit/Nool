@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 19 · OwnerPayment.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 19 · Money In from Clients</span>
+    <h1>
+      <span class="gradient">OwnerPayment.java</span> —<br/>
+      Recording every rupee received
+    </h1>
+    <p class="subtitle">
+      The mirror image of SalaryPayment — but for money flowing IN from clients. When Rahul
+      pays ₹3,000 for polishing his sarees, that becomes one row in this table. The last
+      entity in NOOL's data model.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">💵</div>
+      <div class="fmeta">
+        <h3>OwnerPayment.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/owner/OwnerPayment.java</span>
+        <div class="ftags"><span>Entity</span><span>Money in</span><span>Payment</span><span>Last entity!</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── Compare to SalaryPayment ──────── -->
+    <h2><span class="h2-emoji">🧠</span> Mirror Image of SalaryPayment</h2>
+    <p>
+      Structurally this is very similar to SalaryPayment from the last chapter — but the flow
+      of money is reversed, and the structure is slightly simpler.
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th></th><th>SalaryPayment (out)</th><th>OwnerPayment (in)</th></tr></thead>
+      <tbody>
+        <tr><td>Direction</td><td>Workshop → Worker</td><td>Client → Workshop</td></tr>
+        <tr><td>Linked entity</td><td>Employee</td><td>SareeOwner</td></tr>
+        <tr><td>Work-period range?</td><td>Yes (<code>fromDate</code>, <code>toDate</code>)</td><td>No — single date only</td></tr>
+        <tr><td>Amount column name</td><td><code>amount_paid</code></td><td><code>amount_received</code></td></tr>
+        <tr><td>Java field name</td><td><code>amountPaid</code></td><td><code>amountPaid</code> ← same field name!</td></tr>
+        <tr><td>Payment mode</td><td>CASH / UPI / BANK_TRANSFER</td><td>CASH / UPI / BANK_TRANSFER</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      <strong>Curious quirk:</strong> The Java field is called <code>amountPaid</code> on
+      both entities, but on OwnerPayment it maps to the SQL column
+      <code>amount_received</code>. That's a small naming inconsistency between layers — the
+      Java field name was inherited from a shared pattern, but the DB column name was renamed
+      to reflect the direction. Most code only sees the Java name, so it rarely matters; but
+      if you write a raw SQL query, remember it's <code>amount_received</code>.
+    </div>
+
+    <h3>Why no work-period range?</h3>
+    <p>
+      Owner payments don't naturally map to a "work period". When Rahul sends ₹3,000 via UPI,
+      he's not necessarily paying for a specific batch — he might be paying down a running
+      balance, an advance on the next batch, or just a partial settlement. So NOOL records
+      just the single payment date, and the dashboard uses the SUM of payments vs. SUM of
+      <code>(returnedSarees × ratePerSaree)</code> to compute the pending amount.
+    </p>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/owner/OwnerPayment.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.owner;
+
+<span class="kw">import</span> com.nool.backend.enums.PaymentMode;     <span class="com">// CASH / UPI / BANK_TRANSFER</span>
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"owner_payments"</span>)             <span class="com">// SQL table = owner_payments</span>
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> OwnerPayment {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"payment_id"</span>)
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── PAYMENT DATE ──────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"payment_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate paymentDate;
+    <span class="com">// When the money actually arrived (UPI timestamp, cash hand-off date).</span>
+
+    <span class="com">// ── AMOUNT RECEIVED ───────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"amount_received"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Double amountPaid;
+    <span class="com">// ★ Field is called amountPaid in Java but the DB column is amount_received.
+    //   Java perspective: "the amount paid by the owner".
+    //   DB perspective: "the amount we received". Both are accurate; both
+    //   describe the same event from different sides.</span>
+
+    <span class="com">// ── HOW THEY PAID ─────────────────────────────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)
+    <span class="ann">@Column</span>(name = <span class="str">"payment_mode"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> PaymentMode paymentMode;        <span class="com">// CASH / UPI / BANK_TRANSFER</span>
+
+    <span class="com">// ── REMARKS (optional) ────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"remarks"</span>)
+    <span class="kw">private</span> String remarks;
+    <span class="com">// "UPI ref: 1234567890", "Cheque #45611", "Partial — balance next week".</span>
+
+    <span class="com">// ── OWNER LINK ────────────────────────────────────────────────</span>
+    <span class="ann">@ManyToOne</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"owner_id"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> SareeOwner owner;
+    <span class="com">// Many payments belong to one owner — across time.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>payment_id (PK)</td><td>Unique row ID</td><td><code>14</code></td></tr>
+        <tr><td><code>paymentDate</code></td><td>LocalDate</td><td>payment_date</td><td>When money arrived</td><td><code>2026-05-15</code></td></tr>
+        <tr><td><code>amountPaid</code></td><td>Double</td><td>amount_received</td><td>Amount in rupees</td><td><code>3000.0</code></td></tr>
+        <tr><td><code>paymentMode</code></td><td>PaymentMode</td><td>payment_mode</td><td>CASH / UPI / BANK_TRANSFER</td><td><code>UPI</code></td></tr>
+        <tr><td><code>remarks</code></td><td>String</td><td>remarks</td><td>Optional note</td><td><code>"UPI ref: 1234567890"</code></td></tr>
+        <tr><td><code>owner</code></td><td>SareeOwner</td><td>owner_id (FK)</td><td>Who paid</td><td>FK → saree_owner(owner_id)</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When typed into NOOL</td><td><code>2026-05-15T17:00:00</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Last edit</td><td><code>2026-05-15T17:00:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> owner_payments (
+    payment_id      <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    owner_id        <span class="sk">BIGINT</span>      <span class="sk">NOT NULL</span>,
+    payment_date    <span class="sk">DATE</span>        <span class="sk">NOT NULL</span>,
+    amount_received <span class="sk">DOUBLE</span>      <span class="sk">NOT NULL</span>,             <span class="sc">-- note: column name differs from Java field</span>
+    payment_mode    <span class="sk">VARCHAR</span>(20) <span class="sk">NOT NULL</span>,
+    remarks         <span class="sk">VARCHAR</span>(255),
+    created_at      <span class="sk">DATETIME</span>(6) <span class="sk">NOT NULL</span>,
+    updated_at      <span class="sk">DATETIME</span>(6),
+
+    <span class="sk">PRIMARY KEY</span> (payment_id),
+    <span class="sk">FOREIGN KEY</span> (owner_id) <span class="sk">REFERENCES</span> saree_owner(owner_id)
+);
+
+<span class="sc">-- Rahul sends ₹3,000 via UPI on May 15:</span>
+<span class="sk">INSERT INTO</span> owner_payments
+    (owner_id, payment_date, amount_received, payment_mode,
+     remarks, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">1</span>, <span class="ss">'2026-05-15'</span>, <span class="num2">3000.0</span>, <span class="ss">'UPI'</span>,
+     <span class="ss">'UPI ref: 1234567890'</span>,
+     <span class="ss">'2026-05-15 17:00:00'</span>, <span class="ss">'2026-05-15 17:00:00'</span>);
+
+<span class="sc">-- How much has Rahul paid us this month?</span>
+<span class="sk">SELECT</span> <span class="sk">SUM</span>(amount_received)
+<span class="sk">FROM</span>   owner_payments
+<span class="sk">WHERE</span>  owner_id = <span class="num2">1</span>
+  <span class="sk">AND</span>  payment_date <span class="sk">BETWEEN</span> <span class="ss">'2026-05-01'</span> <span class="sk">AND</span> <span class="ss">'2026-05-31'</span>;
+
+<span class="sc">-- Total cash received across all clients today:</span>
+<span class="sk">SELECT</span> <span class="sk">SUM</span>(amount_received)
+<span class="sk">FROM</span>   owner_payments
+<span class="sk">WHERE</span>  payment_mode = <span class="ss">'CASH'</span>
+  <span class="sk">AND</span>  payment_date = <span class="sk">CURDATE</span>();</pre>
+    </div>
+
+    <!-- ──────── The owner-pending formula ──────── -->
+    <h2><span class="h2-emoji">🧮</span> How Owner-Pending Is Computed</h2>
+    <p>
+      The formula combines THREE entities we've already covered: <code>SareeLedgerEntry</code>
+      (for returned counts), <code>SareeOwner</code> (for the rate), and
+      <code>OwnerPayment</code> (for the amount already received):
+    </p>
+
+    <div class="formula">
+      <div class="label">Pending amount owed by one client</div>
+      <div class="eq">
+        <span class="var">pending</span> <span class="op">=</span>
+        (returnedSarees <span class="op">×</span> <span class="var">owner.polishRatePerSaree</span>)
+        <span class="op">−</span>
+        SUM(<span class="var">owner_payment.amount_received</span>)
+      </div>
+    </div>
+
+    <p>Worked example for Rahul as of May 17, 2026:</p>
+    <table class="ftable">
+      <thead><tr><th>Step</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Total sarees returned to Rahul (from <code>saree_ledger</code>)</td><td>70</td></tr>
+        <tr><td>Rahul's rate per saree</td><td>₹65</td></tr>
+        <tr><td>Total payable: 70 × ₹65</td><td>₹4,550</td></tr>
+        <tr><td>Total payments received from Rahul</td><td>₹3,000</td></tr>
+        <tr><td><strong>Pending</strong></td><td><strong>₹1,550</strong></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul sends a UPI payment</h5>
+      <ol>
+        <li>4:30 PM. Dad gets a UPI notification: "Rahul Textiles paid ₹3,000".</li>
+        <li>Dad opens NOOL → Admin → Owner Payments → Add.</li>
+        <li>Picks Rahul Textiles, amount 3000, date today, mode UPI, remark "UPI ref: 1234567890".</li>
+        <li>Backend inserts a new row in <code>owner_payments</code>.</li>
+        <li>Dashboard updates: Rahul's pending drops by ₹3,000 immediately.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Partial cash payment</h5>
+      <ol>
+        <li>Mrs. Sharma comes to the workshop on May 17 with ₹2,000 cash, says "I'll send the rest by Friday".</li>
+        <li>Dad records: owner=Mrs Sharma, amount=2000, mode=CASH, remark="Partial — balance Friday".</li>
+        <li>Two days later Friday arrives. She sends another ₹1,500 via UPI.</li>
+        <li>Dad records a SECOND row: amount=1500, mode=UPI, remark="Balance payment".</li>
+        <li>The dashboard SUMs both rows for her — total paid = ₹3,500.</li>
+      </ol>
+      <p>Two rows for one client in one week is totally normal — no UNIQUE constraint on (owner_id, payment_date) for exactly this reason.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Reconciling cash at month-end</h5>
+      <ol>
+        <li>End of May. Mom wants to confirm "how much cash did we collect this month?".</li>
+        <li>Query: <code>SELECT SUM(amount_received) FROM owner_payments WHERE payment_mode='CASH' AND payment_date BETWEEN '2026-05-01' AND '2026-05-31'</code>.</li>
+        <li>Result: ₹18,500.</li>
+        <li>Mom counts the cash box: ₹18,500. Match! Or if not, she has a row-by-row list to track the discrepancy.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around OwnerPayment</h5>
+
+      <div class="item">
+        <div class="bad">Naming the Java field <code>amountReceived</code> to match the DB column</div>
+        <div class="good">The current Java field is <code>amountPaid</code> (mirroring SalaryPayment for code consistency). Renaming would mean updating service code, DTOs, controllers, frontend — a much bigger change. The slight asymmetry between Java name and SQL name is accepted.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing the "payable for this payment" amount</div>
+        <div class="good">Don't pre-compute. Pending is always derived from ledger + payments. Storing it would invite drift.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding a UNIQUE constraint on (owner_id, payment_date)</div>
+        <div class="good">Multiple payments per client per day are legitimate (partial settlements). UNIQUE would block real-world workflows.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting to record the payment_mode for a UPI receipt</div>
+        <div class="good">Always set it. Mode drives reconciliation. <code>nullable=false</code> on the column actively prevents leaving it blank.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-deleting a row to "remove a wrong payment"</div>
+        <div class="good">Insert a corrective row with a negative amount + explanatory remark. The audit trail stays clean. (NOOL's current implementation allows admin delete, but conservative practice prefers compensating rows.)</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about OwnerPayment</h5>
+
+      <div class="qa">
+        <div class="q">Why does the Java field <code>amountPaid</code> map to the SQL column <code>amount_received</code>?</div>
+        <div class="a">
+          Two perspectives, both correct. The Java field name <code>amountPaid</code> mirrors
+          SalaryPayment's field of the same name — useful for code consistency and shared DTO
+          patterns. The SQL column <code>amount_received</code> describes it from the
+          workshop's side: this is money we received. Both names accurately describe the same
+          event. The mismatch is just historical and harmless in practice.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why no <code>fromDate</code>/<code>toDate</code> like SalaryPayment?</div>
+        <div class="a">
+          Because client payments don't map cleanly to specific work periods. Rahul might pay
+          for the running balance, advance on a future batch, or partial settlement. The
+          pending calculation already uses the SareeLedger to compute "amount owed up to
+          today", so there's no need to record per-payment work-period boundaries.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Can the same client pay twice on the same day?</div>
+        <div class="a">
+          Yes — there's no UNIQUE constraint stopping it. Partial payments are real-world
+          common (₹2,000 cash on arrival, ₹1,500 UPI later). The salary calculation SUMs the
+          rows, so multiple rows are fine. Each row records one discrete payment event.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How do you handle a refund (workshop pays the owner back)?</div>
+        <div class="a">
+          The current schema doesn't support negative amounts directly (no constraint, but no
+          UI flow either). For a refund, the cleanest pattern is to insert a corrective row
+          with a negative amount + explanatory remark. A more disciplined design would have a
+          separate <code>OwnerRefund</code> entity, but that's beyond NOOL's current scope.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How is "pending amount" computed for the dashboard?</div>
+        <div class="a">
+          Three queries combined: (1) SUM of RETURN entries from <code>saree_ledger</code>
+          for the owner; (2) the owner's <code>polishRatePerSaree</code>; (3) SUM of
+          <code>amount_received</code> from this table for the owner. Pending = (1) × (2) - (3).
+          The OwnerPaymentService (Chapter 48) does this in Java.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens to OwnerPayment rows when an owner is marked INACTIVE?</div>
+        <div class="a">
+          Nothing — the rows stay forever. Status flip on SareeOwner only affects UI dropdowns
+          and active-list filters. The historical payment records remain for audit, tax, and
+          settling any outstanding balance. The FK from <code>owner_payments.owner_id</code>
+          stays valid.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── Entities phase complete! ──────── -->
+    <h2><span class="h2-emoji">🎉</span> Phase 4 Complete — Every Entity Covered</h2>
+    <div class="callout brain">
+      <strong>Congratulations — you've now seen every entity in NOOL!</strong> All 9 tables,
+      every column, every relationship, every constraint. You've seen how login data
+      (<code>User</code>, <code>UserProfile</code>) bridges to business data
+      (<code>Employee</code>, <code>SareeOwner</code>) and how operational events
+      (<code>Attendance</code>, <code>EmployeeDailyWork</code>, <code>SareeLedgerEntry</code>,
+      <code>SalaryPayment</code>, <code>OwnerPayment</code>) layer on top.
+      <br><br>
+      From now on, every Java file you see will <em>operate on</em> these entities — services,
+      repositories, controllers. The data model is the foundation; everything else is verbs.
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With the data model done, the next phase is <strong>Security</strong> (Phase 5). We'll
+      look at how NOOL protects every endpoint — JWT tokens, password hashing, role-based
+      access control. Chapter 20 starts with <code>JwtUtil.java</code> — the token factory.
+    </p>
+
+    <div class="chapnav">
+      <a href="18-salary-payment.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 18 · SalaryPayment.java</span>
+      </a>
+      <a class="dim next">
+        <span class="arrow next">Coming soon →</span>
+        <span class="title">Ch 20 · JwtUtil.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 19 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

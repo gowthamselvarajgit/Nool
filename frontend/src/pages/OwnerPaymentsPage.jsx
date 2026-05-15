@@ -4,8 +4,8 @@ import { Card, Loading, ErrorMessage, Badge } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { ownerPaymentService } from '../services/api';
 import { exportToExcel } from '../utils/excelExporter';
-import { formatDate } from '../utils/formatters';
-import { CreditCard, Banknote, Clock, CheckCircle2, ChevronRight, History, Calendar, Download } from 'lucide-react';
+import { formatDate, toLocalISODate } from '../utils/formatters';
+import { CreditCard, Banknote, Clock, CheckCircle2, ChevronRight, History, Calendar, Download, RefreshCw, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Custom Tooltip for Recharts
@@ -34,39 +34,44 @@ export const OwnerPaymentsPage = () => {
   const now = new Date();
   const monthName = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      // toLocalISODate avoids the UTC drift that .toISOString() introduces past
+      // IST midnight. Backend now returns all-time figures, so the range is
+      // effectively defensive only.
+      const fromDate = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+      const toDate = toLocalISODate(new Date());
+
+      const [historyRes, summaryRes] = await Promise.all([
+        ownerPaymentService.getMyHistory(0, 20).catch(() => ({ content: [] })),
+        ownerPaymentService.getMySummary(fromDate, toDate).catch(() => null),
+      ]);
+
+      const paymentList = historyRes?.content || [];
+      setPayments(paymentList);
+
+      // OwnerPaymentSummaryDto now carries ALL-TIME totals so the owner sees
+      // the real outstanding amount the moment a new return is recorded.
+      const lastPayment = paymentList[0];
+      setSummary({
+        totalPayable: summaryRes?.totalAmountPayable ?? 0,
+        totalPaid: summaryRes?.totalAmountPaid
+          ?? paymentList.reduce((sum, p) => sum + (p.amountPaid || 0), 0),
+        pendingAmount: summaryRes?.pendingAmount ?? 0,
+        lastPaymentDate: lastPayment?.paymentDate ?? null,
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to load payment data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const fromDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-        const toDate = new Date().toISOString().split('T')[0];
-
-        // ✅ Real API calls — ownerPaymentService uses /owner-payments endpoints
-        const [historyRes, summaryRes] = await Promise.all([
-          ownerPaymentService.getMyHistory(0, 20).catch(() => ({ content: [] })),
-          ownerPaymentService.getMySummary(fromDate, toDate).catch(() => null),
-        ]);
-
-        const paymentList = historyRes?.content || [];
-        setPayments(paymentList);
-
-        // ✅ OwnerPaymentSummaryDto fields: totalAmountPaid, pendingAmount
-        const totalPaid = summaryRes?.totalAmountPaid
-          ?? paymentList.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
-        const lastPayment = paymentList[0];
-
-        setSummary({
-          totalPaid,
-          pendingAmount: summaryRes?.pendingAmount ?? 0,
-          lastPaymentDate: lastPayment?.paymentDate ?? null,
-        });
-      } catch (err) {
-        setError(err.message || 'Failed to load payment data');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   if (loading) return <MainLayout><Loading text="Loading your payments..." /></MainLayout>;
@@ -108,29 +113,58 @@ export const OwnerPaymentsPage = () => {
             </p>
           </div>
 
-          <button
-            type="button"
-            disabled={!payments.length}
-            onClick={() => exportToExcel({
-              rows: payments.map(p => ({
-                'Payment ID': p.paymentId,
-                'Date': p.paymentDate ? formatDate(p.paymentDate) : '',
-                'Amount (₹)': p.amountPaid ?? 0,
-                'Mode': p.paymentMode || '',
-                'Remarks': p.remarks || '',
-              })),
-              fileName: 'Nool_My_Payments',
-              sheetName: 'Payments',
-              columnWidths: [12, 14, 14, 12, 24],
-            })}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white text-text-main border border-border rounded-xl text-sm font-semibold hover:bg-surface-hover transition-colors shadow-sm disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" /> Export Excel
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={fetchData}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white text-text-main border border-border rounded-xl text-sm font-semibold hover:bg-surface-hover transition-colors shadow-sm"
+            >
+              <RefreshCw className="w-4 h-4" /> Refresh
+            </button>
+            <button
+              type="button"
+              disabled={!payments.length}
+              onClick={() => exportToExcel({
+                rows: payments.map(p => ({
+                  'Payment ID': p.paymentId,
+                  'Date': p.paymentDate ? formatDate(p.paymentDate) : '',
+                  'Amount (₹)': p.amountPaid ?? 0,
+                  'Mode': p.paymentMode || '',
+                  'Remarks': p.remarks || '',
+                })),
+                fileName: 'Nool_My_Payments',
+                sheetName: 'Payments',
+                columnWidths: [12, 14, 14, 12, 24],
+              })}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white text-text-main border border-border rounded-xl text-sm font-semibold hover:bg-surface-hover transition-colors shadow-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" /> Export Excel
+            </button>
+          </div>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {/* Total Owed Card — derived from sarees returned × rate */}
+          <div className="bg-surface rounded-3xl p-6 border border-border shadow-soft relative overflow-hidden group">
+            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl group-hover:bg-indigo-500/20 transition-colors"></div>
+            <div className="flex justify-between items-start relative z-10">
+              <div>
+                <p className="text-sm font-medium text-secondary-500 mb-1">Total Owed</p>
+                <div className="flex items-end gap-1 mb-2">
+                  <span className="text-2xl font-bold text-text-main mb-1">₹</span>
+                  <h3 className="text-4xl font-display font-bold text-text-main">{summary?.totalPayable?.toLocaleString() || 0}</h3>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+                  <TrendingUp className="w-3 h-3" /> Earned from returns
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
           {/* Total Paid Card */}
           <div className="bg-surface rounded-3xl p-6 border border-border shadow-soft relative overflow-hidden group">
             <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl group-hover:bg-emerald-500/20 transition-colors"></div>
@@ -142,7 +176,7 @@ export const OwnerPaymentsPage = () => {
                   <h3 className="text-4xl font-display font-bold text-text-main">{summary?.totalPaid?.toLocaleString() || 0}</h3>
                 </div>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                  <CheckCircle2 className="w-3 h-3" /> Received this month
+                  <CheckCircle2 className="w-3 h-3" /> Received so far
                 </span>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
@@ -181,7 +215,7 @@ export const OwnerPaymentsPage = () => {
                   <CreditCard className="w-5 h-5 text-white" />
                 </div>
               </div>
-              
+
               <div>
                 <p className="text-2xl font-display font-bold mb-1">
                   {summary?.lastPaymentDate

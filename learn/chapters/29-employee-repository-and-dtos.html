@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 29 · EmployeeRepository + DTOs · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 29 · Employee Module — The Foundation</span>
+    <h1>
+      Employee <span class="gradient">Repository &amp; DTOs</span>
+    </h1>
+    <p class="subtitle">
+      Six files together — one repository and five DTOs — that define how the Employee module
+      talks to the database and to the frontend. Pure plumbing, but every "add worker", "edit
+      rate", "view worker list", and "/me" endpoint flows through these files.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📦</div>
+      <div class="fmeta">
+        <h3>6 files in the employee module</h3>
+        <span class="fpath">backend/.../repository/employee/ + dto/employee/</span>
+        <div class="ftags"><span>Repository</span><span>5 DTOs</span><span>@Query</span><span>Validation</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Six Files</h2>
+    <table class="ftable">
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>EmployeeRepository.java</code></td><td>Spring Data interface — queries against <code>employees</code> table</td></tr>
+        <tr><td><code>CreateEmployeeRequestDto.java</code></td><td>Body of "Add Employee" — name, mobile, joining date, rate, password</td></tr>
+        <tr><td><code>UpdateEmployeeRequestDto.java</code></td><td>Body of "Edit Employee" — partial fields, no password change here</td></tr>
+        <tr><td><code>EmployeeStatusUpdateDto.java</code></td><td>Body of "Mark as Left" / "Reactivate" — just id + status</td></tr>
+        <tr><td><code>EmployeeResponseDto.java</code></td><td>Returned to the frontend for single-employee endpoints</td></tr>
+        <tr><td><code>EmployeeListResponse.java</code></td><td>Returned for list views — identical fields to EmployeeResponseDto</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ─── 1. EmployeeRepository ─── -->
+    <h2><span class="h2-emoji">1️⃣</span> <code>EmployeeRepository.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">repository/employee/EmployeeRepository.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.repository.employee;
+
+<span class="kw">import</span> com.nool.backend.entity.employee.Employee;
+<span class="kw">import</span> com.nool.backend.enums.EmployeeStatus;
+<span class="kw">import</span> org.springframework.data.domain.Page;
+<span class="kw">import</span> org.springframework.data.domain.Pageable;
+<span class="kw">import</span> org.springframework.data.jpa.repository.JpaRepository;
+<span class="kw">import</span> org.springframework.data.jpa.repository.Query;
+<span class="kw">import</span> org.springframework.data.repository.query.Param;
+<span class="kw">import</span> org.springframework.stereotype.Repository;
+<span class="kw">import</span> java.util.List;
+
+<span class="ann">@Repository</span>
+<span class="kw">public interface</span> EmployeeRepository <span class="kw">extends</span> JpaRepository&lt;Employee, Long&gt; {
+
+    <span class="com">// ── 1. Find employees by status (ACTIVE / LEFT) ─────────────</span>
+    List&lt;Employee&gt; findByStatus(EmployeeStatus status);
+
+    <span class="com">// ── 2. Count employees by status ────────────────────────────</span>
+    <span class="kw">long</span> countByStatus(EmployeeStatus status);
+
+    <span class="com">// ── 3. Custom JPQL — all active employees ───────────────────</span>
+    <span class="ann">@Query</span>(<span class="str">"SELECT e FROM Employee e WHERE e.status = 'ACTIVE'"</span>)
+    List&lt;Employee&gt; findAllActiveEmployees();
+
+    <span class="com">// ── 4. Duplicate-check by mobile ────────────────────────────</span>
+    <span class="kw">boolean</span> existsByMobileNumber(String mobileNumber);
+
+    <span class="com">// ── 5. Search by name OR mobile (paginated) ─────────────────</span>
+    <span class="ann">@Query</span>(<span class="str">"SELECT e FROM Employee e WHERE "</span> +
+           <span class="str">"LOWER (e.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "</span> +
+           <span class="str">"e.mobileNumber LIKE CONCAT('%', :keyword, '%')"</span>)
+    Page&lt;Employee&gt; searchEmployees(<span class="ann">@Param</span>(<span class="str">"keyword"</span>) String keyword,
+                                    Pageable pageable);
+}</pre>
+    </div>
+
+    <h3>Method-by-method reference</h3>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>Generated/declared SQL</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>findByStatus(status)</code></td><td><code>SELECT * FROM employees WHERE status = ?</code></td><td>Listing all ACTIVE or LEFT workers</td></tr>
+        <tr><td><code>countByStatus(status)</code></td><td><code>SELECT COUNT(*) FROM employees WHERE status = ?</code></td><td>Admin dashboard count widgets</td></tr>
+        <tr><td><code>findAllActiveEmployees()</code></td><td>JPQL: SELECT e FROM Employee WHERE status='ACTIVE'</td><td>Dropdowns showing only active workers</td></tr>
+        <tr><td><code>existsByMobileNumber(mobile)</code></td><td><code>SELECT 1 FROM employees WHERE mobile_number = ? LIMIT 1</code></td><td>Duplicate-check before insert</td></tr>
+        <tr><td><code>searchEmployees(keyword, pageable)</code></td><td>JPQL: LOWER(name) LIKE %keyword% OR mobile LIKE %keyword%</td><td>Paginated search box in admin UI</td></tr>
+        <tr><td><em>inherited</em></td><td><code>save</code>, <code>findById</code>, <code>findAll</code>, <code>findAll(Pageable)</code>, <code>delete</code></td><td>Standard CRUD</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Two ways to declare queries — both used here</h3>
+
+    <p>
+      Spring Data JPA gives us <strong>two ways</strong> to define repository methods, and
+      <code>EmployeeRepository</code> uses both:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Approach</th><th>How it works</th><th>When to use</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Method-name parsing</strong></td>
+          <td>Spring parses the method name (<code>findByStatus</code>) and generates SQL automatically</td>
+          <td>Simple queries on one or two fields. <code>findByX</code>, <code>existsByX</code>, <code>countByX</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Explicit @Query (JPQL)</strong></td>
+          <td>You write the query yourself in JPQL (a Java version of SQL)</td>
+          <td>Anything beyond trivial — OR conditions, LOWER(), LIKE patterns, JOINs.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>JPQL vs SQL — a quick note</h3>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">JPQL (in @Query)</span><span class="lang">JPQL</span></div>
+<pre><span class="kw">SELECT</span> e <span class="kw">FROM</span> Employee e <span class="kw">WHERE</span> e.status = <span class="str">'ACTIVE'</span></pre>
+    </div>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Translated SQL Hibernate generates</span><span class="lang">SQL</span></div>
+<pre><span class="sk">SELECT</span> * <span class="sk">FROM</span> employees <span class="sk">WHERE</span> status = <span class="ss">'ACTIVE'</span></pre>
+    </div>
+
+    <p>JPQL works on Java <em>entities</em> (<code>Employee</code>, field <code>status</code>); Hibernate translates to SQL using the entity → table mapping. Slightly more abstract — and DB-agnostic.</p>
+
+    <div class="callout brain">
+      <strong>Why not use <code>findByNameContainingIgnoreCaseOrMobileNumberContaining(...)</code>?</strong>
+      You could! Spring Data's name-parser supports those keywords. But once a query has OR and
+      pattern matching, the method name becomes very long. The <code>@Query</code> version is
+      more readable. Both styles work.
+    </div>
+
+    <!-- ─── 2. CreateEmployeeRequestDto ─── -->
+    <h2><span class="h2-emoji">2️⃣</span> <code>CreateEmployeeRequestDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/employee/CreateEmployeeRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.employee;
+
+<span class="kw">import</span> jakarta.validation.constraints.*;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> CreateEmployeeRequestDto {
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Employee name is required"</span>)
+    <span class="kw">private</span> String employeeName;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Joining date is required"</span>)
+    <span class="kw">private</span> LocalDate joiningDate;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Polishing rate is required"</span>)
+    <span class="ann">@Positive</span>(message = <span class="str">"Polishing rate must be greater than zero"</span>)
+    <span class="kw">private</span> Double polishingRate;
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Mobile number is required"</span>)
+    <span class="ann">@Pattern</span>(
+            regexp = <span class="str">"^[6-9][0-9]{9}$"</span>,
+            message = <span class="str">"Mobile number must be a valid 10-digit Indian mobile number"</span>
+    )
+    <span class="kw">private</span> String mobileNumber;
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Password is required"</span>)
+    <span class="kw">private</span> String password;
+}</pre>
+    </div>
+
+    <h3>The validation rules at a glance</h3>
+    <table class="ftable">
+      <thead><tr><th>Field</th><th>Annotations</th><th>Valid example</th><th>Rejected example</th></tr></thead>
+      <tbody>
+        <tr><td><code>employeeName</code></td><td>@NotBlank</td><td>"Prema"</td><td>"" or " " or null</td></tr>
+        <tr><td><code>joiningDate</code></td><td>@NotNull</td><td>"2026-05-15"</td><td>null</td></tr>
+        <tr><td><code>polishingRate</code></td><td>@NotNull, @Positive</td><td>30.0</td><td>0, -1, null</td></tr>
+        <tr><td><code>mobileNumber</code></td><td>@NotBlank, @Pattern(<code>^[6-9][0-9]{9}$</code>)</td><td>"9000000002"</td><td>"123", "5000000000", "abc"</td></tr>
+        <tr><td><code>password</code></td><td>@NotBlank</td><td>"prema123"</td><td>"" or null</td></tr>
+      </tbody>
+    </table>
+
+    <h3>The mobile-number regex explained</h3>
+    <p>That <code>^[6-9][0-9]{9}$</code> deserves a closer look — it enforces Indian mobile format:</p>
+
+    <ul>
+      <li><code>^</code> — start of string</li>
+      <li><code>[6-9]</code> — first digit MUST be 6, 7, 8, or 9 (Indian mobile prefixes)</li>
+      <li><code>[0-9]{9}</code> — followed by exactly 9 more digits</li>
+      <li><code>$</code> — end of string (so total length is exactly 10)</li>
+    </ul>
+
+    <p>This catches typos like "5xxxxxxxxx" (landline-prefix), short numbers, and any non-digit characters.</p>
+
+    <!-- ─── 3. UpdateEmployeeRequestDto ─── -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>UpdateEmployeeRequestDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/employee/UpdateEmployeeRequestDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.employee;
+
+<span class="kw">import</span> jakarta.validation.constraints.*;
+<span class="kw">import</span> lombok.Data;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> UpdateEmployeeRequestDto {
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Employee id is required"</span>)
+    <span class="kw">private</span> Long employeeId;                       <span class="com">// which employee to update</span>
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Employee name is required"</span>)
+    <span class="kw">private</span> String employeeName;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Polishing rate is required"</span>)
+    <span class="ann">@Positive</span>(message = <span class="str">"Polishing rate must be greater than zero"</span>)
+    <span class="kw">private</span> Double polishingRate;
+
+    <span class="ann">@NotBlank</span>(message = <span class="str">"Mobile number is required"</span>)
+    <span class="ann">@Pattern</span>(
+            regexp = <span class="str">"^[6-9][0-9]{9}$"</span>,
+            message = <span class="str">"Mobile number must be a valid 10-digit Indian mobile number"</span>
+    )
+    <span class="kw">private</span> String mobileNumber;
+}</pre>
+    </div>
+
+    <h3>How update differs from create</h3>
+    <table class="ftable">
+      <thead><tr><th>Create</th><th>Update</th></tr></thead>
+      <tbody>
+        <tr><td>No <code>employeeId</code> — server assigns it</td><td><code>employeeId</code> required — points to the row to edit</td></tr>
+        <tr><td>Has <code>password</code></td><td>NO password (passwords are not updated through this endpoint)</td></tr>
+        <tr><td>Has <code>joiningDate</code></td><td>NO joining date (historical — never edit)</td></tr>
+        <tr><td>Status auto-set to ACTIVE</td><td>Status NOT in this DTO (separate endpoint for status flips)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>Why are these omissions deliberate?</strong>
+      <ul style="margin-bottom: 0;">
+        <li><strong>password</strong> — security. Password changes deserve their own endpoint with extra checks (old-password verification, etc.). Bundling it with name edits is a recipe for accidents.</li>
+        <li><strong>joiningDate</strong> — it's historical fact. Should never be edited.</li>
+        <li><strong>status</strong> — status changes have business consequences (worker can/can't log in). A separate endpoint isolates that intent.</li>
+      </ul>
+    </div>
+
+    <!-- ─── 4. EmployeeStatusUpdateDto ─── -->
+    <h2><span class="h2-emoji">4️⃣</span> <code>EmployeeStatusUpdateDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/employee/EmployeeStatusUpdateDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.employee;
+
+<span class="kw">import</span> com.nool.backend.enums.EmployeeStatus;
+<span class="kw">import</span> jakarta.validation.constraints.NotNull;
+<span class="kw">import</span> lombok.Data;
+
+<span class="ann">@Data</span>
+<span class="kw">public class</span> EmployeeStatusUpdateDto {
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Employee id is required"</span>)
+    <span class="kw">private</span> Long employeeId;
+
+    <span class="ann">@NotNull</span>(message = <span class="str">"Employee status is required"</span>)
+    <span class="kw">private</span> EmployeeStatus status;             <span class="com">// ACTIVE or LEFT</span>
+}</pre>
+    </div>
+
+    <p>The simplest of the request DTOs. Just two fields: who, and what new status. Used for "Mark as Left" and (potentially) "Reactivate" actions.</p>
+
+    <!-- ─── 5. EmployeeResponseDto ─── -->
+    <h2><span class="h2-emoji">5️⃣</span> <code>EmployeeResponseDto.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/employee/EmployeeResponseDto.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.employee;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> EmployeeResponseDto {
+    <span class="kw">private</span> Long      employeeId;
+    <span class="kw">private</span> String    employeeName;
+    <span class="kw">private</span> LocalDate joiningDate;
+    <span class="kw">private</span> Double    polishingRate;
+    <span class="kw">private</span> String    status;
+    <span class="kw">private</span> String    mobileNumber;
+}</pre>
+    </div>
+
+    <p>Returned by single-employee endpoints. Sample JSON:</p>
+    <div class="codewrap">
+      <div class="head"><span class="path">GET /api/employees/5 response</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"employeeId"</span>:    <span class="num2">5</span>,
+  <span class="str">"employeeName"</span>:  <span class="str">"Prema"</span>,
+  <span class="str">"joiningDate"</span>:   <span class="str">"2025-08-12"</span>,
+  <span class="str">"polishingRate"</span>: <span class="num2">30.0</span>,
+  <span class="str">"status"</span>:        <span class="str">"ACTIVE"</span>,
+  <span class="str">"mobileNumber"</span>:  <span class="str">"9000000002"</span>
+}</pre>
+    </div>
+
+    <h3>What's NOT in the response</h3>
+    <ul>
+      <li><strong>password</strong> — never expose</li>
+      <li><strong>user_id</strong> — internal foreign-key, not useful to the frontend</li>
+      <li><strong>createdAt / updatedAt</strong> — internal audit, not shown in worker lists</li>
+      <li><strong>The User object</strong> — would leak the BCrypt password hash</li>
+    </ul>
+
+    <div class="callout brain">
+      <strong>DTO as a security boundary:</strong> the response DTO controls EXACTLY what
+      data the frontend (and therefore anyone with browser dev tools) can see. Returning the
+      entity directly would expose the BCrypt password hash and other internal fields. The
+      DTO is the wall between "what we store" and "what we expose".
+    </div>
+
+    <!-- ─── 6. EmployeeListResponse ─── -->
+    <h2><span class="h2-emoji">6️⃣</span> <code>EmployeeListResponse.java</code></h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/employee/EmployeeListResponse.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.employee;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDate;
+
+<span class="ann">@Data</span> <span class="ann">@Builder</span>
+<span class="kw">public class</span> EmployeeListResponse {
+    <span class="kw">private</span> Long      employeeId;
+    <span class="kw">private</span> String    employeeName;
+    <span class="kw">private</span> LocalDate joiningDate;
+    <span class="kw">private</span> Double    polishingRate;
+    <span class="kw">private</span> String    status;
+    <span class="kw">private</span> String    mobileNumber;
+}</pre>
+    </div>
+
+    <p>This DTO is currently <strong>identical</strong> to <code>EmployeeResponseDto</code>. Why two classes with the same fields?</p>
+
+    <div class="callout info">
+      <strong>Two reasons.</strong>
+      <br><br>
+      <strong>(1) Future divergence.</strong> List endpoints often want LESS detail than single-row endpoints (e.g., omit the mobile from a public list view to save bandwidth). Keeping a separate class lets us tune that later without touching all the single-row consumers.
+      <br><br>
+      <strong>(2) Type-level clarity.</strong> When a function signature returns <code>PaginationResponseDto&lt;EmployeeListResponse&gt;</code>, the reader instantly knows "this is a list page", not a single employee. Saves a comment.
+    </div>
+
+    <!-- ─── Real-world examples ─── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad searches for "Pre" in the employee list</h5>
+      <ol>
+        <li>Frontend posts <code>POST /api/employees/list</code> with body <code>{ "page": 0, "size": 10, "searchKeyword": "Pre", "sortBy": "createdAt", "sortingDirection": "DESC" }</code>.</li>
+        <li>Service builds a PageRequest, calls <code>employeeRepository.searchEmployees("Pre", pageable)</code>.</li>
+        <li>Repository's <code>@Query</code> fires: <code>SELECT e FROM Employee e WHERE LOWER(e.name) LIKE '%pre%' OR e.mobileNumber LIKE '%Pre%'</code>.</li>
+        <li>Hibernate translates to MySQL, executes, returns a Page of Employee entities.</li>
+        <li>Service maps each Employee → EmployeeListResponse (excluding password, audit fields).</li>
+        <li>Wraps in PaginationResponseDto, returns to controller, serialized to JSON.</li>
+        <li>Frontend renders the table with pagination.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Dad tries to add a worker with mobile "1234567890"</h5>
+      <ol>
+        <li>Frontend posts <code>POST /api/employees</code> with bad mobile.</li>
+        <li>Spring deserializes into <code>CreateEmployeeRequestDto</code>.</li>
+        <li><code>@Valid</code> kicks in. <code>@Pattern</code> on mobileNumber: "1234567890" → first digit is "1", not in [6-9]. FAILS.</li>
+        <li>Spring throws <code>MethodArgumentNotValidException</code> before the controller body runs.</li>
+        <li>GlobalExceptionHandler returns 400 with: <em>"mobileNumber: Mobile number must be a valid 10-digit Indian mobile number"</em>.</li>
+        <li>Service is never called — no wasted DB hit.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Admin counts active workers for the dashboard</h5>
+      <ol>
+        <li>Dashboard service calls <code>employeeRepository.countByStatus(EmployeeStatus.ACTIVE)</code>.</li>
+        <li>SQL: <code>SELECT COUNT(*) FROM employees WHERE status = 'ACTIVE'</code>.</li>
+        <li>Returns 7 — the count is rendered as a dashboard stat card.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Quick mobile-uniqueness check before insert</h5>
+      <ol>
+        <li>EmployeeServiceImpl.createEmployee receives a new request.</li>
+        <li>Calls <code>employeeRepository.existsByMobileNumber("9000000002")</code>.</li>
+        <li>Returns true → throws <code>DuplicateResourceException</code> BEFORE attempting any insert.</li>
+        <li>This is faster than letting MySQL's UNIQUE constraint throw — the friendly check up-front gives a better error message and avoids transaction rollback.</li>
+      </ol>
+    </div>
+
+    <!-- ─── Mistakes ─── -->
+    <div class="mistakes">
+      <h5>Common mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Returning <code>Employee</code> (the entity) directly from controllers</div>
+        <div class="good">Always map to a DTO. The entity exposes the BCrypt password hash, internal timestamps, and lazy-loaded relationships that can trigger N+1 queries.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Including <code>password</code> in the Update DTO</div>
+        <div class="good">Password changes deserve their own endpoint with extra checks. Bundling password edits with name/rate edits invites accidents.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using the same DTO for create and update</div>
+        <div class="good">They have different rules — create needs password + joining date, update doesn't. Separate DTOs make the rules visible at the type level.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Repository</code> on the interface</div>
+        <div class="good">Spring auto-detects JpaRepository-derived interfaces, but <code>@Repository</code> makes the role explicit and provides exception translation (converts JDBC SQLExceptions into Spring's DataAccessException hierarchy).</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Writing the search query as <code>findByNameOrMobileNumberContainingIgnoreCase(...)</code></div>
+        <div class="good">For complex queries, the method name becomes hard to read. <code>@Query</code> with named parameters is clearer for OR + LIKE + LOWER.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Returning <code>List&lt;Employee&gt;</code> from a search/list endpoint</div>
+        <div class="good">Return a paginated response. The employees table could grow to thousands of rows; loading them all blows up memory. <code>Page&lt;Employee&gt;</code> + PaginationResponseDto handle pagination naturally.</div>
+      </div>
+    </div>
+
+    <!-- ─── Q&A ─── -->
+    <div class="qabox">
+      <h5>Interview questions</h5>
+
+      <div class="qa">
+        <div class="q">Why are there two DTOs (EmployeeResponseDto and EmployeeListResponse) with the same fields?</div>
+        <div class="a">
+          Future-proofing and type-level clarity. The fields are identical today, but list endpoints frequently diverge later (e.g., trim to a few columns for performance). Keeping them separate now means we can tune one without affecting the other. The type also documents intent at function signatures.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">When should you use <code>@Query</code> vs method-name derivation?</div>
+        <div class="a">
+          Use method-name derivation for simple queries on 1-2 fields. Switch to <code>@Query</code> when the method name would become unwieldy — OR conditions, function calls like LOWER(), JOINs across entities, or anything more complex than a few finder keywords.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why <code>existsByMobileNumber</code> instead of <code>findByMobileNumber + isPresent</code>?</div>
+        <div class="a">
+          Performance. <code>existsBy</code> generates a query that the database can short-circuit at the first matching row (<code>SELECT 1 ... LIMIT 1</code>). <code>findBy</code> SELECTs all columns of all matching rows, which is wasteful when you only need a boolean.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does <code>@Pattern</code> validate?</div>
+        <div class="a">
+          It runs the field's value against a regex. If the regex matches, the field is valid. Used here to enforce Indian mobile format (10 digits starting with 6-9). The error message in the annotation is what GlobalExceptionHandler returns when validation fails.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is the password field in CreateEmployeeRequestDto a plain String, not a special type?</div>
+        <div class="a">
+          The DTO is just a transport object. The plain-text password lives in memory only for the duration of the request, then is hashed in <code>AdminUserService</code> before any persistence. Adding a "SecureString" type would be over-engineering for a single transient field.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does the search method return <code>Page&lt;Employee&gt;</code> instead of <code>List&lt;Employee&gt;</code>?</div>
+        <div class="a">
+          Spring Data's Page includes total count, current page index, page size, total pages — useful for pagination UIs. The service later maps this to <code>PaginationResponseDto</code> which exposes the same info to the frontend. <code>List</code> would lose the totals.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>The plumbing is laid. Next chapter wires it together in <strong>EmployeeService + Impl</strong> — the business logic for adding, editing, deleting, and listing workers.</p>
+
+    <div class="chapnav">
+      <a href="28-auth-controller.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 28 · AuthController</span></a>
+      <a href="30-employee-service.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 30 · EmployeeService + Impl</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 29 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

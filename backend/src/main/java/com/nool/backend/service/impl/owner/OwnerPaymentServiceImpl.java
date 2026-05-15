@@ -120,26 +120,22 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
         SareeOwner owner = sareeOwnerRepository.findById(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Owner not found"));
 
-        // ✅ Null-safe paid amount
-        Double totalPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwnerAndDateRange(
-                ownerId,
-                dateRangeDto.getFromDate(),
-                dateRangeDto.getToDate()
-        );
-        double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
-
-        // Payable = sarees returned in this date range × rate per saree
-        Long totalReturnedBoxed = sareeLedgerRepository.sumQuantityByOwnerAndTypeAndDateRange(
-                ownerId,
-                LedgerEntryType.RETURN,
-                dateRangeDto.getFromDate(),
-                dateRangeDto.getToDate()
-        );
-
+        // Payable / paid / pending are ALL-TIME totals. Filtering by date range
+        // here used to hide returns from earlier periods (or returns whose entryDate
+        // landed outside the page's "this month" window), making the owner's
+        // pending amount appear stuck at ₹0 after a new return was recorded.
+        // Match the admin's getAllOwnersPaymentSummary semantics for consistency.
+        Long totalReturnedBoxed = sareeLedgerRepository.sumQuantityByOwnerAndType(
+                ownerId, LedgerEntryType.RETURN);
         long totalReturned = totalReturnedBoxed == null ? 0 : totalReturnedBoxed;
 
-        // Use the owner's configured rate; fall back to global config if unset (legacy rows).
-        double rate = owner.getPolishRatePerSaree() != null ? owner.getPolishRatePerSaree() : ratePerSaree;
+        Double totalPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
+        double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
+
+        // Owner-configured rate; fall back to global config if unset OR 0
+        // (legacy rows can land with rate=0 because the column was added later).
+        Double ownerRate = owner.getPolishRatePerSaree();
+        double rate = (ownerRate != null && ownerRate > 0) ? ownerRate : ratePerSaree;
         double totalPayable = totalReturned * rate;
 
         // ✅ NEVER allow negative pending
@@ -183,12 +179,16 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
         List<SareeOwner> owners = sareeOwnerRepository.findAll();
 
         // 2) all-time returned totals per owner (we earn money on returns)
+        // Use the toString() form for enum matching — Hibernate can return either
+        // the enum or its String representation for Object[] projections of an
+        // @Enumerated(EnumType.STRING) column, and a hard `(LedgerEntryType)` cast
+        // either misses every RETURN row (string comparison) or throws CCE.
         java.util.Map<Long, Long> returnedByOwner = new java.util.HashMap<>();
         for (Object[] row : sareeLedgerRepository.aggregateAllOwnersByType()) {
             Long ownerId = (Long) row[0];
-            LedgerEntryType type = (LedgerEntryType) row[1];
+            String typeName = row[1] == null ? "" : row[1].toString();
             long sum = ((Number) row[2]).longValue();
-            if (type == LedgerEntryType.RETURN) {
+            if (LedgerEntryType.RETURN.name().equals(typeName)) {
                 returnedByOwner.put(ownerId, sum);
             }
         }
@@ -205,7 +205,12 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
         List<OwnerPaymentSummaryDto> result = new java.util.ArrayList<>(owners.size());
         for (SareeOwner owner : owners) {
             long returned = returnedByOwner.getOrDefault(owner.getId(), 0L);
-            double rate = owner.getPolishRatePerSaree() != null ? owner.getPolishRatePerSaree() : ratePerSaree;
+            // Rate fallback also catches 0/negative values. Owners created before
+            // polish_rate_per_saree existed in the schema can land with a DB-level
+            // default of 0, which the Lombok @Builder.Default(70.0) cannot fix
+            // for existing rows.
+            Double ownerRate = owner.getPolishRatePerSaree();
+            double rate = (ownerRate != null && ownerRate > 0) ? ownerRate : ratePerSaree;
             double payable = returned * rate;
             double paid = paidByOwner.getOrDefault(owner.getId(), 0.0);
             double pending = Math.max(payable - paid, 0);

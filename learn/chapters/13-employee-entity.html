@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 13 · Employee.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 13 · The Worker Entity</span>
+    <h1>
+      <span class="gradient">Employee.java</span> —<br/>
+      The worker's profile
+    </h1>
+    <p class="subtitle">
+      One row per polisher at my parents' workshop — Prema, Ravi, and the rest. This entity
+      holds the business-specific information that drives salary calculations: name, joining
+      date, status, and the all-important per-saree polish rate.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">👷</div>
+      <div class="fmeta">
+        <h3>Employee.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/employee/Employee.java</span>
+        <div class="ftags"><span>Entity</span><span>Worker</span><span>Business data</span><span>polishRate</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── Why a separate entity ──────── -->
+    <h2><span class="h2-emoji">🧠</span> Why Employee Is Separate From User</h2>
+    <p>
+      A reminder from Chapter 11: a <code>User</code> holds login data, an <code>Employee</code>
+      holds business data. Splitting them keeps both classes focused. Here's what each one
+      is responsible for:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>User (the login row)</th><th>Employee (the worker row)</th></tr></thead>
+      <tbody>
+        <tr><td>Mobile number, password, role</td><td>Name, joining date, polish rate, status</td></tr>
+        <tr><td>Used at every API call (auth check)</td><td>Used in payroll, attendance, daily work</td></tr>
+        <tr><td>Sensitive (BCrypt hash)</td><td>Routine business facts</td></tr>
+        <tr><td>One row per <em>person who logs in</em></td><td>One row per <em>worker</em>, even if no login yet</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>The flexible bit:</strong> the <code>user_id</code> link on Employee is
+      <em>nullable</em>. That means Dad can add a new worker to the system <em>before</em>
+      setting up their phone login. The Employee row exists; the User row gets created later.
+      We'll see exactly how that helps below.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/employee/Employee.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.employee;
+<span class="com">// ↑ Lives in entity/employee/, a sub-package grouping all worker-related entities</span>
+
+<span class="kw">import</span> com.nool.backend.auth.entity.User;        <span class="com">// for the OneToOne login link</span>
+<span class="kw">import</span> com.nool.backend.enums.EmployeeStatus;     <span class="com">// ACTIVE / LEFT</span>
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDate;                       <span class="com">// for joiningDate (day-precision)</span>
+<span class="kw">import</span> java.time.LocalDateTime;                   <span class="com">// for created/updated timestamps</span>
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"employees"</span>)                    <span class="com">// SQL table = `employees`</span>
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> Employee {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"employee_id"</span>)            <span class="com">// MySQL auto-increments: 1, 2, 3...</span>
+    <span class="kw">private</span> Long id;
+
+    <span class="com">// ── EMPLOYEE NAME ─────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"employee_name"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> String name;                       <span class="com">// "Prema", "Ravi", etc.</span>
+
+    <span class="com">// ── MOBILE NUMBER ─────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"mobile_number"</span>,
+            nullable = <span class="kw">false</span>, unique = <span class="kw">true</span>)   <span class="com">// duplicated from User.mobileNumber</span>
+    <span class="kw">private</span> String mobileNumber;
+    <span class="com">// ★ NOTE: This is a deliberate denormalization. The same number lives
+    //   on the linked User row too. Why duplicate? So we can look up a
+    //   worker by phone without joining the users table — useful for
+    //   admin lists and quick contact display.</span>
+
+    <span class="com">// ── JOINING DATE ──────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"joining_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate joiningDate;             <span class="com">// for tenure calculations</span>
+    <span class="com">// LocalDate (not LocalDateTime) — only the day matters, not the hour.</span>
+
+    <span class="com">// ── STATUS ────────────────────────────────────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)              <span class="com">// store as "ACTIVE" or "LEFT" text</span>
+    <span class="ann">@Column</span>(name = <span class="str">"status"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> EmployeeStatus status;
+    <span class="com">// Two values only: ACTIVE (currently employed) or LEFT (no longer with us).
+    // Soft-delete pattern — see Chapter 08.</span>
+
+    <span class="com">// ── POLISH RATE ★ ─────────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"polishing_rate"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Double polishRate;                 <span class="com">// rupees per saree polished</span>
+    <span class="com">// ★ THE MOST IMPORTANT BUSINESS FIELD on this entity.
+    //   Daily earnings = (freshCount + rePolishCount) × this rate.
+    //   Each worker can have their OWN rate — Prema might be ₹30/saree,
+    //   Ravi might be ₹25/saree (he's newer).</span>
+
+    <span class="com">// ── LOGIN LINK ────────────────────────────────────────────────</span>
+    <span class="com">// (link to the User row that holds login credentials)</span>
+    <span class="ann">@OneToOne</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"user_id"</span>,
+                nullable = <span class="kw">true</span>,              <span class="com">// CAN be NULL — see below</span>
+                unique   = <span class="kw">true</span>)              <span class="com">// each User links to at most one Employee</span>
+    <span class="kw">private</span> User user;
+    <span class="com">// ★ nullable=true lets Dad add an Employee BEFORE creating their phone
+    //   login. Useful when a new worker shows up Monday but their phone
+    //   account is set up Tuesday.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMPS ──────────────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+
+    <span class="ann">@Column</span>(name = <span class="str">"updated_at"</span>)
+    <span class="kw">private</span> LocalDateTime updatedAt;
+
+    <span class="com">// ── LIFECYCLE HOOKS ───────────────────────────────────────────</span>
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate(){
+        LocalDateTime now = LocalDateTime.now();
+        <span class="kw">this</span>.createdAt = now;
+        <span class="kw">this</span>.updatedAt = now;
+    }
+
+    <span class="ann">@PreUpdate</span>
+    <span class="kw">protected void</span> onUpdate(){
+        <span class="kw">this</span>.updatedAt = LocalDateTime.now();
+    }
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>employee_id (PK)</td><td>Unique row identifier</td><td><code>5</code></td></tr>
+        <tr><td><code>name</code></td><td>String</td><td>employee_name</td><td>Full name shown in UI</td><td><code>"Prema"</code></td></tr>
+        <tr><td><code>mobileNumber</code></td><td>String</td><td>mobile_number (UNIQUE)</td><td>10-digit Indian mobile</td><td><code>"9000000002"</code></td></tr>
+        <tr><td><code>joiningDate</code></td><td>LocalDate</td><td>joining_date</td><td>First day on the job</td><td><code>2025-08-12</code></td></tr>
+        <tr><td><code>status</code></td><td>EmployeeStatus</td><td>status</td><td>ACTIVE or LEFT</td><td><code>ACTIVE</code></td></tr>
+        <tr><td><code>polishRate</code></td><td>Double</td><td>polishing_rate</td><td>₹ this worker earns per saree</td><td><code>30.0</code></td></tr>
+        <tr><td><code>user</code></td><td>User (nullable)</td><td>user_id (FK, UNIQUE)</td><td>Their login row (NULL until set up)</td><td>FK → users(user_id)</td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When the worker was added</td><td><code>2025-08-12T09:30:00</code></td></tr>
+        <tr><td><code>updatedAt</code></td><td>LocalDateTime</td><td>updated_at</td><td>Last edit</td><td><code>2026-05-15T11:18:42</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> employees (
+    employee_id     <span class="sk">BIGINT</span>       <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    employee_name   <span class="sk">VARCHAR</span>(255)  <span class="sk">NOT NULL</span>,
+    mobile_number   <span class="sk">VARCHAR</span>(255)  <span class="sk">NOT NULL</span> <span class="sk">UNIQUE</span>,
+    joining_date    <span class="sk">DATE</span>          <span class="sk">NOT NULL</span>,
+    status          <span class="sk">VARCHAR</span>(20)   <span class="sk">NOT NULL</span>,    <span class="sc">-- enum stored as text</span>
+    polishing_rate  <span class="sk">DOUBLE</span>        <span class="sk">NOT NULL</span>,
+    user_id         <span class="sk">BIGINT</span>        <span class="sk">UNIQUE</span>,        <span class="sc">-- nullable but unique</span>
+    created_at      <span class="sk">DATETIME</span>(6)   <span class="sk">NOT NULL</span>,
+    updated_at      <span class="sk">DATETIME</span>(6),
+    <span class="sk">PRIMARY KEY</span> (employee_id),
+    <span class="sk">FOREIGN KEY</span> (user_id) <span class="sk">REFERENCES</span> users(user_id)
+);
+
+<span class="sc">-- Dad hires Prema:</span>
+<span class="sk">INSERT INTO</span> employees
+    (employee_name, mobile_number, joining_date, status,
+     polishing_rate, user_id, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="ss">'Prema'</span>, <span class="ss">'9000000002'</span>, <span class="ss">'2025-08-12'</span>,
+     <span class="ss">'ACTIVE'</span>, <span class="num2">30.0</span>, <span class="num2">3</span>,
+     <span class="ss">'2025-08-12 09:30:00'</span>, <span class="ss">'2025-08-12 09:30:00'</span>);
+
+<span class="sc">-- A few months later, Dad gives Prema a raise (₹30 → ₹32):</span>
+<span class="sk">UPDATE</span> employees
+   <span class="sk">SET</span> polishing_rate = <span class="num2">32.0</span>,
+       updated_at     = <span class="ss">'2026-05-15 11:18:42'</span>
+ <span class="sk">WHERE</span> employee_id = <span class="num2">5</span>;
+
+<span class="sc">-- Mom looks up a worker by phone:</span>
+<span class="sk">SELECT</span> * <span class="sk">FROM</span> employees <span class="sk">WHERE</span> mobile_number = <span class="ss">'9000000002'</span>;</pre>
+    </div>
+
+    <!-- ──────── The polish rate ──────── -->
+    <h2><span class="h2-emoji">💰</span> The Polish Rate — How a Worker's Pay Is Calculated</h2>
+    <p>
+      <code>polishingRate</code> (column <code>polishing_rate</code>) is the most important
+      business field on this entity. It directly drives every salary calculation in NOOL.
+    </p>
+
+    <div class="formula">
+      <div class="label">Worker's earnings for one day</div>
+      <div class="eq">
+        <span class="var">earnings</span> <span class="op">=</span>
+        (freshCount <span class="op">+</span> rePolishCount)
+        <span class="op">×</span>
+        <span class="var">employee.polishingRate</span>
+      </div>
+    </div>
+
+    <p>
+      So if Prema's rate is ₹30 and on May 15 she polished 8 fresh + 2 re-polish sarees:
+    </p>
+    <p style="text-align:center; font-family:'Menlo',monospace; font-size:15px;">
+      earnings = (8 + 2) × ₹30 = <strong>₹300 for that day</strong>
+    </p>
+
+    <p>The summary screen (covered in Chapter 39) totals this across a date range to get total earnings, then subtracts SUM(<code>salary_payment.amount_paid</code>) in the same range to compute the pending salary.</p>
+
+    <h3>Why rate is per-worker (not global)</h3>
+    <div class="callout info">
+      Different workers earn different rates based on skill and experience:
+      <ul style="margin-bottom: 0;">
+        <li><strong>Prema</strong> (experienced) → ₹30/saree</li>
+        <li><strong>Ravi</strong> (newer, still learning) → ₹25/saree</li>
+      </ul>
+      Storing the rate per-employee gives my parents the flexibility to reward better workers,
+      grant raises individually, and adjust without affecting anyone else. A global rate would
+      be too rigid for a real workshop.
+    </div>
+
+    <!-- ──────── User link nuance ──────── -->
+    <h2><span class="h2-emoji">🪢</span> The Nullable <code>user</code> Link — Why It Matters</h2>
+    <p>
+      Notice the relationship to User is <code>nullable = true</code>:
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">The crucial line</span><span class="lang">Java</span></div>
+<pre><span class="ann">@OneToOne</span>
+<span class="ann">@JoinColumn</span>(name = <span class="str">"user_id"</span>, nullable = <span class="kw">true</span>, unique = <span class="kw">true</span>)
+<span class="kw">private</span> User user;</pre>
+    </div>
+
+    <p>That single <code>nullable=true</code> enables three useful flows:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Scenario</th><th>What it allows</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Workshop hires a new worker mid-week</td>
+          <td>Dad can add the Employee row immediately (so they can mark attendance, log daily work) and create the phone login later when the worker brings their phone.</td>
+        </tr>
+        <tr>
+          <td>Quick HR experiments</td>
+          <td>Try someone for a week without bothering to set up app login. Track their work; decide whether to onboard fully.</td>
+        </tr>
+        <tr>
+          <td>Bulk seed data</td>
+          <td>Initial bulk import can create all employees first, then later attach login accounts.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The <code>unique = true</code> constraint still applies whenever a User <em>is</em> set:
+      no User can be linked to more than one Employee. So even with nullable, we can never end
+      up with "two employees sharing one phone login".
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad hires Ravi as a new polisher</h5>
+      <ol>
+        <li>Dad clicks "Add Employee" and fills the form:
+          <ul>
+            <li>Name: Ravi</li>
+            <li>Mobile: 9000000003</li>
+            <li>Joining date: 2026-03-01</li>
+            <li>Polish rate: ₹25/saree (lower than Prema's ₹30 — he's new)</li>
+            <li>Password: ravi123</li>
+          </ul>
+        </li>
+        <li>The employee-service code (covered in Chapter 30):
+          <ul>
+            <li>Creates a <code>User</code> row with role <code>WORKER</code> and BCrypt-hashed password.</li>
+            <li>Creates an <code>Employee</code> row with status ACTIVE, polishRate 25.0, linked to that User.</li>
+            <li>Creates a <code>UserProfile</code> row bridging them.</li>
+          </ul>
+        </li>
+        <li>The Employee's <code>@PrePersist</code> stamps <code>createdAt</code> and <code>updatedAt</code>.</li>
+        <li>Hibernate runs <code>INSERT INTO employees (...) VALUES (...)</code>.</li>
+        <li>Ravi can now log in on his phone and see his own dashboard.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Calculating Prema's weekly earnings</h5>
+      <p>It's Saturday. Dad wants to know what Prema earned this week (May 11-15).</p>
+      <ol>
+        <li>Service queries: <code>SELECT * FROM employee_daily_work WHERE employee_id = 5 AND work_date BETWEEN '2026-05-11' AND '2026-05-15'</code>.</li>
+        <li>For each day, computes <code>(fresh + rePolish) × Prema.polishRate</code>.</li>
+        <li>Mon: 8+2=10 × ₹30 = ₹300</li>
+        <li>Tue: 9+1=10 × ₹30 = ₹300</li>
+        <li>Wed: 7+3=10 × ₹30 = ₹300</li>
+        <li>Thu: she was absent (no row)</li>
+        <li>Fri: 10+0=10 × ₹30 = ₹300</li>
+        <li>Total earnings: ₹1,200</li>
+        <li>Already paid in the same range: ₹0 (it's the end of the week, no payment yet)</li>
+        <li>Pending salary: ₹1,200</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: A worker leaves</h5>
+      <p>Suresh (employee_id=7) tells Dad he's moving to another city. Two updates happen:</p>
+      <div class="sqlbox">
+<pre><span class="sc">-- Mark him as LEFT</span>
+<span class="sk">UPDATE</span> employees <span class="sk">SET</span> status = <span class="ss">'LEFT'</span>, updated_at = <span class="ss">'2026-05-15 17:00:00'</span> <span class="sk">WHERE</span> employee_id = <span class="num2">7</span>;
+
+<span class="sc">-- Disable his login</span>
+<span class="sk">UPDATE</span> users <span class="sk">SET</span> active_status = <span class="kw">false</span>, updated_at = <span class="ss">'2026-05-15 17:00:00'</span> <span class="sk">WHERE</span> user_id = <span class="num2">8</span>;</pre>
+      </div>
+      <p>
+        All of Suresh's history (daily_work, attendance, salary_payment rows) stays in the
+        database forever. The "Employees" list filter shows only ACTIVE workers by default,
+        so he naturally disappears from operational screens. But Dad can still pull up Suresh's
+        salary history any time for audit.
+      </p>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around Employee.java</h5>
+
+      <div class="item">
+        <div class="bad">Hard-deleting an employee when they leave</div>
+        <div class="good">Use <code>status = LEFT</code> instead. Hard delete would orphan all attendance/daily-work/salary rows (or worse, cascade-delete them, losing all history).</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting to set <code>unique = true</code> on the <code>user_id</code> link</div>
+        <div class="good">Without it, two Employee rows could share the same User — meaning one phone login becomes "two workers" with split history. The unique constraint blocks this at the DB level.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using <code>BigDecimal</code> wishfully — or <code>int</code> destructively — for the polish rate</div>
+        <div class="good">NOOL uses <code>Double</code>, which is fine for whole-rupee rates (₹25, ₹30, ₹50). <code>int</code> would prevent half-rupee rates. <code>BigDecimal</code> would be ideal for money but adds boilerplate. Accept the small floating-point risk for simplicity.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Changing <code>polishingRate</code> and expecting old salary calculations to update</div>
+        <div class="good">Rate changes apply going forward only. Old paid salaries don't get recalculated retroactively — they were already paid at the old rate. Don't retroactively update old <code>salary_payment</code> rows; insert a new payment for any difference if needed.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Duplicating mobile number between User and Employee and letting them drift</div>
+        <div class="good">When a worker's phone changes, update BOTH the User row AND the Employee row. Service methods should update both together inside one transaction. Don't change one and forget the other.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about Employee.java</h5>
+
+      <div class="qa">
+        <div class="q">Why is <code>user_id</code> nullable on Employee?</div>
+        <div class="a">
+          So Dad can add a new worker BEFORE creating their phone login. For example, Ravi
+          joins Monday but his phone account is set up Tuesday. Between those two days, the
+          Employee row exists with <code>user_id = NULL</code>; on Tuesday, the User row is
+          created and linked. Without nullable, the admin would be forced to create both rows
+          simultaneously, which doesn't match real workshop workflow.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between Employee's <code>mobileNumber</code> and User's <code>mobileNumber</code>?</div>
+        <div class="a">
+          They store the SAME number, intentionally. The User row uses it for login lookup
+          (<code>SELECT * FROM users WHERE mobile_number = ?</code>). The Employee row uses
+          it as a contact reference — so my parents can call Prema without joining the users
+          table from a worker list. It's a deliberate denormalization for convenience.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>polishingRate</code> on each Employee instead of a global rate?</div>
+        <div class="a">
+          Real workshops pay different workers different rates based on skill, experience, and
+          loyalty. Prema is fast and skilled → ₹30/saree. Ravi just joined → ₹25. Storing the
+          rate per-employee gives my parents the flexibility to negotiate individually,
+          reward better workers, and change one person's rate without touching anyone else.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens if I update Prema's polish rate? Do her old salaries change?</div>
+        <div class="a">
+          No — old paid salaries stay at the old rate (they were already disbursed). Only
+          future calculations use the new rate. If Prema's rate changes from ₹30 to ₹32 on
+          May 1, her April salary calculation is still ₹30 (already paid), but anything she
+          polishes from May 1 onwards earns ₹32. This is by design — we never retroactively
+          recompute completed payments.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why use <code>LocalDate</code> for <code>joiningDate</code> instead of <code>LocalDateTime</code>?</div>
+        <div class="a">
+          Because joining is a day-precision event — we care that Prema joined on Aug 12, 2025,
+          not what minute. <code>LocalDate</code> stores only the date (no hours/minutes), is
+          smaller, and avoids any timezone shenanigans. <code>LocalDateTime</code> would store
+          extra precision we don't need.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How would you add support for hourly pay alongside per-saree pay?</div>
+        <div class="a">
+          Two clean options. (1) Add a <code>payMode</code> enum (PER_SAREE / HOURLY) and an
+          <code>hourlyRate</code> field — the salary service picks the formula based on mode.
+          (2) Make the rate field a structured object: <code>PayConfig {mode, rate, ...}</code>
+          stored as JSON in MySQL. Option 1 is simpler and probably right for NOOL's scale.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could two employees have the same mobile number?</div>
+        <div class="a">
+          No — the column has <code>unique = true</code>, meaning MySQL itself rejects
+          duplicates. If you try to insert a second Employee with an existing mobile, you get
+          a <code>DataIntegrityViolationException</code>, which the GlobalExceptionHandler
+          (Chapter 09) converts into <em>"This mobile number is already registered"</em>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      We've covered the worker entity. Next: the <em>other</em> kind of business person — the
+      <strong>SareeOwner</strong>. Same pattern as Employee, but for clients: per-owner pricing
+      and a totally separate set of lifecycle behaviors.
+    </p>
+
+    <div class="chapnav">
+      <a href="12-user-profile.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 12 · UserProfile.java</span>
+      </a>
+      <a href="14-saree-owner-entity.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 14 · SareeOwner.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 13 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

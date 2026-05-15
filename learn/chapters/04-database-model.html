@@ -68,7 +68,7 @@
       </thead>
       <tbody>
         <tr><td><code>users</code></td><td>Login credentials. Mobile + hashed password + role.</td><td>person who can log in</td></tr>
-        <tr><td><code>user_profile</code></td><td>Links a User to either an Employee or an Owner.</td><td>logged-in person, one-to-one with users</td></tr>
+        <tr><td><code>user_profiles</code></td><td>Links a User to either an Employee or an Owner.</td><td>logged-in person, one-to-one with users</td></tr>
         <tr><td><code>employees</code></td><td>Worker business info: name, joining date, polish rate.</td><td>worker at the workshop</td></tr>
         <tr><td><code>attendance</code></td><td>Daily attendance — present/absent/leave/half-day.</td><td><strong>(employee, date)</strong> pair</td></tr>
         <tr><td><code>employee_daily_work</code></td><td>How many fresh + re-polish sarees done.</td><td><strong>(employee, date)</strong> pair</td></tr>
@@ -100,7 +100,7 @@
                        └──────┬───────┘
                               │ 1:1
                        ┌──────▼───────┐
-                       │ user_profile │   <span class="com">← bridge to business entity</span>
+                       │ user_profiles │   <span class="com">← bridge to business entity</span>
                        │──────────────│
                        │ profile_id   │
                        │ user_id (FK) │
@@ -171,8 +171,8 @@
       </tbody>
     </table>
 
-    <!-- ─── user_profile ─── -->
-    <h3>2. <code>user_profile</code> — the bridge to business entities</h3>
+    <!-- ─── user_profiles ─── -->
+    <h3>2. <code>user_profiles</code> — the bridge to business entities</h3>
     <p>
       A User has login credentials only. To find out what business entity they represent
       (Employee? Owner?), we look up their UserProfile row. It points to either an Employee

@@ -612,3 +612,81 @@ footer.foot {
   text-align: center; color: var(--muted); font-size: 13px;
 }
 footer.foot strong { color: var(--ink); }
+
+/* ────────── Line-by-line walkthrough cards ────────── */
+.lbl { margin: 18px 0; }
+.lbl .step {
+  background: white; border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 18px; margin: 10px 0; box-shadow: var(--shadow-sm);
+}
+.lbl .step .step-num {
+  display: inline-block; background: var(--primary); color: white;
+  min-width: 28px; height: 28px; border-radius: 14px;
+  text-align: center; line-height: 28px; padding: 0 8px;
+  font-weight: 700; font-size: 12px;
+  margin-right: 10px; vertical-align: middle;
+}
+.lbl .step .step-code {
+  display: inline-block; background: var(--code-bg); color: var(--code-ink);
+  padding: 3px 10px; border-radius: 6px;
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 13px;
+  margin: 4px 0; vertical-align: middle;
+}
+.lbl .step .step-body { margin-top: 8px; font-size: 14.5px; color: var(--ink-soft); line-height: 1.65; }
+.lbl .step .step-body strong { color: var(--ink); }
+
+/* ────────── Game-style INPUT → OUTPUT panels ────────── */
+.iogame {
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border: 2px solid #86efac; border-radius: 16px;
+  padding: 18px 20px; margin: 20px 0;
+  box-shadow: var(--shadow-sm);
+}
+.iogame-title {
+  font-weight: 700; color: #14532d;
+  margin-bottom: 12px; font-size: 15px;
+  display: flex; align-items: center; gap: 8px;
+}
+.iogame-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 14px; align-items: center;
+  margin: 8px 0;
+}
+@media (max-width: 700px) {
+  .iogame-row { grid-template-columns: 1fr; }
+  .iogame-arrow { display: none; }
+}
+.iogame-in, .iogame-out {
+  background: white; border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px;
+}
+.iogame-in strong, .iogame-out strong {
+  display: block; font-size: 11px; letter-spacing: 1.5px;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.iogame-in strong { color: #6366f1; }
+.iogame-out strong { color: #10b981; }
+.iogame-in pre, .iogame-out pre {
+  margin: 0; padding: 8px; border-radius: 6px;
+  background: var(--code-bg); color: var(--code-ink);
+  font-family: 'Menlo', 'Monaco', monospace; font-size: 12.5px;
+  line-height: 1.5; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-word;
+}
+.iogame-arrow {
+  font-size: 28px; color: var(--primary); font-weight: 800;
+  text-align: center;
+}
+.iogame-explain {
+  margin-top: 10px; padding: 10px 12px;
+  background: rgba(255,255,255,0.7); border-radius: 8px;
+  font-size: 14px; color: #14532d;
+}
+.iogame-explain strong { color: #052e16; }
+.iogame.error { background: linear-gradient(135deg, #fef2f2, #fee2e2); border-color: #fca5a5; }
+.iogame.error .iogame-title { color: #7f1d1d; }
+.iogame.error .iogame-in strong { color: #be123c; }
+.iogame.error .iogame-out strong { color: #dc2626; }
+.iogame.error .iogame-explain { background: rgba(255,255,255,0.6); color: #7f1d1d; }
+

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 27 · AdminBootstrapRunner · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 27 · The Chicken-and-Egg Solver</span>
+    <h1>
+      <span class="gradient">AdminBootstrapRunner</span> —<br/>
+      Creating the very first admin
+    </h1>
+    <p class="subtitle">
+      Every admin in NOOL is created by another admin. So who creates the <em>first</em> one?
+      This file solves that chicken-and-egg problem by inserting a seed admin row the very
+      first time NOOL boots on an empty database.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🌱</div>
+      <div class="fmeta">
+        <h3>AdminBootstrapRunner.java</h3>
+        <span class="fpath">backend/.../auth/bootstrap/AdminBootstrapRunner.java</span>
+        <div class="ftags"><span>@Component</span><span>CommandLineRunner</span><span>Startup hook</span><span>Idempotent</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Problem This Solves</h2>
+    <p>
+      NOOL's rule: only admins can create new admins. But on a brand-new install, there are
+      zero admins. With no way to log in, my parents could never use the app. So we need a
+      one-time bootstrap mechanism that creates the first admin automatically.
+    </p>
+
+    <div class="callout brain">
+      <strong>The trick:</strong> a Spring <code>CommandLineRunner</code> bean that runs once
+      after the app starts. On the first boot, no admin exists → insert one using credentials
+      from <code>application.properties</code>. On every subsequent boot, an admin already
+      exists → do nothing. <em>Idempotent</em>: safe to run any number of times, only the
+      first run has effect.
+    </div>
+
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">auth/bootstrap/AdminBootstrapRunner.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.auth.bootstrap;
+
+<span class="kw">import</span> com.nool.backend.auth.entity.User;
+<span class="kw">import</span> com.nool.backend.repository.auth.UserRepository;
+<span class="kw">import</span> com.nool.backend.enums.Role;
+<span class="kw">import</span> lombok.RequiredArgsConstructor;
+<span class="kw">import</span> org.springframework.boot.CommandLineRunner;
+<span class="kw">import</span> org.springframework.beans.factory.annotation.Value;
+<span class="kw">import</span> org.springframework.security.crypto.password.PasswordEncoder;
+<span class="kw">import</span> org.springframework.stereotype.Component;
+
+<span class="ann">@Component</span>                                          <span class="com">// Spring picks this up automatically</span>
+<span class="ann">@RequiredArgsConstructor</span>                            <span class="com">// constructor for final fields</span>
+<span class="kw">public class</span> AdminBootstrapRunner <span class="kw">implements</span> CommandLineRunner {
+
+    <span class="kw">private final</span> UserRepository  userRepository;
+    <span class="kw">private final</span> PasswordEncoder passwordEncoder;
+
+    <span class="ann">@Value</span>(<span class="str">"${admin.mobile}"</span>)
+    <span class="kw">private</span> String adminMobile;                       <span class="com">// from application.properties</span>
+
+    <span class="ann">@Value</span>(<span class="str">"${admin.password}"</span>)
+    <span class="kw">private</span> String adminPassword;                     <span class="com">// from application.properties</span>
+
+    <span class="ann">@Override</span>
+    <span class="kw">public void</span> run(String... args){              <span class="com">// runs ONCE after Spring Boot starts</span>
+
+        <span class="com">// ── STEP 1: Is there already an admin? ───────────────────</span>
+        <span class="kw">boolean</span> adminExists = userRepository.existsByRole(Role.ADMIN);
+        <span class="kw">if</span> (adminExists) {
+            <span class="kw">return</span>;                                   <span class="com">// idempotent — do nothing</span>
+        }
+
+        <span class="com">// ── STEP 2: First boot — create the seed admin ──────────</span>
+        User admin = <span class="kw">new</span> User();
+        admin.setMobileNumber(adminMobile);                           <span class="com">// "9876543210"</span>
+        admin.setPassword(passwordEncoder.encode(adminPassword));     <span class="com">// BCrypt-hash "Admin@123"</span>
+        admin.setRole(Role.ADMIN);
+        admin.setActive(<span class="kw">true</span>);
+
+        userRepository.save(admin);                                   <span class="com">// INSERT into users</span>
+
+        <span class="com">// ── STEP 3: Friendly console message ─────────────────────</span>
+        System.out.println(<span class="str">"✅ DEFAULT ADMIN ACCOUNT CREATED SUCCESSFULLY"</span>);
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">⚙️</span> What's a <code>CommandLineRunner</code>?</h2>
+    <p>
+      It's a special Spring interface with one method: <code>run(String... args)</code>. When
+      Spring Boot finishes starting up (after all beans are created, Tomcat is listening,
+      etc.), it calls <code>run()</code> on every bean implementing this interface. Perfect
+      for one-time startup tasks like:
+    </p>
+
+    <ul>
+      <li>Seeding initial data (NOOL's case)</li>
+      <li>Validating configuration</li>
+      <li>Warming up caches</li>
+      <li>Logging startup info</li>
+    </ul>
+
+    <div class="callout info">
+      You can have multiple <code>CommandLineRunner</code> beans — Spring runs them all. If
+      order matters, annotate them with <code>@Order(1)</code>, <code>@Order(2)</code>, etc.
+      NOOL has just this one, so order isn't a concern.
+    </div>
+
+    <h2><span class="h2-emoji">🔄</span> Why Idempotent?</h2>
+    <p>
+      The <code>existsByRole(Role.ADMIN)</code> check is what makes this safe to run on
+      every startup. Let's walk through both cases:
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Boot scenario</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>First ever boot — empty DB</strong></td>
+          <td>existsByRole returns false → create admin → log success → continue.</td>
+        </tr>
+        <tr>
+          <td><strong>Every subsequent boot</strong></td>
+          <td>existsByRole returns true → early return → no insertion → no log.</td>
+        </tr>
+        <tr>
+          <td><strong>Admin was disabled and re-enabled</strong></td>
+          <td>Doesn't matter — existsByRole only checks the role column, not active.</td>
+        </tr>
+        <tr>
+          <td><strong>All admins deleted from DB manually</strong></td>
+          <td>existsByRole returns false → seed admin recreated. NOOL self-heals.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">📋</span> Why Use the Direct Repository Instead of AdminUserService?</h2>
+    <p>
+      Notice this runner uses <code>userRepository.save(admin)</code> directly, NOT
+      <code>adminUserService.createEmployeeUser(...)</code>. Three reasons:
+    </p>
+
+    <ol>
+      <li><strong>No UserProfile needed.</strong> Admins don't have a UserProfile (they aren't workers or owners). AdminUserService always creates a profile too.</li>
+      <li><strong>No role check needed.</strong> AdminUserService hardcodes WORKER or SAREE_OWNER. We need ADMIN here.</li>
+      <li><strong>No duplicate check needed.</strong> We already know there's no admin (just checked <code>existsByRole</code>).</li>
+    </ol>
+
+    <p>So the runner uses raw repository calls — minimal, direct, and bypasses logic that doesn't apply.</p>
+
+    <h2><span class="h2-emoji">🗄️</span> The Single INSERT on First Boot</h2>
+    <div class="sqlbox">
+<pre><span class="sc">-- On the very first startup with empty DB:</span>
+
+<span class="sc">-- Step 1: existsByRole check (empty table = no rows = false)</span>
+<span class="sk">SELECT</span> <span class="sk">CASE WHEN COUNT</span>(*) &gt; 0 <span class="sk">THEN</span> 1 <span class="sk">ELSE</span> 0 <span class="sk">END</span>
+  <span class="sk">FROM</span> users <span class="sk">WHERE</span> role = <span class="ss">'ADMIN'</span>;
+<span class="sc">-- → 0 (no admin yet)</span>
+
+<span class="sc">-- Step 2: insert the seed admin</span>
+<span class="sk">INSERT INTO</span> users
+    (mobile_number, password, role, active_status, created_at, updated_at)
+<span class="sk">VALUES</span>
+    (<span class="ss">'9876543210'</span>,
+     <span class="ss">'$2a$10$abcdef1234567890...'</span>,  <span class="sc">-- BCrypt hash of "Admin@123"</span>
+     <span class="ss">'ADMIN'</span>,
+     <span class="kw">true</span>,
+     <span class="ss">'2026-05-15 10:30:00'</span>,
+     <span class="ss">'2026-05-15 10:30:00'</span>);
+
+<span class="sc">-- Console prints: "✅ DEFAULT ADMIN ACCOUNT CREATED SUCCESSFULLY"</span>
+
+<span class="sc">-- ───────────────────────────────────────────────────────────</span>
+<span class="sc">-- On every subsequent startup:</span>
+<span class="sk">SELECT</span> <span class="sk">CASE WHEN COUNT</span>(*) &gt; 0 <span class="sk">THEN</span> 1 <span class="sk">ELSE</span> 0 <span class="sk">END</span>
+  <span class="sk">FROM</span> users <span class="sk">WHERE</span> role = <span class="ss">'ADMIN'</span>;
+<span class="sc">-- → 1 (admin exists), early return, no INSERT</span></pre>
+    </div>
+
+    <h2><span class="h2-emoji">📌</span> The Seed Credentials</h2>
+    <p>
+      The mobile and password come from <code>application.properties</code> (Chapter 06):
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">From application.properties</span><span class="lang">properties</span></div>
+<pre>admin.mobile=9876543210
+admin.password=Admin@123</pre>
+    </div>
+
+    <div class="callout warn">
+      <strong>Production deployment must override these!</strong> The hard-coded
+      <code>Admin@123</code> is intentionally easy for local development. For a real
+      deployment, set environment variables <code>ADMIN_MOBILE</code> and
+      <code>ADMIN_PASSWORD</code> BEFORE first boot — Spring's property resolution will
+      pick them up and Mom and Dad's first admin will have a strong, unique password.
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Brand-new install</h5>
+      <ol>
+        <li>I clone the NOOL repo to a fresh laptop with empty MySQL.</li>
+        <li>Run <code>./mvnw spring-boot:run</code>.</li>
+        <li>Spring Boot starts, Hibernate auto-creates the schema (ddl-auto=update).</li>
+        <li>Tomcat starts on port 8083.</li>
+        <li>Spring invokes every CommandLineRunner — <code>AdminBootstrapRunner.run()</code> fires.</li>
+        <li><code>existsByRole(ADMIN)</code> → false. Runner proceeds to insert.</li>
+        <li>Console: <em>"✅ DEFAULT ADMIN ACCOUNT CREATED SUCCESSFULLY"</em>.</li>
+        <li>I open <code>http://localhost:5173</code>, log in with <code>9876543210 / Admin@123</code>. Works!</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Routine restart</h5>
+      <ol>
+        <li>I stop and restart NOOL after a code change.</li>
+        <li>Same startup flow.</li>
+        <li><code>existsByRole(ADMIN)</code> → true (already exists from earlier boot).</li>
+        <li>Runner returns immediately. No insert, no console log.</li>
+        <li>App is up. Existing admin can log in.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Production deploy with override</h5>
+      <ol>
+        <li>Production server has environment variables:
+          <pre style="margin:8px 0; padding:10px; background:#1a1530; color:#86efac; border-radius:6px; font-size:12px;">ADMIN_MOBILE=9123456789
+ADMIN_PASSWORD=Str0ngR@nd0mPass!2026</pre>
+        </li>
+        <li>NOOL starts. Spring's @Value resolves to those env vars (overrides the file).</li>
+        <li>Runner inserts admin with the strong production password.</li>
+        <li>Dad logs in with the production credentials only he knows.</li>
+        <li>Local-dev <code>Admin@123</code> never works in production. Safe.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Database corrupted, admin row lost</h5>
+      <ol>
+        <li>Some catastrophe wipes the User row for the admin.</li>
+        <li>NOOL is restarted.</li>
+        <li><code>existsByRole(ADMIN)</code> → false (no admin row anymore).</li>
+        <li>Runner inserts a fresh seed admin — recovery without any manual SQL.</li>
+        <li>Note: in production, you'd hope to restore from a backup first. But the runner is the safety net.</li>
+      </ol>
+    </div>
+
+    <div class="mistakes">
+      <h5>Common mistakes</h5>
+      <div class="item">
+        <div class="bad">Hard-coding the password directly in this file</div>
+        <div class="good">Read from <code>application.properties</code> via <code>@Value</code> — exactly what NOOL does. This lets production override without code changes.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting to BCrypt-hash the password before saving</div>
+        <div class="good"><code>passwordEncoder.encode(adminPassword)</code> is essential. Without it, the password column would store plain text — a massive security hole.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Skipping the <code>existsByRole</code> check</div>
+        <div class="good">Without the check, every restart would try to insert another admin — fails due to UNIQUE constraint on mobile, but you'd see ugly stack traces in the log on every boot.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Leaving the default <code>Admin@123</code> password in production</div>
+        <div class="good">Override via environment variable BEFORE first deploy. Once the admin is created with the seed password, it stays until manually changed — anyone with the README knows it.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Putting the runner in a deeply nested package that auto-scan might miss</div>
+        <div class="good">The runner lives under <code>com.nool.backend.auth.bootstrap</code> — covered by <code>@SpringBootApplication</code>'s component scan from <code>com.nool.backend</code>. Always verify your runner is in a scanned package.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">When does <code>CommandLineRunner.run()</code> get called?</div>
+        <div class="a">
+          After Spring Boot's startup is fully complete — all beans created, dependency
+          injection done, Tomcat listening — but before the JVM blocks on the main thread.
+          So by the time <code>run()</code> fires, the app is fully ready to serve HTTP
+          requests (though no real ones have arrived yet).
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What's the difference between <code>CommandLineRunner</code> and <code>ApplicationRunner</code>?</div>
+        <div class="a">
+          Nearly identical. <code>CommandLineRunner.run(String...)</code> takes a raw String
+          array; <code>ApplicationRunner.run(ApplicationArguments)</code> takes a parsed
+          ApplicationArguments object that distinguishes option args from non-option args. For
+          simple seeding tasks like NOOL's, <code>CommandLineRunner</code> is fine.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Could you do the same thing with a SQL migration script?</div>
+        <div class="a">
+          Yes — a Flyway or Liquibase migration could INSERT the admin row. The trade-off:
+          you'd lose the BCrypt-at-startup hashing (you'd have to pre-compute the hash and
+          paste it into the SQL), and password rotation via env vars wouldn't work. Java-side
+          seeding is more flexible for credentials. SQL migrations are still preferred for
+          schema changes.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why does the runner write to <code>System.out</code> instead of using a logger?</div>
+        <div class="a">
+          Pragmatism. The message is a one-shot success notification, not regular operational
+          logging. Using <code>System.out.println</code> guarantees it shows up in the console
+          even if SLF4J is misconfigured. A more polished version would use
+          <code>log.info("...")</code> via a Logger.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What if multiple instances start at the same time on a shared database?</div>
+        <div class="a">
+          Race condition possible but harmless. Both instances would see no admin, both try
+          to INSERT. One succeeds; the other hits the UNIQUE mobile constraint and gets an
+          exception (which would surface as a startup error). For NOOL's single-instance
+          deployment this is irrelevant. For a clustered setup, you'd add a database
+          advisory lock around the check + insert.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>We've covered the service layer of the auth module. Final piece: the <strong>controller</strong> — the HTTP endpoint that ties everything together. Next chapter is <code>AuthController.java</code>.</p>
+
+    <div class="chapnav">
+      <a href="26-admin-user-service.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 26 · AdminUserService</span></a>
+      <a href="28-auth-controller.html" class="next"><span class="arrow next">Next chapter →</span><span class="title">Ch 28 · AuthController</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 27 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

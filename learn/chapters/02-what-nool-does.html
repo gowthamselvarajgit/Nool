@@ -26,7 +26,6 @@
 
 <main class="container">
 
-  <!-- ──────── Chapter hero ──────── -->
   <section class="chapter-hero">
     <span class="num-badge">Chapter 02 · The Big Picture</span>
     <h1>
@@ -34,39 +33,71 @@
       The three roles &amp; daily workflow
     </h1>
     <p class="subtitle">
-      Before we dive into code, let's understand <em>who</em> uses NOOL and <em>what</em>
-      they do with it every day. Knowing this will make every code file we read later
-      make much more sense.
+      Before any code, you need to know <em>who</em> uses NOOL and <em>what</em>
+      they do with it every day. Knowing this makes every code file we read later
+      make sense.
     </p>
   </section>
 
   <div class="content">
 
-    <!-- ──────── What NOOL does in one paragraph ──────── -->
+    <!-- ════════════════════════════════════════════════════ -->
     <h2><span class="h2-emoji">🎯</span> What NOOL Does in One Paragraph</h2>
     <div class="callout brain">
-      NOOL is a complete <strong>Enterprise Resource Planning (ERP) system</strong> for a
-      saree-polishing workshop. It tracks <em>every saree</em> that enters and leaves the
-      workshop, records <em>every worker's daily polishing</em>, calculates <em>everyone's
-      salary</em>, tracks <em>every rupee paid by or to owners</em>, and gives my parents
-      a real-time picture of how the business is doing — all from a phone or laptop browser.
+      NOOL is a complete <strong>ERP system</strong> (Enterprise Resource Planning — a fancy
+      name for "a tool that runs your whole business") for a saree-polishing workshop. It
+      tracks <em>every saree</em> that enters and leaves the workshop, records <em>every
+      worker's daily polishing</em>, calculates <em>everyone's salary</em>, tracks <em>every
+      rupee paid by or to owners</em>, and gives my parents a real-time picture of how the
+      business is doing — all from a phone or laptop browser.
     </div>
 
-    <!-- ──────── The three kinds of people ──────── -->
+    <!-- ════════════════════════════════════════════════════ -->
     <h2><span class="h2-emoji">👥</span> The Three Kinds of People Who Log In</h2>
     <p>
       Every person who can log into NOOL falls into one of three categories. In the code,
-      this is enforced by a Java enum called <code>Role</code> with exactly three values:
-      <code>ADMIN</code>, <code>WORKER</code>, and <code>SAREE_OWNER</code>. Each role sees
-      a completely different version of the app.
+      this is enforced by a <strong>Java enum</strong> (a fixed list of allowed values) called
+      <code>Role</code> with exactly three options: <code>ADMIN</code>, <code>WORKER</code>,
+      and <code>SAREE_OWNER</code>. Each role sees a completely different version of the app.
     </p>
 
-    <div class="roles" style="margin: 24px 0;">
+    <h3>Line-by-line — what each role can do</h3>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">Role.ADMIN — my mom &amp; dad</span>
+        <div class="step-body">
+          They run the workshop. They can add &amp; remove workers, add &amp; remove owners,
+          mark attendance, record sarees received and returned, pay salaries, collect payments,
+          and view every dashboard. Admins can see <strong>everyone's</strong> data.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">Role.WORKER — Prema, Ravi, and other polishers</span>
+        <div class="step-body">
+          They polish sarees. They can see <strong>only their own</strong> attendance,
+          daily polish counts, salary earned, and salary received. They cannot view other
+          workers' data, cannot add new employees, and cannot see owner-side data.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-code">Role.SAREE_OWNER — Rahul and other clients</span>
+        <div class="step-body">
+          They bring sarees to be polished. They see <strong>only their own</strong>
+          inventory (how many of their sarees are still with the workshop), their receive/return
+          history, and what they've paid vs still owe. They cannot see other owners' data,
+          cannot see workers, and cannot modify anything.
+        </div>
+      </div>
+    </div>
 
+    <div class="roles" style="margin: 24px 0;">
       <div class="role admin">
         <span class="emoji">👑</span>
         <h3>ADMIN</h3>
-        <p><strong>That's my mom &amp; dad.</strong> They run the whole business.</p>
+        <p><strong>That's my mom &amp; dad.</strong></p>
         <ul>
           <li>Add &amp; manage workers</li>
           <li>Add &amp; manage owners (clients)</li>
@@ -77,14 +108,12 @@
           <li>Pay salaries to workers</li>
           <li>Record payments coming in from owners</li>
           <li>See business-wide dashboard &amp; analytics</li>
-          <li>Export everything to Excel</li>
         </ul>
       </div>
-
       <div class="role worker">
         <span class="emoji">👷</span>
         <h3>WORKER</h3>
-        <p><strong>The polishers</strong> — like Prema, Ravi, and the others.</p>
+        <p><strong>The polishers</strong> — like Prema and Ravi.</p>
         <ul>
           <li>See own dashboard with today's stats</li>
           <li>View own profile</li>
@@ -92,14 +121,12 @@
           <li>Log own daily work (fresh + re-polish counts)</li>
           <li>See own salary history</li>
           <li>See own earnings vs. amount paid</li>
-          <li>See own performance trends</li>
         </ul>
       </div>
-
       <div class="role owner">
         <span class="emoji">🧵</span>
         <h3>SAREE_OWNER</h3>
-        <p><strong>The clients</strong> — like Rahul, Sharma Madam, etc.</p>
+        <p><strong>The clients</strong> — like Rahul.</p>
         <ul>
           <li>See own dashboard</li>
           <li>View own profile</li>
@@ -109,21 +136,86 @@
           <li>See their payment history</li>
         </ul>
       </div>
+    </div>
 
+    <h3>🎮 Play the game — role-based access in action</h3>
+
+    <div class="iogame error">
+      <div class="iogame-title">😰 Prema tries to view ALL workers</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Action</strong>
+<pre>Prema (WORKER) hits:
+  POST /api/employees/list
+
+(an admin-only endpoint
+to see every worker)</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>Response</strong>
+<pre>HTTP 403 Forbidden
+
+{
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access Denied"
+}</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        The backend reads Prema's JWT (her login ID-card), sees role = WORKER, and the
+        security rules say "only ADMIN can call /employees/list". Rejected with no data
+        leak. The protection lives in <strong>both</strong> the frontend (the button doesn't
+        appear in Prema's UI) and the backend (even if she crafts the request manually, it's
+        blocked).
+      </div>
+    </div>
+
+    <div class="iogame">
+      <div class="iogame-title">🎮 Prema views HER OWN attendance</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Action</strong>
+<pre>Prema (WORKER) hits:
+  POST /api/attendance/my-list
+
+(a worker-friendly endpoint
+that returns "my own" data)</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>Response</strong>
+<pre>HTTP 200 OK
+
+[
+  { "date": "2026-05-15",
+    "status": "PRESENT" },
+  { "date": "2026-05-14",
+    "status": "PRESENT" },
+  { "date": "2026-05-13",
+    "status": "ABSENT" }
+]</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        The backend reads Prema's employee ID from her JWT and returns ONLY her rows. She
+        never has to send "give me employee 5's data" — the server already knows who she is
+        and serves her own data automatically.
+      </div>
     </div>
 
     <div class="callout tip">
-      <strong>🔐 The protection rule:</strong> Each role can ONLY see their own stuff. A worker
-      cannot see another worker's salary. An owner cannot see another owner's sarees. This
-      is enforced both <em>in the frontend</em> (the wrong buttons don't even appear) AND
-      <em>in the backend</em> (so even a clever attacker can't bypass it). We'll cover this
-      in detail when we get to security chapters (Chapters 20-23).
+      <strong>The pattern:</strong> Endpoints with <code>/my-*</code> in the URL automatically
+      filter to "your own" data. Endpoints without it (like <code>/list</code>) are
+      admin-only and show everyone's data. We'll see this convention applied across every
+      module — Attendance, Daily Work, Salary, Inventory, Payments.
     </div>
 
-    <!-- ──────── Meet the cast ──────── -->
-    <h2><span class="h2-emoji">🎭</span> Meet the Cast — The People in Our Story</h2>
+    <!-- ════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">🎭</span> Meet the Cast</h2>
     <p>
-      Throughout this whole tutorial, we'll keep referring to the same three example people.
+      Throughout the rest of this tutorial we'll keep referring to three real-ish people.
       Memorise these names — they'll appear in code examples, SQL queries, and scenarios.
     </p>
 
@@ -136,9 +228,9 @@
         </div>
       </div>
       <p>
-        The two people running the whole workshop. When NOOL boots up for the first time,
-        an admin account is automatically created with these credentials — we call this the
-        "seed admin" and it's created by a file called <code>AdminBootstrapRunner.java</code>
+        The two people running the whole workshop. When NOOL boots for the very first time
+        on a new computer, an admin account is automatically created with these credentials —
+        the "seed admin", created by a file called <code>AdminBootstrapRunner.java</code>
         (Chapter 27). They're the only ones who can change business data.
       </p>
     </div>
@@ -168,18 +260,18 @@
         </div>
       </div>
       <p>
-        One of my parents' best workers. She can polish ~10 sarees a day — a mix of fresh
-        polish (brand new sarees) and re-polish (touch-ups for sarees that came back). She
-        earns ₹30 per saree she finishes. So a typical day = ₹300 earned.
+        One of my parents' best workers. She can polish ~10 sarees a day — a mix of
+        <strong>fresh polish</strong> (brand-new sarees) and <strong>re-polish</strong>
+        (touch-ups for sarees that came back). She earns ₹30 per saree she finishes. So a
+        typical day = ₹300 earned.
       </p>
     </div>
 
-    <!-- ──────── The journey of a saree ──────── -->
+    <!-- ════════════════════════════════════════════════════ -->
     <h2><span class="h2-emoji">🎬</span> A Saree's Journey — The Whole Cycle</h2>
     <p>
-      Let's follow ONE saree from the moment Rahul drops it off until the moment
-      everyone gets paid. This is the central workflow of NOOL — every chapter from now
-      on will reference some step of this journey.
+      Let's follow ONE saree from the moment Rahul drops it off until the moment everyone
+      gets paid. This is the central workflow of NOOL.
     </p>
 
     <div class="journey">
@@ -192,7 +284,7 @@
         <div class="journey-step">
           <span class="emj">📋</span>
           <h5>2. Hold</h5>
-          <p>Workshop now "has" the sarees. Inventory shows them as in-hand.</p>
+          <p>Workshop "has" the sarees. Inventory shows them as in-hand.</p>
         </div>
         <div class="journey-step">
           <span class="emj">✨</span>
@@ -212,76 +304,166 @@
       </div>
     </div>
 
-    <!-- ──────── A real-world walk-through ──────── -->
-    <h2><span class="h2-emoji">📅</span> A Real Week at the Workshop</h2>
-    <p>Let's walk through one week using our cast. Dates use the year 2026 for clarity.</p>
+    <h3>Line-by-line through one real week</h3>
 
-    <div class="scenario">
-      <h5>Monday, May 11, 2026 — Rahul drops off 100 sarees</h5>
-      <ul>
-        <li>Rahul arrives with a big bundle. Tells Dad: "100 sarees, Diwali batch."</li>
-        <li>Dad opens NOOL → Inventory → Add Receipt</li>
-        <li>Picks "Rahul Textiles", types 100, date 2026-05-11, remarks "Diwali batch"</li>
-        <li><strong>In the database:</strong> a new row is inserted into the <code>saree_ledger</code>
-            table with <code>entry_type = RECEIPT</code>, <code>quantity = 100</code>.</li>
-        <li>Rahul's "in-hand" balance jumps to 100.</li>
-      </ul>
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">Mon</span>
+        <span class="step-code">Rahul drops off 100 sarees</span>
+        <div class="step-body">
+          Rahul arrives at the workshop on Monday May 11. He hands over a bundle of 100
+          sarees. Dad opens NOOL → Inventory → Add Receipt → picks "Rahul Textiles", types
+          quantity 100, date today, remarks "Diwali batch". One row is now in the database
+          marked RECEIPT. <strong>Rahul's balance with us: 100 sarees in hand.</strong>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">Tue</span>
+        <span class="step-code">Prema polishes 10 sarees</span>
+        <div class="step-body">
+          Tuesday morning Prema arrives. Mom marks her PRESENT. At end of day Dad asks "how
+          many today?" — she says 8 fresh + 2 re-polish. Dad opens NOOL → Daily Work → Add
+          → picks Prema, types 8 and 2. Her earnings for the day: (8 + 2) × ₹30 = <strong>₹300</strong>.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">Wed</span>
+        <span class="step-code">Same routine continues</span>
+        <div class="step-body">
+          Wednesday: Prema does 9 fresh + 1 re-polish = ₹300 again. Mom marks her PRESENT.
+          Ravi (another worker) does 6 fresh + 3 re-polish at his rate of ₹25 = ₹225 earned.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">Thu</span>
+        <span class="step-code">Prema is absent (sick day)</span>
+        <div class="step-body">
+          Mom marks her ABSENT for Thursday. No daily work row is recorded for her that day
+          — she didn't earn anything. Other workers continue.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">Fri</span>
+        <span class="step-code">Dad returns 50 polished sarees to Rahul</span>
+        <div class="step-body">
+          Friday afternoon, Dad delivers 50 finished sarees back to Rahul. Records a RETURN
+          in NOOL. <strong>Rahul's balance is now 100 − 50 = 50 still being polished.</strong>
+          <strong>Rahul now owes:</strong> 50 × ₹65 = ₹3,250. He sends ₹3,000 by UPI; Dad
+          records the OwnerPayment. Rahul's pending: ₹250.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">Sat</span>
+        <span class="step-code">Pay-day for Prema</span>
+        <div class="step-body">
+          Saturday Dad sums up the week's daily-work rows for Prema: 4 working days × ~10
+          sarees × ₹30 = ₹1,200 earned. He pays her ₹1,000 in cash and records the
+          SalaryPayment. <strong>Her pending salary: ₹200.</strong>
+        </div>
+      </div>
     </div>
 
-    <div class="scenario">
-      <h5>Tuesday-Wednesday — Prema &amp; the team polish</h5>
-      <ul>
-        <li>Tuesday: Prema polishes 8 fresh + 2 re-polish = 10 sarees</li>
-        <li>Dad opens NOOL → Daily Work → Add. Picks Prema, types 8 and 2, date today.</li>
-        <li><strong>In the database:</strong> a new row in <code>employee_daily_work</code> table.</li>
-        <li>Prema's earnings for the day = (8 + 2) × ₹30 = <strong>₹300</strong></li>
-        <li>Wednesday: similar entry, similar maths.</li>
-      </ul>
+    <h3>🎮 Play the game — receive and return sarees</h3>
+
+    <div class="iogame">
+      <div class="iogame-title">🎮 Add Receipt — Monday morning</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Dad inputs</strong>
+<pre>Owner:     Rahul Textiles
+Quantity:  100
+Date:      2026-05-11
+Remarks:   "Diwali batch"</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>NOOL responds</strong>
+<pre>Row #147 saved to
+saree_ledger:
+
+  owner_id = 1
+  type     = RECEIPT
+  quantity = 100
+  date     = 2026-05-11
+
+Rahul's in-hand: 100</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        Dad's click produced one row in the database. The "in-hand" number isn't stored
+        anywhere — NOOL computes it fresh every time you ask: <code>sum(receipts) − sum(returns)</code>.
+        We'll see exactly where this formula lives in <strong>Chapter 15</strong>
+        (the SareeLedgerEntry).
+      </div>
     </div>
 
-    <div class="scenario">
-      <h5>Thursday, May 14 — Mom marks attendance</h5>
-      <ul>
-        <li>Every morning Mom opens NOOL → Attendance and ticks who's here.</li>
-        <li>Prema: PRESENT. Ravi: PRESENT. (Another worker took the day off — Mom marks LEAVE.)</li>
-        <li><strong>In the database:</strong> three rows in the <code>attendance</code> table for today.</li>
-        <li>Each worker's attendance calendar updates instantly.</li>
-      </ul>
+    <div class="iogame">
+      <div class="iogame-title">🎮 Add Return — Friday afternoon</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Dad inputs</strong>
+<pre>Owner:    Rahul Textiles
+Quantity: 50
+Date:     2026-05-15
+Remarks:  "First batch ready"</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>NOOL responds</strong>
+<pre>Row #148 saved to
+saree_ledger:
+
+  owner_id = 1
+  type     = RETURN
+  quantity = 50
+
+Rahul's in-hand: 50
+Rahul owes: 50 × ₹65
+          = ₹3,250</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        Before saving, the backend checks: <em>"Are there at least 50 of Rahul's sarees in
+        hand?"</em> Yes (100). So the return is allowed. If Dad mistakenly typed 150, NOOL
+        would refuse with <em>"Only 100 in hand — cannot return 150"</em>. This safety net is
+        in <strong>Chapter 45</strong>.
+      </div>
     </div>
 
-    <div class="scenario">
-      <h5>Friday — Dad returns 50 polished sarees to Rahul</h5>
-      <ul>
-        <li>Dad opens NOOL → Inventory → Add Return. Rahul Textiles, 50 sarees.</li>
-        <li><strong>Important:</strong> NOOL first checks <em>"how many do we still have for Rahul?"</em>
-            Computes: <code>100 received − 0 returned = 100 in hand</code>.
-            50 ≤ 100? YES. Approved.</li>
-        <li>Inserts a new ledger row with <code>entry_type = RETURN</code>, <code>quantity = 50</code>.</li>
-        <li>Rahul's new in-hand balance: <code>100 − 50 = 50 still with us</code>.</li>
-      </ul>
+    <div class="iogame error">
+      <div class="iogame-title">😰 Trying to return more than we have</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Dad inputs (by mistake)</strong>
+<pre>Owner:    Rahul Textiles
+Quantity: 200
+(Rahul only gave 100!)</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>NOOL refuses</strong>
+<pre>HTTP 400 Bad Request
+
+{
+  "message":
+    "Cannot return 200.
+     Only 100 in hand."
+}</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        This is the kind of mistake that's <em>impossible</em> in NOOL but happened often
+        with paper notebooks. The validation lives in the service layer (Chapter 45) and
+        protects business integrity.
+      </div>
     </div>
 
-    <div class="scenario">
-      <h5>Friday evening — Owner payment &amp; worker salary</h5>
-      <ul>
-        <li>Rahul owes: <code>50 returned × ₹65 = ₹3,250</code></li>
-        <li>He sends ₹3,000 via UPI. Dad records it: Owner Payments → Add.</li>
-        <li>His pending amount: <code>₹3,250 − ₹3,000 = ₹250 still pending</code>.</li>
-        <li>Same evening, Mom checks Prema's earnings this week — say ₹1,500 — and decides to pay her ₹1,000 as advance.</li>
-        <li>Salary → Pay. Prema, ₹1,000, today.</li>
-        <li>Prema's pending salary: <code>₹1,500 − ₹1,000 = ₹500</code>.</li>
-      </ul>
-    </div>
-
-    <p>
-      That's a typical week. Every single transaction is logged. Every balance is recomputed
-      instantly. No paper notebook required. <strong>This is what NOOL does.</strong>
-    </p>
-
-    <!-- ──────── How money flows ──────── -->
+    <!-- ════════════════════════════════════════════════════ -->
     <h2><span class="h2-emoji">💵</span> How Money Flows — Two Separate Streams</h2>
     <p>
-      There are two completely independent money flows in NOOL. Important to keep them separate:
+      Money in the workshop moves in <strong>two completely independent streams</strong>.
+      It's important to keep them separate in your head — they live in different database
+      tables and follow different formulas.
     </p>
 
     <h3>Stream 1 — Money coming IN (from owners)</h3>
@@ -290,6 +472,35 @@
       <div class="label">Owner Payable</div>
       <div class="eq">
         <span class="var">totalPayable</span> <span class="op">=</span> sareesReturned <span class="op">×</span> ratePerSaree
+      </div>
+    </div>
+
+    <div class="iogame">
+      <div class="iogame-title">🎮 Compute what Rahul owes this month</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Inputs</strong>
+<pre>sareesReturned = 80
+rahul.ratePerSaree = ₹65
+amountAlreadyPaid = ₹4,000</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>NOOL computes</strong>
+<pre>totalPayable
+  = 80 × ₹65
+  = ₹5,200
+
+pendingAmount
+  = ₹5,200 − ₹4,000
+  = ₹1,200 owed</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        These three numbers come from three different tables: <code>sareesReturned</code>
+        from <code>saree_ledger</code>, <code>ratePerSaree</code> from <code>saree_owner</code>,
+        and <code>amountAlreadyPaid</code> from <code>owner_payment</code>. The dashboard
+        joins them together to show one tidy "Pending: ₹1,200".
       </div>
     </div>
 
@@ -302,40 +513,119 @@
       </div>
     </div>
 
-    <div class="callout info">
-      <strong>The workshop's profit per saree</strong> = owner's rate (₹65) − worker's rate (₹30) = ₹35.
-      That's how my parents' workshop stays in business. NOOL doesn't compute this number directly —
-      but you can see both streams side by side in the analytics dashboard.
+    <div class="iogame">
+      <div class="iogame-title">🎮 Compute Prema's salary for a week</div>
+      <div class="iogame-row">
+        <div class="iogame-in">
+          <strong>Inputs (5 days)</strong>
+<pre>Mon: 8 fresh + 2 repolish
+Tue: 9 fresh + 1 repolish
+Wed: 7 fresh + 3 repolish
+Thu: absent (no row)
+Fri: 10 fresh + 0 repolish
+prema.polishingRate = ₹30
+alreadyPaid = ₹1,000</pre>
+        </div>
+        <div class="iogame-arrow">→</div>
+        <div class="iogame-out">
+          <strong>NOOL computes</strong>
+<pre>Mon:  10 × 30 = 300
+Tue:  10 × 30 = 300
+Wed:  10 × 30 = 300
+Thu:   0
+Fri:  10 × 30 = 300
+
+Total earned: ₹1,200
+Already paid: ₹1,000
+Pending:        ₹200</pre>
+        </div>
+      </div>
+      <div class="iogame-explain">
+        Each day's number is computed on the fly using Prema's current rate. NOOL recomputes
+        with the current rate every time it's queried (see Chapter 36 for the trade-off
+        discussion).
+      </div>
     </div>
 
-    <!-- ──────── What NOOL does NOT do ──────── -->
+    <div class="callout info">
+      <strong>The workshop's profit per saree</strong> = owner's rate (₹65) − worker's rate
+      (₹30) = ₹35. That's how my parents' workshop stays in business. NOOL doesn't compute
+      this number directly, but you can see both streams side by side in the admin dashboard.
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
     <h2><span class="h2-emoji">🚫</span> What NOOL Does NOT Do (Honest Disclosure)</h2>
     <p>
-      To set expectations, here are things NOOL does <em>not</em> do — either because they
-      weren't needed, or because I left them for future versions:
+      To set expectations, here are things NOOL <em>doesn't</em> do — either because they
+      weren't needed, or I left them for future versions:
     </p>
-    <ul>
-      <li><strong>No GST/tax calculations.</strong> My parents' workshop is below the GST threshold. If needed, this can be added later.</li>
-      <li><strong>No SMS or email notifications.</strong> All communication still happens by phone call.</li>
-      <li><strong>No multi-workshop / multi-tenancy.</strong> NOOL is currently single-tenant.</li>
-      <li><strong>No mobile app.</strong> It's a responsive web app — works fine on phone browsers.</li>
-      <li><strong>No automatic backups.</strong> The DB is backed up manually (something to improve).</li>
-      <li><strong>No PDF invoice generation.</strong> Could be added — currently invoices are verbal.</li>
-    </ul>
+
+    <div class="lbl">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-code">No GST or tax calculations</span>
+        <div class="step-body">
+          My parents' workshop is below the GST threshold in India. If needed later, this
+          could be added as a separate computation on top of owner payments.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-code">No SMS or email notifications</span>
+        <div class="step-body">
+          All communication still happens by phone call. Adding SMS would mean integrating
+          an SMS gateway like Twilio or MSG91 — beyond NOOL's current scope.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-code">No multi-workshop support</span>
+        <div class="step-body">
+          NOOL is single-tenant — one workshop per installation. If you wanted to run NOOL
+          for multiple workshops sharing one database, you'd need to add a "workshop_id"
+          column to most tables.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-code">No mobile app</span>
+        <div class="step-body">
+          NOOL is a responsive web app — it works fine on phone browsers. A native Android/iOS
+          app could be added later, but the web version is enough today.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-code">No automatic backups</span>
+        <div class="step-body">
+          The database is backed up manually for now. Adding a scheduled <code>mysqldump</code>
+          cron job is a one-day task someone could pick up.
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-num">6</span>
+        <span class="step-code">No PDF invoice generation</span>
+        <div class="step-body">
+          Currently invoices are verbal — Dad tells Rahul "you owe ₹3,250" over the phone.
+          Adding PDF generation (e.g., using OpenPDF or iText) is a possible future
+          enhancement.
+        </div>
+      </div>
+    </div>
+
     <p>
       These are deliberate trade-offs. NOOL is built for one workshop's <em>actual</em> needs,
       not hypothetical ones. The principle: <em>don't build features nobody asked for.</em>
     </p>
 
-    <!-- ──────── What you'll see next ──────── -->
+    <!-- ════════════════════════════════════════════════════ -->
     <h2><span class="h2-emoji">🗺️</span> What's Coming Next</h2>
     <p>
-      Now that you know what NOOL does and who uses it, the next chapter zooms out to show
-      <strong>how it's built</strong> — the technical architecture, what tools/libraries
-      are used, and how the pieces talk to each other.
+      Now that you know <em>what</em> NOOL does and <em>who</em> uses it, the next chapter
+      zooms out to show <strong>how it's built</strong> — the technical architecture, what
+      tools and libraries are used, and how the pieces talk to each other.
     </p>
 
-    <!-- ──────── Chapter navigation ──────── -->
     <div class="chapnav">
       <a href="01-the-story.html">
         <span class="arrow">← Previous chapter</span>
@@ -351,7 +641,7 @@
 </main>
 
 <footer class="foot">
-  <p>Chapter 02 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Chapter 02 of 85 · <a href="../index.html">Back to table of contents</a> · Rewritten in newbie-friendly + game style</p>
   <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
 </footer>
 

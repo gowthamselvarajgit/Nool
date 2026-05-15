@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 22 · SecurityConfig.java · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 22 · The Master Rules Book</span>
+    <h1>
+      <span class="gradient">SecurityConfig.java</span> —<br/>
+      Who can access what
+    </h1>
+    <p class="subtitle">
+      This is where NOOL declares <em>every authorization rule</em>: who can add employees,
+      who can approve payments, who can view inventory. One Java file controls the entire
+      security policy. Read it carefully — it's the law of the application.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📜</div>
+      <div class="fmeta">
+        <h3>SecurityConfig.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/auth/security/SecurityConfig.java</span>
+        <div class="ftags"><span>@Configuration</span><span>Security</span><span>URL rules</span><span>CORS</span><span>BCrypt</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── What this file is ──────── -->
+    <h2><span class="h2-emoji">🧠</span> What This File Controls</h2>
+    <p>
+      SecurityConfig is a Spring <code>@Configuration</code> class that defines:
+    </p>
+
+    <ol>
+      <li><strong>The password hasher</strong> (BCrypt) — used to hash + verify passwords</li>
+      <li><strong>CORS settings</strong> — which frontend origins can call the backend</li>
+      <li><strong>The security filter chain</strong> — the master URL → role mapping</li>
+      <li><strong>The JWT filter slot</strong> — where our custom filter plugs into Spring's chain</li>
+    </ol>
+
+    <div class="callout brain">
+      <strong>One file, the whole authorization policy.</strong> If a rule needs to change
+      (e.g., "let workers also view their own owner payments"), you edit one line here. No
+      annotations scattered across 50 controllers, no copy-paste mistakes.
+    </div>
+
+    <!-- ──────── Setup section ──────── -->
+    <h2><span class="h2-emoji">⚙️</span> The Three Beans + One Filter Chain</h2>
+    <p>SecurityConfig defines four things. We'll go through each.</p>
+
+    <h3>Part 1 — The class header and dependencies</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">SecurityConfig.java — top of file</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.auth.security;
+
+<span class="com">// imports omitted — typical Spring Security &amp; CORS imports</span>
+
+<span class="ann">@Configuration</span>                                <span class="com">// Spring: "this class defines beans"</span>
+<span class="ann">@RequiredArgsConstructor</span>                      <span class="com">// Lombok: generates the constructor</span>
+<span class="kw">public class</span> SecurityConfig {
+
+    <span class="kw">private final</span> JwtAuthenticationFilter jwtAuthenticationFilter;
+    <span class="com">// ★ Injected so we can plug our JWT filter into Spring's chain.</span>
+}</pre>
+    </div>
+
+    <h3>Part 2 — The password encoder bean</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">BCrypt for password hashing</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Bean</span>
+<span class="kw">public</span> PasswordEncoder passwordEncoder() {
+    <span class="kw">return new</span> BCryptPasswordEncoder();
+}</pre>
+    </div>
+    <p>
+      Exposes a single BCrypt bean used throughout the auth code. Whenever a service does
+      <code>passwordEncoder.encode(plainPassword)</code> or
+      <code>passwordEncoder.matches(plain, hash)</code>, this is the bean that runs.
+      BCrypt was covered in detail in Chapter 11 (User entity) — it's one-way, adds a
+      salt automatically, and is industry-standard.
+    </p>
+
+    <h3>Part 3 — CORS configuration</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">CORS: which frontend origins can call this backend</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Bean</span>
+<span class="kw">public</span> CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = <span class="kw">new</span> CorsConfiguration();
+    configuration.setAllowedOrigins(List.of(
+            <span class="str">"http://localhost:5173"</span>,         <span class="com">// Vite dev server default port</span>
+            <span class="str">"http://localhost:5174"</span>,         <span class="com">// alternate dev port</span>
+            <span class="str">"http://localhost:4173"</span>,         <span class="com">// Vite preview server</span>
+            <span class="str">"http://127.0.0.1:5173"</span>,
+            <span class="str">"http://127.0.0.1:5174"</span>,
+            <span class="str">"http://127.0.0.1:4173"</span>
+    ));
+    configuration.setAllowedMethods(List.of(
+            <span class="str">"GET"</span>, <span class="str">"POST"</span>, <span class="str">"PUT"</span>,
+            <span class="str">"DELETE"</span>, <span class="str">"PATCH"</span>, <span class="str">"OPTIONS"</span>));    <span class="com">// all standard HTTP verbs</span>
+    configuration.setAllowedHeaders(List.of(<span class="str">"*"</span>));   <span class="com">// allow Authorization, Content-Type, etc.</span>
+    configuration.setAllowCredentials(<span class="kw">true</span>);          <span class="com">// allow cookies if any (we use JWT in headers)</span>
+
+    UrlBasedCorsConfigurationSource source =
+            <span class="kw">new</span> UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration(<span class="str">"/**"</span>, configuration);   <span class="com">// apply to all paths</span>
+    <span class="kw">return</span> source;
+}</pre>
+    </div>
+
+    <p>
+      <strong>What's CORS?</strong> Cross-Origin Resource Sharing. By default, browsers refuse
+      to let a page from <code>http://localhost:5173</code> (frontend) call APIs on
+      <code>http://localhost:8083</code> (backend) — different ports = different origins =
+      blocked. This bean tells the browser <em>"allow these origins"</em>. Without it, the
+      React app couldn't talk to the backend at all in dev mode.
+    </p>
+
+    <h3>Part 4 — The security filter chain (the heart of the file)</h3>
+    <p>This is where every URL pattern is mapped to a required role. It's long, so we'll go through it section by section.</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">SecurityFilterChain bean</span><span class="lang">Java</span></div>
+<pre><span class="ann">@Bean</span>
+<span class="kw">public</span> SecurityFilterChain securityFilterChain(HttpSecurity http) <span class="kw">throws</span> Exception {
+
+    http
+        <span class="com">// ── Wire up CORS using the bean above ─────────────────────────</span>
+        .cors(cors -&gt; cors.configurationSource(corsConfigurationSource()))
+
+        <span class="com">// ── Disable CSRF — not needed for stateless REST APIs ─────────</span>
+        .csrf(csrf -&gt; csrf.disable())
+
+        <span class="com">// ── No HTTP sessions — every request authenticates via its JWT ─</span>
+        .sessionManagement(session -&gt;
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+        <span class="com">// ── Disable browser-default auth UIs we don't use ─────────────</span>
+        .httpBasic(basic -&gt; basic.disable())
+        .formLogin(form -&gt; form.disable())</pre>
+    </div>
+
+    <p>
+      The setup so far: CORS on, CSRF off (we don't need it for stateless APIs), no sessions
+      (every request is independent), no default login forms (we have our own
+      <code>/api/auth/login</code> endpoint).
+    </p>
+
+    <h3>Part 5 — URL-to-role rules</h3>
+    <p>
+      Now comes the main event: declaring who can call what. The rules are evaluated <strong>in
+      order</strong> — the first matching rule wins. So most-specific rules come first,
+      catch-alls come last.
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Authorization rules (continued from above)</span><span class="lang">Java</span></div>
+<pre>        .authorizeHttpRequests(auth -&gt; auth
+
+            <span class="com">// ── Public ────────────────────────────────────────────────</span>
+            .requestMatchers(<span class="str">"/auth/**"</span>).permitAll()
+            <span class="com">// Login / logout / validate — anyone can call (no JWT needed).</span>
+
+            <span class="com">// ── Admin-only analytics &amp; dashboard ──────────────────────</span>
+            .requestMatchers(<span class="str">"/admin/**"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            <span class="com">// Every URL under /admin requires the user to have role ADMIN.</span>
+
+            <span class="com">// ── Employee management ───────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employees"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.PUT,    <span class="str">"/employees"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.PATCH,  <span class="str">"/employees/status"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.DELETE, <span class="str">"/employees/**"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employees/list"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/employees/me"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/employees/**"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            <span class="com">// Create/edit/delete: ADMIN only.
+            // Read (especially "me"): ADMIN or WORKER (so workers can view their own profile).</span>
+
+            <span class="com">// ── Attendance ────────────────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/attendance"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/attendance/list"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/attendance/my-list"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/attendance/employee/*/summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/attendance/summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/attendance/**"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            <span class="com">// Marking attendance: ADMIN only. Reading own: WORKER too.</span>
+
+            <span class="com">// ── Daily Work ────────────────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employee-daily-working"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employee-daily-working/list"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employee-daily-working/my-list"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employee-daily-working/employee/*/summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/employee-daily-working/summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+
+            <span class="com">// ── Salary ────────────────────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/salary-payments"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/salary-payments/employee/*/history"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/salary-payments/history"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/salary-payments/summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"WORKER"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/salary-payments/employees-summary"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/salary-payments/**"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            <span class="com">// Paying out: ADMIN only. Viewing own history: WORKER too.</span>
+
+            <span class="com">// ── Owners ────────────────────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owners"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.PUT,    <span class="str">"/owners"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.PATCH,  <span class="str">"/owners/status"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.DELETE, <span class="str">"/owners/**"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owners/list"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/owners/me"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"SAREE_OWNER"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/owners/**"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"SAREE_OWNER"</span>)
+
+            <span class="com">// ── Inventory ─────────────────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/receipt"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/return"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/owner/*/ledger"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/owner/*/summary"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/summary"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/inventory/owners"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.DELETE, <span class="str">"/inventory/entry/**"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/my-ledger"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"SAREE_OWNER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/inventory/my-summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"SAREE_OWNER"</span>)
+            <span class="com">// All inventory writes: ADMIN only. "My" endpoints: owner too.</span>
+
+            <span class="com">// ── Owner Payments ────────────────────────────────────────</span>
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owner-payments"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owner-payments/owner/*/history"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owner-payments/owner/*/summary"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.GET,    <span class="str">"/owner-payments/owners-summary"</span>).hasAuthority(<span class="str">"ADMIN"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owner-payments/history"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"SAREE_OWNER"</span>)
+            .requestMatchers(HttpMethod.POST,   <span class="str">"/owner-payments/summary"</span>).hasAnyAuthority(<span class="str">"ADMIN"</span>, <span class="str">"SAREE_OWNER"</span>)
+
+            <span class="com">// ── Fallback — anything else needs at least to be logged in ─</span>
+            .anyRequest().authenticated()
+        )</pre>
+    </div>
+
+    <h3>Part 6 — Plug in the JWT filter and return</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">Wiring + return</span><span class="lang">Java</span></div>
+<pre>        .addFilterBefore(jwtAuthenticationFilter,
+                          UsernamePasswordAuthenticationFilter.class);
+    <span class="com">// ★ Place our JWT filter BEFORE Spring's default username/password filter.
+    //   Spring runs filters in order; ours sets the security context first,
+    //   so by the time the URL rules above are checked, we already know who's calling.</span>
+
+    <span class="kw">return</span> http.build();
+}</pre>
+    </div>
+
+    <!-- ──────── Rules at a glance ──────── -->
+    <h2><span class="h2-emoji">📋</span> Quick Reference — Who Can Do What</h2>
+    <p>Distilled summary of the rules:</p>
+
+    <table class="ftable">
+      <thead>
+        <tr><th>Capability</th><th>ADMIN</th><th>WORKER</th><th>SAREE_OWNER</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Log in / log out</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Add / edit / disable employees</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Add / edit / disable owners</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Add receipt / return in inventory</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Mark attendance</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Log daily work</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Pay salaries</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Record owner payments</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>See own profile (<code>/me</code>)</td><td>✓</td><td>✓ (employee)</td><td>✓ (owner)</td></tr>
+        <tr><td>See own attendance / work / salary history</td><td>✓</td><td>✓</td><td>—</td></tr>
+        <tr><td>See own inventory ledger</td><td>✓</td><td>—</td><td>✓</td></tr>
+        <tr><td>See own payment history</td><td>✓</td><td>—</td><td>✓</td></tr>
+        <tr><td>See workshop-wide dashboards (<code>/admin/*</code>)</td><td>✓</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── How rule matching works ──────── -->
+    <h2><span class="h2-emoji">🎯</span> How Rule Matching Actually Works</h2>
+    <p>
+      Rules are evaluated <strong>top to bottom</strong>. The FIRST rule whose pattern + method
+      matches is the one that decides. That's why ordering matters.
+    </p>
+
+    <p>Example: a worker calls <code>GET /employees/me</code>.</p>
+
+    <ol>
+      <li>Does <code>/auth/**</code> match? No, URL is <code>/employees/me</code>.</li>
+      <li>Does <code>/admin/**</code> match? No.</li>
+      <li>Does <code>POST /employees</code> match? No, method is GET not POST.</li>
+      <li>Does <code>PUT /employees</code> match? No.</li>
+      <li>... continues down ...</li>
+      <li>Does <code>GET /employees/me</code> match? <strong>Yes!</strong> Rule says: ADMIN or WORKER. Worker passes. Request allowed.</li>
+    </ol>
+
+    <div class="callout warn">
+      <strong>Ordering matters!</strong> If <code>GET /employees/**</code> came BEFORE
+      <code>GET /employees/me</code>, the more general rule would match first and the
+      specific one would never be reached. Specific rules must come before catch-alls.
+    </div>
+
+    <!-- ──────── Why .anyRequest().authenticated() ──────── -->
+    <h2><span class="h2-emoji">🛡️</span> The Final Catch-All</h2>
+    <p>
+      The last rule is <code>.anyRequest().authenticated()</code>. This means: <em>"any URL
+      not matched above must at least be logged in"</em>. It's the safety net.
+    </p>
+
+    <p>Without this rule, an URL not listed above would be reachable WITHOUT any auth at all
+    — a massive security hole. The catch-all says <strong>"by default, deny unless authenticated"</strong>.</p>
+
+    <!-- ──────── Why @Bean for filter chain ──────── -->
+    <h2><span class="h2-emoji">🌱</span> Why Beans?</h2>
+    <p>
+      Each <code>@Bean</code>-annotated method returns an object that Spring registers in its
+      IoC container. Other parts of the app can then inject these beans by type:
+    </p>
+
+    <ul>
+      <li><code>PasswordEncoder</code> — injected into <code>AuthServiceImpl</code> and <code>AdminUserServiceImpl</code></li>
+      <li><code>CorsConfigurationSource</code> — used by the SecurityFilterChain bean</li>
+      <li><code>SecurityFilterChain</code> — picked up automatically by Spring Security</li>
+    </ul>
+
+    <p>
+      The Spring framework discovers all <code>@Bean</code> methods at startup, creates the
+      objects, and wires them where they're needed. No manual <code>new BCryptPasswordEncoder()</code>
+      calls anywhere else in the codebase.
+    </p>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Worker tries to add an employee (should fail)</h5>
+      <ol>
+        <li>Prema (WORKER) sends <code>POST /api/employees</code> trying to add a fake employee.</li>
+        <li>JwtAuthenticationFilter verifies her token, sets security context with role WORKER.</li>
+        <li>SecurityConfig rules evaluate. Matching rule: <code>POST /employees</code> → <code>hasAuthority("ADMIN")</code>.</li>
+        <li>Prema's authority is WORKER, not ADMIN. Rule rejects.</li>
+        <li>Response: 403 Forbidden.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Worker views her own profile (should succeed)</h5>
+      <ol>
+        <li>Prema sends <code>GET /api/employees/me</code>.</li>
+        <li>Filter sets context with role WORKER.</li>
+        <li>SecurityConfig: matching rule is <code>GET /employees/me</code> → <code>hasAnyAuthority("ADMIN", "WORKER")</code>.</li>
+        <li>Prema is WORKER → passes.</li>
+        <li>Controller runs, uses <code>CurrentUserUtil.getEmployeeId()</code> to find Prema's row, returns it.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Owner accesses inventory of another owner (should fail at service layer, not security)</h5>
+      <ol>
+        <li>Rahul (SAREE_OWNER) somehow sends <code>POST /api/inventory/owner/2/ledger</code> (someone else's owner_id).</li>
+        <li>SecurityConfig: matching rule is <code>POST /inventory/owner/*/ledger</code> → <code>hasAuthority("ADMIN")</code>.</li>
+        <li>Rahul is not ADMIN → blocked with 403.</li>
+        <li><strong>Note:</strong> Even if Rahul tried <code>/inventory/my-ledger</code>, the service layer would scope it to his own owner ID via <code>CurrentUserUtil.getOwnerId()</code> — defense in depth.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Login attempt (no token yet)</h5>
+      <ol>
+        <li>Frontend sends <code>POST /api/auth/login</code> with mobile + password.</li>
+        <li>JwtAuthenticationFilter's <code>shouldNotFilter</code> sees <code>/api/auth/</code> prefix → SKIP.</li>
+        <li>SecurityConfig rule: <code>/auth/**</code> → <code>permitAll()</code>.</li>
+        <li>Request reaches <code>AuthController.login()</code>.</li>
+        <li>Service verifies password, mints JWT, returns it.</li>
+      </ol>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common SecurityConfig mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Putting catch-all rules BEFORE specific ones</div>
+        <div class="good">Rules are matched top-down, first wins. Put specific rules first, catch-alls last. Otherwise the catch-all swallows everything.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using <code>permitAll()</code> too liberally to "make things work"</div>
+        <div class="good"><code>permitAll()</code> means literally anyone can call it — even unauthenticated requests. Use sparingly: only login, register, public health-check endpoints.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Disabling CSRF for stateful session-based apps</div>
+        <div class="good">CSRF is needed for cookie-based auth. NOOL is stateless + JWT in headers → CSRF disabled is correct. But don't blindly copy this to a session-based app — you'd open an attack vector.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Wildcarding the CORS origin to <code>*</code></div>
+        <div class="good">Explicit origins only. Wildcard origins + credentials = security hole. NOOL lists each allowed dev port explicitly, and production would add the production frontend URL.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>.addFilterBefore(jwtAuthenticationFilter, ...)</code></div>
+        <div class="good">Without this line, our JWT filter wouldn't run — Spring would never know about our custom auth flow. The order matters: must be before <code>UsernamePasswordAuthenticationFilter</code>.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Mixing <code>hasRole()</code> and <code>hasAuthority()</code> inconsistently</div>
+        <div class="good">In Spring Security, <code>hasRole("X")</code> implicitly looks for authority <code>"ROLE_X"</code> (adds the prefix). <code>hasAuthority("X")</code> checks for the literal string. NOOL stores roles WITHOUT the ROLE_ prefix, so we use <code>hasAuthority()</code> consistently.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about SecurityConfig</h5>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>hasRole</code> and <code>hasAuthority</code> in Spring Security?</div>
+        <div class="a">
+          <code>hasRole("ADMIN")</code> implicitly looks for an authority called
+          <code>"ROLE_ADMIN"</code> — Spring auto-prefixes "ROLE_". <code>hasAuthority("ADMIN")</code>
+          looks for the literal authority <code>"ADMIN"</code>. NOOL stores roles without the
+          prefix (the JWT claim is just <code>"role": "ADMIN"</code>), so we use
+          <code>hasAuthority</code> consistently to avoid confusion.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is CSRF disabled?</div>
+        <div class="a">
+          CSRF (Cross-Site Request Forgery) protection guards against malicious websites
+          tricking a logged-in user's browser into submitting requests using their session
+          cookies. NOOL uses JWT tokens in the <code>Authorization</code> header, NOT
+          cookies — so the CSRF attack vector doesn't apply. Disabling it is correct here.
+          For a session-based app, you'd KEEP CSRF on.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why <code>SessionCreationPolicy.STATELESS</code>?</div>
+        <div class="a">
+          To tell Spring Security: <em>"don't create HTTP sessions for me; don't try to remember
+          users between requests."</em> Each request must independently authenticate via its JWT.
+          This is the foundation of NOOL's stateless architecture — multiple backend instances
+          behind a load balancer all work the same way, no session affinity needed.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could you replace this file with method-level annotations like <code>@PreAuthorize</code>?</div>
+        <div class="a">
+          You could — Spring Security supports both. <code>@PreAuthorize("hasAuthority('ADMIN')")</code>
+          on each controller method achieves the same per-endpoint rule. The trade-off: URL
+          rules are centralized in ONE file (easier to audit), but method annotations live
+          next to the methods (easier to spot when reading a controller). NOOL chose URL
+          rules for the audit benefit, plus they apply even if you forget the annotation.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does the asterisk in <code>/attendance/employee/*/summary</code> mean?</div>
+        <div class="a">
+          A single <code>*</code> matches one path segment (no slashes). So
+          <code>/attendance/employee/5/summary</code> matches but
+          <code>/attendance/employee/5/something/else</code> doesn't. A <code>**</code> would
+          match any number of segments. NOOL uses single-star for path variables and double-star
+          for "any subpath" patterns.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How would you add a new endpoint?</div>
+        <div class="a">
+          Three steps. (1) Add the controller method. (2) Add a rule in SecurityConfig
+          specifying who can call it. (3) Test with each role. The catch-all
+          <code>.anyRequest().authenticated()</code> protects you against forgetting step 2 —
+          unmatched URLs require at least authentication, never anonymous.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why declare a <code>PasswordEncoder</code> bean in this file?</div>
+        <div class="a">
+          Because security-related beans naturally live in the security config. Spring Security
+          looks for a <code>PasswordEncoder</code> bean by type when wiring its
+          <code>AuthenticationProvider</code>. Putting it here keeps all security policy
+          in one file.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      JwtUtil makes tokens. The filter verifies them. SecurityConfig enforces who can do what.
+      But how does business code <em>read</em> the caller's identity once a request makes it
+      through? That's the job of <code>CurrentUserUtil.java</code> — a tiny helper class that
+      bridges Spring's security context to plain Java method calls. Last chapter of Phase 5.
+    </p>
+
+    <div class="chapnav">
+      <a href="21-jwt-authentication-filter.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 21 · JwtAuthenticationFilter</span>
+      </a>
+      <a href="23-current-user-util.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 23 · CurrentUserUtil.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 22 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 31 · EmployeeController · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 31 · The HTTP Face</span>
+    <h1>
+      <span class="gradient">EmployeeController.java</span>
+    </h1>
+    <p class="subtitle">
+      Seven endpoints, all under <code>/api/employees</code>. Thin — every method is one line
+      delegating to the service. The pattern you'll see repeated for every business module
+      that follows.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🌐</div>
+      <div class="fmeta">
+        <h3>EmployeeController.java</h3>
+        <span class="fpath">backend/.../controller/employee/EmployeeController.java</span>
+        <div class="ftags"><span>@RestController</span><span>7 endpoints</span><span>CRUD + me</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Seven Endpoints</h2>
+    <table class="ftable">
+      <thead><tr><th>HTTP method</th><th>Path</th><th>Purpose</th><th>Required role</th></tr></thead>
+      <tbody>
+        <tr><td>POST</td><td><code>/api/employees</code></td><td>Create new worker</td><td>ADMIN</td></tr>
+        <tr><td>PUT</td><td><code>/api/employees</code></td><td>Update worker</td><td>ADMIN</td></tr>
+        <tr><td>PATCH</td><td><code>/api/employees/status</code></td><td>Mark as LEFT / reactivate</td><td>ADMIN</td></tr>
+        <tr><td>GET</td><td><code>/api/employees/{employeeId}</code></td><td>Fetch one by ID</td><td>ADMIN or WORKER (self)</td></tr>
+        <tr><td>POST</td><td><code>/api/employees/list</code></td><td>Paginated, searchable list</td><td>ADMIN</td></tr>
+        <tr><td>GET</td><td><code>/api/employees/me</code></td><td>Worker fetches own profile</td><td>ADMIN or WORKER</td></tr>
+        <tr><td>DELETE</td><td><code>/api/employees/{employeeId}</code></td><td>Hard delete</td><td>ADMIN</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">controller/employee/EmployeeController.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.controller.employee;
+
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationResponseDto;
+<span class="kw">import</span> com.nool.backend.dto.employee.*;
+<span class="kw">import</span> com.nool.backend.service.employee.EmployeeService;
+<span class="kw">import</span> jakarta.validation.Valid;
+<span class="kw">import</span> lombok.RequiredArgsConstructor;
+<span class="kw">import</span> org.springframework.web.bind.annotation.*;
+
+<span class="ann">@RestController</span>                       <span class="com">// Spring: JSON-only controller</span>
+<span class="ann">@RequestMapping</span>(<span class="str">"/employees"</span>)       <span class="com">// every path: /api/employees/*</span>
+<span class="ann">@RequiredArgsConstructor</span>             <span class="com">// constructor injection of `employeeService`</span>
+<span class="kw">public class</span> EmployeeController {
+
+    <span class="kw">private final</span> EmployeeService employeeService;
+
+    <span class="com">// ── 1. CREATE WORKER ────────────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>
+    <span class="kw">public</span> EmployeeResponseDto createEmployee(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> CreateEmployeeRequestDto requestDto){
+        <span class="kw">return</span> employeeService.createEmployee(requestDto);
+    }
+
+    <span class="com">// ── 2. UPDATE WORKER ────────────────────────────────────────</span>
+    <span class="ann">@PutMapping</span>
+    <span class="kw">public void</span> updateEmployee(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> UpdateEmployeeRequestDto requestDto){
+        employeeService.updateEmployee(requestDto);
+    }
+
+    <span class="com">// ── 3. STATUS UPDATE (mark as LEFT) ─────────────────────────</span>
+    <span class="ann">@PatchMapping</span>(<span class="str">"/status"</span>)
+    <span class="kw">public void</span> updateEmployeeStatus(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> EmployeeStatusUpdateDto requestDto){
+        employeeService.updateEmployeeStatus(requestDto);
+    }
+
+    <span class="com">// ── 4. GET ONE BY ID ────────────────────────────────────────</span>
+    <span class="ann">@GetMapping</span>(<span class="str">"/{employeeId}"</span>)
+    <span class="kw">public</span> EmployeeResponseDto getEmployeeById(
+            <span class="ann">@PathVariable</span> Long employeeId){
+        <span class="kw">return</span> employeeService.getEmployeeById(employeeId);
+    }
+
+    <span class="com">// ── 5. PAGINATED LIST ───────────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/list"</span>)
+    <span class="kw">public</span> PaginationResponseDto&lt;EmployeeListResponse&gt; getEmployeeList(
+            <span class="ann">@RequestBody</span> PaginationRequestDto paginationRequestDto){
+        <span class="kw">return</span> employeeService.getEmployeeList(paginationRequestDto);
+    }
+
+    <span class="com">// ── 6. WORKER'S OWN PROFILE ─────────────────────────────────</span>
+    <span class="ann">@GetMapping</span>(<span class="str">"/me"</span>)
+    <span class="kw">public</span> EmployeeResponseDto getMyProfile(){
+        <span class="kw">return</span> employeeService.getMyProfile();
+    }
+
+    <span class="com">// ── 7. HARD DELETE (rare) ───────────────────────────────────</span>
+    <span class="ann">@DeleteMapping</span>(<span class="str">"/{employeeId}"</span>)
+    <span class="kw">public void</span> deleteEmployee(<span class="ann">@PathVariable</span> Long employeeId){
+        employeeService.deleteEmployee(employeeId);
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">📋</span> Annotation Reference</h2>
+    <table class="ftable">
+      <thead><tr><th>Annotation</th><th>Where it appears</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>@RestController</code></td><td>Class-level</td><td>Every method returns JSON. Combo of @Controller + @ResponseBody.</td></tr>
+        <tr><td><code>@RequestMapping("/employees")</code></td><td>Class-level</td><td>Prefix every URL with /employees. Combined with /api context path → /api/employees</td></tr>
+        <tr><td><code>@RequiredArgsConstructor</code></td><td>Class-level (Lombok)</td><td>Auto-generate constructor for all final fields. Spring uses it for DI.</td></tr>
+        <tr><td><code>@PostMapping</code></td><td>Method-level</td><td>Handle HTTP POST. Optionally takes a path argument.</td></tr>
+        <tr><td><code>@PutMapping</code></td><td>Method-level</td><td>Handle HTTP PUT — typically "full update".</td></tr>
+        <tr><td><code>@PatchMapping</code></td><td>Method-level</td><td>Handle HTTP PATCH — typically "partial update" (just status).</td></tr>
+        <tr><td><code>@GetMapping</code></td><td>Method-level</td><td>Handle HTTP GET — read-only.</td></tr>
+        <tr><td><code>@DeleteMapping</code></td><td>Method-level</td><td>Handle HTTP DELETE.</td></tr>
+        <tr><td><code>@PathVariable</code></td><td>Parameter</td><td>Extract value from URL path: <code>/{employeeId}</code> → method param.</td></tr>
+        <tr><td><code>@RequestBody</code></td><td>Parameter</td><td>Deserialize JSON body into the typed object.</td></tr>
+        <tr><td><code>@Valid</code></td><td>Parameter</td><td>Trigger Bean Validation on the bound object's annotations.</td></tr>
+      </tbody>
+    </table>
+
+    <h2><span class="h2-emoji">🤔</span> Why HTTP Methods Matter — POST vs PUT vs PATCH vs DELETE</h2>
+    <p>NOOL uses different HTTP verbs deliberately:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Verb</th><th>Used for</th><th>NOOL example</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>POST</strong></td>
+          <td>Create something new, or invoke a non-idempotent action</td>
+          <td>Add new employee. Also used for <code>/list</code> because the search body is too large for query params.</td>
+        </tr>
+        <tr>
+          <td><strong>GET</strong></td>
+          <td>Read data — safe, idempotent, no side effects</td>
+          <td>Fetch one by ID, fetch "me"</td>
+        </tr>
+        <tr>
+          <td><strong>PUT</strong></td>
+          <td>Replace the whole resource — idempotent</td>
+          <td>Update employee name + rate + mobile (all fields together)</td>
+        </tr>
+        <tr>
+          <td><strong>PATCH</strong></td>
+          <td>Update a SUBSET of fields</td>
+          <td>Change only status (LEFT or ACTIVE) without touching anything else</td>
+        </tr>
+        <tr>
+          <td><strong>DELETE</strong></td>
+          <td>Remove the resource</td>
+          <td>Hard-delete an employee row</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <strong>Why POST <code>/list</code> instead of GET?</strong> Two reasons. (1) The
+      pagination DTO has many fields (page, size, sortBy, sortingDirection, searchKeyword) —
+      putting them all in query params is ugly. (2) Search keywords might contain special
+      characters that need escaping. A POST body sidesteps both problems. It's a NOOL
+      convention used everywhere: <code>/api/X/list</code> for paginated reads.
+    </div>
+
+    <h2><span class="h2-emoji">⛓️</span> Why Each Method Is One Line</h2>
+    <p>Look at the bodies:</p>
+    <ul>
+      <li><code>return employeeService.createEmployee(requestDto);</code></li>
+      <li><code>employeeService.updateEmployee(requestDto);</code></li>
+      <li>...and so on for all seven.</li>
+    </ul>
+
+    <p>This is intentional. Controllers in NOOL are <strong>thin</strong>. Their only jobs:</p>
+
+    <ol>
+      <li>Receive the HTTP request</li>
+      <li>Parse it into typed DTOs (Spring + @Valid do this)</li>
+      <li>Delegate to the service</li>
+      <li>Return the result (Spring serializes to JSON)</li>
+    </ol>
+
+    <p>No business logic, no validation beyond what's on the DTO, no DB calls. Anything more
+    interesting belongs in the service.</p>
+
+    <div class="callout brain">
+      <strong>Benefits of thin controllers:</strong>
+      <ul style="margin-bottom: 0;">
+        <li><strong>Reusability</strong> — the same service can be called by a CLI, a scheduled job, or another service. The HTTP layer is just one consumer.</li>
+        <li><strong>Testability</strong> — services are easier to unit-test than controllers. If business logic lived in controllers, you'd need MockMvc for every test.</li>
+        <li><strong>Maintainability</strong> — bugs are usually in business logic. Knowing they're all in one place (the service) makes them faster to find.</li>
+      </ul>
+    </div>
+
+    <h2><span class="h2-emoji">🔍</span> The Full Request Flow</h2>
+    <p>Let's trace what happens when Dad submits "Add Employee":</p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">Request flow for POST /api/employees</span><span class="lang">flow</span></div>
+<pre>1. Browser → HTTP request:
+   POST http://localhost:8083/api/employees
+   Authorization: Bearer eyJhbGc...
+   Content-Type: application/json
+   Body: { "employeeName": "Prema", "mobileNumber": "9000000002", ... }
+
+2. Tomcat receives → routes through filters.
+
+3. JwtAuthenticationFilter:
+   - Reads Authorization header.
+   - Verifies signature + expiry via JwtUtil.
+   - Sets SecurityContext with role=ADMIN, userId=1.
+
+4. SecurityConfig rules:
+   - Matches POST /employees → hasAuthority("ADMIN"). Pass.
+
+5. Spring dispatcher routes to EmployeeController.createEmployee:
+   - @RequestBody deserializes JSON into CreateEmployeeRequestDto.
+   - @Valid runs validation:
+     • @NotBlank on employeeName     ✓
+     • @NotNull on joiningDate       ✓
+     • @Positive on polishingRate    ✓
+     • @Pattern on mobileNumber      ✓
+     • @NotBlank on password         ✓
+   - All pass.
+
+6. Method body: return employeeService.createEmployee(requestDto);
+
+7. Service does its full createEmployee flow (Chapter 30):
+   - Dup check, orphan cleanup, insert Employee, insert User+Profile via AdminUserService.
+
+8. Service returns EmployeeResponseDto.
+
+9. Spring auto-serializes the DTO to JSON.
+
+10. HTTP 200 OK with JSON body sent back to browser.
+
+11. Frontend updates the employee list table.</pre>
+    </div>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Successful Add Employee</h5>
+      <ol>
+        <li>Dad fills the form → submit.</li>
+        <li>Frontend posts JSON to <code>POST /api/employees</code>.</li>
+        <li>Filter passes, SecurityConfig passes, validation passes.</li>
+        <li>Service runs (Chapter 30).</li>
+        <li>Response: <code>{ employeeId: 5, employeeName: "Prema", status: "ACTIVE", ... }</code>.</li>
+        <li>Frontend appends Prema to the table — instant feedback.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Validation rejects invalid mobile</h5>
+      <ol>
+        <li>Dad accidentally types "12345" as the mobile.</li>
+        <li>Frontend posts.</li>
+        <li><code>@Valid</code> runs <code>@Pattern</code> on mobileNumber → "12345" doesn't match Indian regex.</li>
+        <li>Spring throws <code>MethodArgumentNotValidException</code> BEFORE the controller method body runs.</li>
+        <li>GlobalExceptionHandler returns HTTP 400: <em>"mobileNumber: Mobile number must be a valid 10-digit Indian mobile number"</em>.</li>
+        <li>Frontend highlights the field in red. Service is never called — no wasted DB hit.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Workers can call <code>/me</code> but not <code>/list</code></h5>
+      <ol>
+        <li>Prema (WORKER) calls <code>GET /api/employees/me</code> → SecurityConfig allows for ADMIN or WORKER → returns her profile.</li>
+        <li>Prema calls <code>POST /api/employees/list</code> → SecurityConfig rule <code>POST /employees/list</code> requires ADMIN → 403.</li>
+        <li>So workers see their own data via <code>/me</code> but can't browse the full directory.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Prema tries to GET another worker</h5>
+      <ol>
+        <li>Prema calls <code>GET /api/employees/8</code> (Ravi's ID) — crafted in browser dev tools.</li>
+        <li>SecurityConfig: <code>GET /employees/**</code> allows ADMIN or WORKER → passes.</li>
+        <li>Controller invokes <code>getEmployeeById(8)</code>.</li>
+        <li>Service's self-or-admin check (Chapter 30) detects Prema (employeeId=5) doesn't match the requested 8 → AccessDeniedException → 403.</li>
+        <li>Defense in depth — even though SecurityConfig allowed the URL, the service blocks the misuse.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Paginated list with search</h5>
+      <ol>
+        <li>Admin UI: Dad types "ra" in the search box.</li>
+        <li>Frontend posts to <code>/api/employees/list</code> with <code>{ page: 0, size: 10, sortBy: "createdAt", sortingDirection: "DESC", searchKeyword: "ra" }</code>.</li>
+        <li>Controller delegates to service.</li>
+        <li>Service builds PageRequest, calls <code>repo.searchEmployees("ra", pageable)</code>.</li>
+        <li>Repository runs the LOWER(name) LIKE or mobile LIKE query.</li>
+        <li>Returns Page with Ravi (matches name) and any others matching the pattern.</li>
+        <li>Service wraps in PaginationResponseDto, returns.</li>
+        <li>Frontend renders the filtered table.</li>
+      </ol>
+    </div>
+
+    <h2><span class="h2-emoji">🗄️</span> Sample API Calls (cURL)</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">All seven endpoints with cURL</span><span class="lang">bash</span></div>
+<pre><span class="com"># 1. Create</span>
+curl -X POST http://localhost:8083/api/employees \
+  -H <span class="str">"Authorization: Bearer $JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"employeeName":"Prema","mobileNumber":"9000000002","joiningDate":"2026-05-15","polishingRate":30.0,"password":"prema123"}'</span>
+
+<span class="com"># 2. Update</span>
+curl -X PUT http://localhost:8083/api/employees \
+  -H <span class="str">"Authorization: Bearer $JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"employeeId":5,"employeeName":"Prema","mobileNumber":"9000000002","polishingRate":32.0}'</span>
+
+<span class="com"># 3. Mark as LEFT</span>
+curl -X PATCH http://localhost:8083/api/employees/status \
+  -H <span class="str">"Authorization: Bearer $JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"employeeId":5,"status":"LEFT"}'</span>
+
+<span class="com"># 4. Get one</span>
+curl -X GET http://localhost:8083/api/employees/5 \
+  -H <span class="str">"Authorization: Bearer $JWT"</span>
+
+<span class="com"># 5. Paginated list with search</span>
+curl -X POST http://localhost:8083/api/employees/list \
+  -H <span class="str">"Authorization: Bearer $JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"page":0,"size":10,"sortBy":"createdAt","sortingDirection":"DESC","searchKeyword":"Pre"}'</span>
+
+<span class="com"># 6. Worker's own profile</span>
+curl -X GET http://localhost:8083/api/employees/me \
+  -H <span class="str">"Authorization: Bearer $PREMA_JWT"</span>
+
+<span class="com"># 7. Hard delete</span>
+curl -X DELETE http://localhost:8083/api/employees/5 \
+  -H <span class="str">"Authorization: Bearer $JWT"</span></pre>
+    </div>
+
+    <!-- ─── Mistakes ─── -->
+    <div class="mistakes">
+      <h5>Common controller mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Adding business logic inside the controller method</div>
+        <div class="good">Keep controllers thin. Even a single <code>if</code> for "if admin then X else Y" belongs in the service. The controller's job is HTTP routing, not business decisions.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Forgetting <code>@Valid</code> on @RequestBody parameters</div>
+        <div class="good">Without it, the validation annotations on the DTO don't run. Bad inputs pass through silently. <code>@Valid</code> is what turns the DTO from a "shape" into a "validated shape".</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Wrapping the return in <code>ResponseEntity.ok(...)</code> unnecessarily</div>
+        <div class="good">Spring automatically wraps the return as 200 OK with the body as JSON. Only use ResponseEntity if you need a different status code (e.g., 201 Created) or custom headers.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Try/catch inside controller methods</div>
+        <div class="good">Let exceptions propagate. GlobalExceptionHandler catches them centrally. Local try/catch leads to inconsistent error responses across endpoints.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using <code>@RequestParam</code> for complex search bodies</div>
+        <div class="good">Pagination + search params can be many fields. Use <code>@RequestBody</code> with a DTO (POST /list pattern) — cleaner URLs, easier escaping.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Using GET with a request body</div>
+        <div class="good">HTTP technically allows it, but most clients (cURL, fetch) discourage it. Use POST when a body is needed.</div>
+      </div>
+    </div>
+
+    <!-- ─── Q&A ─── -->
+    <div class="qabox">
+      <h5>Interview questions</h5>
+
+      <div class="qa">
+        <div class="q">Why are NOOL's controllers so thin?</div>
+        <div class="a">
+          To separate concerns. Controllers handle HTTP plumbing (parsing, status codes,
+          serialization). Services handle business logic. This makes the service reusable
+          (other entry points: CLI, scheduler), the controller easier to scan, and bugs
+          easier to locate.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why POST <code>/list</code> for read endpoints? Isn't GET more "RESTful"?</div>
+        <div class="a">
+          Strict REST says GET for reads. But NOOL's pagination/search bodies have many fields
+          and special characters. Putting all that in query parameters is messy. POST with
+          a body is a pragmatic NOOL convention. The endpoint is still read-only — it just
+          uses the wrong verb for "purer" REST taste. We accept the trade-off for cleaner URLs.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does <code>updateEmployee</code> use PUT but <code>updateStatus</code> uses PATCH?</div>
+        <div class="a">
+          PUT semantically means "replace the whole resource" — the Update DTO has all the
+          editable fields together. PATCH means "modify a subset" — the Status DTO has just
+          status. Following these conventions makes the API self-documenting: clients reading
+          the spec know what each endpoint expects.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens if a worker calls <code>POST /api/employees</code>?</div>
+        <div class="a">
+          SecurityConfig (Chapter 22) rule <code>POST /employees → hasAuthority("ADMIN")</code>
+          rejects it with 403 Forbidden. The controller method never runs. Even if a worker
+          tried to add themselves through that endpoint, they can't.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>getMyProfile</code> a separate endpoint from <code>getEmployeeById</code>?</div>
+        <div class="a">
+          UX clarity and security. The worker's frontend doesn't need to know its own employeeId —
+          it just calls <code>/me</code> and the backend infers identity from the JWT. This avoids
+          leaking IDs in URLs and prevents requests that could be confused with admin lookups.
+          Cleaner code, less attack surface.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could you reuse <code>getEmployeeById(currentUserId)</code> for getMyProfile?</div>
+        <div class="a">
+          You could, but having a separate method makes the intent explicit. <code>getMyProfile()</code>
+          reads better than <code>getEmployeeById(currentUserId)</code>. Slightly more code, much
+          clearer purpose.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why doesn't this controller have any <code>@PreAuthorize</code> annotations?</div>
+        <div class="a">
+          NOOL centralizes authorization in <code>SecurityConfig</code>'s URL rules. Adding
+          method-level <code>@PreAuthorize</code> would duplicate the policy in two places.
+          One source of truth (SecurityConfig) is easier to audit. Method-level annotations
+          would only make sense if individual methods needed dynamically-computed rules.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🎉</span> Phase 7 (Employee Module) Complete</h2>
+    <div class="callout brain">
+      You've now seen the complete Employee module end to end. Repository, DTOs, service
+      interface + implementation, and controller. From now on, every business module
+      (Attendance, Daily Work, Salary, Owner, Inventory, Owner Payment) follows the same
+      pattern — so subsequent modules will move faster.
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Phase 8 starts the <strong>Attendance module</strong> — repository, service, controller —
+      same pattern, different domain. Chapter 32 begins with the AttendanceRepository and DTOs.
+    </p>
+
+    <div class="chapnav">
+      <a href="30-employee-service.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 30 · EmployeeService + Impl</span></a>
+      <a class="dim next"><span class="arrow next">Coming soon →</span><span class="title">Ch 32 · Attendance Repository &amp; DTOs</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 31 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

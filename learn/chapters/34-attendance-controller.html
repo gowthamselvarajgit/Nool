@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 34 · AttendanceController · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 34 · The HTTP Face</span>
+    <h1>
+      <span class="gradient">AttendanceController.java</span>
+    </h1>
+    <p class="subtitle">
+      Six endpoints under <code>/api/attendance</code>. Thin file — each method one line — but
+      notice the deliberate split between admin endpoints (no <code>/me</code>) and worker
+      endpoints (with <code>/me</code> or <code>/my-*</code> patterns). It's the URL structure
+      that drives the role rules in SecurityConfig.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">🌐</div>
+      <div class="fmeta">
+        <h3>AttendanceController.java</h3>
+        <span class="fpath">backend/.../controller/employee/AttendanceController.java</span>
+        <div class="ftags"><span>@RestController</span><span>6 endpoints</span><span>Admin + worker variants</span></div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🧠</span> The Six Endpoints</h2>
+    <table class="ftable">
+      <thead><tr><th>HTTP</th><th>Path</th><th>Purpose</th><th>Required role</th></tr></thead>
+      <tbody>
+        <tr><td>POST</td><td><code>/api/attendance</code></td><td>Mark a single attendance row</td><td>ADMIN</td></tr>
+        <tr><td>GET</td><td><code>/api/attendance/{attendanceId}</code></td><td>Fetch one row</td><td>ADMIN or WORKER</td></tr>
+        <tr><td>POST</td><td><code>/api/attendance/list</code></td><td>Paginated list of ALL attendance</td><td>ADMIN</td></tr>
+        <tr><td>POST</td><td><code>/api/attendance/my-list</code></td><td>Worker's own paginated history</td><td>ADMIN or WORKER</td></tr>
+        <tr><td>POST</td><td><code>/api/attendance/employee/{id}/summary</code></td><td>Summary for one worker over date range</td><td>ADMIN or WORKER (self)</td></tr>
+        <tr><td>POST</td><td><code>/api/attendance/summary</code></td><td>Worker's own summary</td><td>ADMIN or WORKER</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>The admin-vs-worker pattern:</strong>
+      <ul style="margin-bottom: 0;">
+        <li><code>/list</code> → admin sees everyone</li>
+        <li><code>/my-list</code> → worker sees just self</li>
+        <li><code>/employee/{id}/summary</code> → admin specifies whose summary</li>
+        <li><code>/summary</code> → worker gets their own (ID inferred from JWT)</li>
+      </ul>
+      Twin endpoints, one with an explicit ID, one with implicit (caller's own).
+      This URL split lets SecurityConfig assign distinct roles to each variant
+      without complex predicate logic.
+    </div>
+
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">controller/employee/AttendanceController.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.controller.employee;
+
+<span class="kw">import</span> com.nool.backend.dto.attendance.*;
+<span class="kw">import</span> com.nool.backend.dto.common.DateRangeDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationRequestDto;
+<span class="kw">import</span> com.nool.backend.dto.common.PaginationResponseDto;
+<span class="kw">import</span> com.nool.backend.service.employee.AttendanceService;
+<span class="kw">import</span> jakarta.validation.Valid;
+<span class="kw">import</span> lombok.RequiredArgsConstructor;
+<span class="kw">import</span> org.springframework.web.bind.annotation.*;
+
+<span class="ann">@RestController</span>
+<span class="ann">@RequestMapping</span>(<span class="str">"/attendance"</span>)            <span class="com">// every URL: /api/attendance/*</span>
+<span class="ann">@RequiredArgsConstructor</span>
+<span class="kw">public class</span> AttendanceController {
+    <span class="kw">private final</span> AttendanceService attendanceService;
+
+    <span class="com">// ── 1. MARK ATTENDANCE ──────────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>
+    <span class="kw">public</span> AttendanceResponseDto markAttendance(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> AttendanceRequestDto requestDto){
+        <span class="kw">return</span> attendanceService.markAttendance(requestDto);
+    }
+
+    <span class="com">// ── 2. GET ONE BY ID ────────────────────────────────────────</span>
+    <span class="ann">@GetMapping</span>(<span class="str">"/{attendanceId}"</span>)
+    <span class="kw">public</span> AttendanceResponseDto getAttendanceById(
+            <span class="ann">@PathVariable</span> Long attendanceId){
+        <span class="kw">return</span> attendanceService.getAttendanceById(attendanceId);
+    }
+
+    <span class="com">// ── 3. ADMIN PAGINATED LIST ─────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/list"</span>)
+    <span class="kw">public</span> PaginationResponseDto&lt;AttendanceListResponseDto&gt; getAttendanceList(
+            <span class="ann">@RequestBody</span> PaginationRequestDto paginationRequestDto){
+        <span class="kw">return</span> attendanceService.getAttendanceList(paginationRequestDto);
+    }
+
+    <span class="com">// ── 4. WORKER'S OWN PAGINATED LIST ──────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/my-list"</span>)
+    <span class="kw">public</span> PaginationResponseDto&lt;AttendanceListResponseDto&gt; getMyAttendanceList(
+            <span class="ann">@RequestBody</span> PaginationRequestDto paginationRequestDto){
+        <span class="kw">return</span> attendanceService.getMyAttendanceList(paginationRequestDto);
+    }
+
+    <span class="com">// ── 5. SUMMARY FOR A SPECIFIC EMPLOYEE ──────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/employee/{employeeId}/summary"</span>)
+    <span class="kw">public</span> AttendanceSummaryDto getAttendanceSummary(
+            <span class="ann">@PathVariable</span> Long employeeId,
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> DateRangeDto dateRangeDto){
+        <span class="kw">return</span> attendanceService.getAttendanceSummaryByEmployee(employeeId, dateRangeDto);
+    }
+
+    <span class="com">// ── 6. WORKER'S OWN SUMMARY ─────────────────────────────────</span>
+    <span class="ann">@PostMapping</span>(<span class="str">"/summary"</span>)
+    <span class="kw">public</span> AttendanceSummaryDto getMyAttendanceSummary(
+            <span class="ann">@Valid</span> <span class="ann">@RequestBody</span> DateRangeDto dateRangeDto){
+        <span class="kw">return</span> attendanceService.getMyAttendanceSummary(dateRangeDto);
+    }
+}</pre>
+    </div>
+
+    <h2><span class="h2-emoji">⚙️</span> Why POST for Reads That Take a Body?</h2>
+    <p>
+      Notice <code>/list</code>, <code>/my-list</code>, <code>/employee/{id}/summary</code>,
+      and <code>/summary</code> all use <strong>POST</strong> even though they're conceptually
+      read operations. Why?
+    </p>
+
+    <table class="ftable">
+      <thead><tr><th>Endpoint</th><th>Body shape</th><th>Why not GET?</th></tr></thead>
+      <tbody>
+        <tr><td><code>/list</code> and <code>/my-list</code></td><td>PaginationRequestDto (5 fields)</td><td>Search keyword could have special chars; pagination fields are awkward in query strings</td></tr>
+        <tr><td><code>/employee/{id}/summary</code> and <code>/summary</code></td><td>DateRangeDto (2 LocalDates)</td><td>Dates could go in path params, but JSON body keeps the contract consistent</td></tr>
+      </tbody>
+    </table>
+
+    <p>NOOL's convention: <strong>any endpoint with a request body uses POST</strong>, even
+    for reads. This avoids ambiguity and keeps query strings clean.</p>
+
+    <h2><span class="h2-emoji">🛡️</span> Where Authorization Is Enforced</h2>
+    <p>The controller doesn't have explicit role checks. Authorization happens in TWO places:</p>
+
+    <ol>
+      <li>
+        <strong>SecurityConfig URL rules</strong> (Chapter 22) — coarse-grained, by URL pattern.
+        Marking attendance → ADMIN only; reading own attendance → ADMIN or WORKER.
+      </li>
+      <li>
+        <strong>Service-layer self-or-admin check</strong> (Chapter 33) — fine-grained, at row level.
+        For <code>/employee/{id}/summary</code>, a worker can call it only with their own ID.
+      </li>
+    </ol>
+
+    <p>The controller's job is to map HTTP → service method. Authorization is a cross-cutting concern handled elsewhere.</p>
+
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Mom marks the morning roll call</h5>
+      <ol>
+        <li>For each worker, frontend sends a POST: <code>{ "employeeId": X, "attendanceDate": "2026-05-15", "status": "PRESENT" }</code>.</li>
+        <li>JWT filter (Chapter 21) verifies → role=ADMIN.</li>
+        <li>SecurityConfig: <code>POST /attendance → hasAuthority("ADMIN")</code> → passes.</li>
+        <li>Body deserialized → validation passes.</li>
+        <li>Controller delegates to service → row inserted → DTO returned.</li>
+        <li>Frontend ticks each worker green.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Prema views her own calendar</h5>
+      <ol>
+        <li>Frontend sends POST to <code>/api/attendance/my-list</code> with pagination body.</li>
+        <li>SecurityConfig: <code>POST /attendance/my-list → hasAnyAuthority("ADMIN", "WORKER")</code> → passes.</li>
+        <li>Service reads <code>employeeId=5</code> from Prema's JWT.</li>
+        <li>Returns paginated rows.</li>
+        <li>Frontend renders the month-view calendar with green/red dots.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Dad views Prema's May summary</h5>
+      <ol>
+        <li>Frontend POSTs to <code>/api/attendance/employee/5/summary</code> with <code>{ "fromDate": "2026-05-01", "toDate": "2026-05-15" }</code>.</li>
+        <li>SecurityConfig: matching rule → ADMIN or WORKER allowed → passes.</li>
+        <li>Service self-or-admin check: role=ADMIN → passes immediately.</li>
+        <li>Computes summary → returns DTO.</li>
+        <li>Dashboard renders: "Prema · 86.67%".</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Ravi tries to view Prema's summary</h5>
+      <ol>
+        <li>Ravi (WORKER, employeeId=8) crafts a POST to <code>/api/attendance/employee/5/summary</code>.</li>
+        <li>SecurityConfig: URL allows ADMIN or WORKER → passes (this is intentional — workers CAN call the endpoint).</li>
+        <li>Service self-or-admin check: role=WORKER, caller(8) != 5 → throws AccessDeniedException.</li>
+        <li>Spring Security returns 403 Forbidden.</li>
+        <li>Defense in depth: SecurityConfig allowed the URL but the service blocked the misuse.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 5: Worker views own summary via /summary</h5>
+      <ol>
+        <li>Prema's app POSTs to <code>/api/attendance/summary</code> with just the date range.</li>
+        <li>No need to pass her own employeeId — the service reads it from her JWT.</li>
+        <li>Summary returned: her May percentages.</li>
+        <li>The URL design (no path variable) makes it impossible to accidentally request someone else's data.</li>
+      </ol>
+    </div>
+
+    <h2><span class="h2-emoji">🗄️</span> Sample API Calls (cURL)</h2>
+    <div class="codewrap">
+      <div class="head"><span class="path">All six endpoints</span><span class="lang">bash</span></div>
+<pre><span class="com"># 1. Mark</span>
+curl -X POST http://localhost:8083/api/attendance \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"employeeId":5,"attendanceDate":"2026-05-15","status":"PRESENT"}'</span>
+
+<span class="com"># 2. Get one</span>
+curl -X GET http://localhost:8083/api/attendance/142 \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span>
+
+<span class="com"># 3. Admin list</span>
+curl -X POST http://localhost:8083/api/attendance/list \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"page":0,"size":20,"sortBy":"attendanceDate","sortingDirection":"DESC"}'</span>
+
+<span class="com"># 4. Worker's own list</span>
+curl -X POST http://localhost:8083/api/attendance/my-list \
+  -H <span class="str">"Authorization: Bearer $PREMA_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"page":0,"size":20,"sortBy":"attendanceDate","sortingDirection":"DESC"}'</span>
+
+<span class="com"># 5. Summary for one employee (admin specifies)</span>
+curl -X POST http://localhost:8083/api/attendance/employee/5/summary \
+  -H <span class="str">"Authorization: Bearer $ADMIN_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"fromDate":"2026-05-01","toDate":"2026-05-15"}'</span>
+
+<span class="com"># 6. Worker's own summary</span>
+curl -X POST http://localhost:8083/api/attendance/summary \
+  -H <span class="str">"Authorization: Bearer $PREMA_JWT"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"fromDate":"2026-05-01","toDate":"2026-05-15"}'</span></pre>
+    </div>
+
+    <h2><span class="h2-emoji">📋</span> Field-by-Field Summary</h2>
+    <table class="ftable">
+      <thead><tr><th>Method</th><th>HTTP verb + Path</th><th>Body</th><th>Returns</th></tr></thead>
+      <tbody>
+        <tr><td>markAttendance</td><td>POST /attendance</td><td>AttendanceRequestDto</td><td>AttendanceResponseDto</td></tr>
+        <tr><td>getAttendanceById</td><td>GET /attendance/{id}</td><td>none</td><td>AttendanceResponseDto</td></tr>
+        <tr><td>getAttendanceList</td><td>POST /attendance/list</td><td>PaginationRequestDto</td><td>PaginationResponseDto&lt;AttendanceListResponseDto&gt;</td></tr>
+        <tr><td>getMyAttendanceList</td><td>POST /attendance/my-list</td><td>PaginationRequestDto</td><td>PaginationResponseDto&lt;AttendanceListResponseDto&gt;</td></tr>
+        <tr><td>getAttendanceSummary</td><td>POST /attendance/employee/{id}/summary</td><td>DateRangeDto</td><td>AttendanceSummaryDto</td></tr>
+        <tr><td>getMyAttendanceSummary</td><td>POST /attendance/summary</td><td>DateRangeDto</td><td>AttendanceSummaryDto</td></tr>
+      </tbody>
+    </table>
+
+    <div class="mistakes">
+      <h5>Common attendance-controller mistakes</h5>
+      <div class="item">
+        <div class="bad">Adding role checks inside the controller</div>
+        <div class="good">Authorization belongs in SecurityConfig (URL rules) and the service (row-level). Controllers stay thin.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Forgetting <code>@Valid</code> on @RequestBody</div>
+        <div class="good">Without it, the <code>@NotNull</code> annotations on DTOs don't run. Null inputs silently slip through to the service.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Using GET with a body for list/summary endpoints</div>
+        <div class="good">Many HTTP clients (especially older ones) don't reliably support GET with a body. POST is the safe choice.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Putting the employeeId in the request body of <code>/employee/{id}/summary</code></div>
+        <div class="good">Path variable + body is the right pattern. The path identifies the target resource; the body provides the query parameters. Mixing them into one large body would be unconventional.</div>
+      </div>
+      <div class="item">
+        <div class="bad">Adding <code>/me</code>-style endpoints that take any ID</div>
+        <div class="good"><code>/my-list</code> and <code>/summary</code> deliberately take NO employeeId. The ID always comes from the JWT — making it impossible to accidentally request someone else's data.</div>
+      </div>
+    </div>
+
+    <div class="qabox">
+      <h5>Interview questions</h5>
+      <div class="qa">
+        <div class="q">Why does this controller have BOTH <code>/list</code> and <code>/my-list</code>?</div>
+        <div class="a">
+          Different audiences, different access scopes. <code>/list</code> is for admins
+          browsing all attendance. <code>/my-list</code> is for workers seeing their own.
+          They share most logic in the service but use different repository queries (findAll
+          vs findByEmployeeId). Separate URLs make role rules in SecurityConfig trivial.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why isn't there a PUT or PATCH endpoint to edit attendance?</div>
+        <div class="a">
+          Two reasons. First, attendance is meant to be immutable history — once marked
+          for a day, it shouldn't change easily. Second, the UNIQUE constraint on
+          (employee_id, attendance_date) prevents marking the same day twice anyway. If you
+          really need to fix a wrong status, the practical option is to delete the row
+          (admin only) and remark.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Why use POST for <code>/summary</code> when summaries are read operations?</div>
+        <div class="a">
+          The body contains the date range. GET with a body is technically allowed but
+          inconsistently supported by HTTP clients. NOOL's convention is: any endpoint
+          requiring a body uses POST. Consistency beats REST purity in a project this size.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">How does the URL <code>/employee/{employeeId}/summary</code> get matched?</div>
+        <div class="a">
+          Spring's path-pattern matcher recognises <code>{employeeId}</code> as a path
+          variable. The <code>@PathVariable Long employeeId</code> annotation in the method
+          signature extracts it. Then the body (DateRangeDto) is deserialized separately.
+          Spring handles both — path and body — and passes the typed values to the method.
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Could you combine the two summary endpoints into one method?</div>
+        <div class="a">
+          Theoretically yes — a single method accepting an optional employeeId, defaulting to
+          the JWT's caller ID. But the explicit split is clearer at the API contract level:
+          <code>/employee/{id}/summary</code> says "specifying someone"; <code>/summary</code>
+          says "self". Cleaner endpoint design beats DRY for HTTP APIs.
+        </div>
+      </div>
+    </div>
+
+    <h2><span class="h2-emoji">🎉</span> Phase 8 (Attendance Module) Complete</h2>
+    <div class="callout brain">
+      Three chapters covering the attendance module end to end. From now on, every business
+      module follows this same pattern:
+      <strong>Repository (with module-specific queries) → DTOs (request, response, list, summary) → Service interface + Impl (with self-or-admin checks) → Controller (thin, admin + worker variants)</strong>.
+      The remaining modules will move faster because the template is now well-established.
+    </div>
+
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Next phase — Daily Work module (Chapters 35-37). Same pattern, this time tracking how
+      many fresh + re-polish sarees each worker produced each day, which feeds the salary
+      formula.
+    </p>
+
+    <div class="chapnav">
+      <a href="33-attendance-service.html"><span class="arrow">← Previous chapter</span><span class="title">Ch 33 · AttendanceService + Impl</span></a>
+      <a class="dim next"><span class="arrow next">Coming soon →</span><span class="title">Ch 35 · Daily Work Repo &amp; DTOs</span></a>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 34 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+</body>
+</html>

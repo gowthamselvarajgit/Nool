@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 09 · Custom Exceptions &amp; GlobalExceptionHandler · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 09 · When Things Go Wrong</span>
+    <h1>
+      Custom Exceptions &amp;<br/>
+      <span class="gradient">GlobalExceptionHandler</span>
+    </h1>
+    <p class="subtitle">
+      Every real application needs a clear, consistent way to say <em>"that didn't work"</em>.
+      NOOL has three small custom exception classes and one big handler that catches everything
+      and turns it into a clean JSON error response.
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">⚠️</div>
+      <div class="fmeta">
+        <h3>5 files in the exception/dto layer</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/exception/ + dto/common/ApiErrorResponse.java</span>
+        <div class="ftags"><span>Error handling</span><span>@RestControllerAdvice</span><span>HTTP status codes</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── Why we need this ──────── -->
+    <h2><span class="h2-emoji">🧠</span> Why Custom Exceptions?</h2>
+    <p>
+      Java has plenty of built-in exceptions (<code>NullPointerException</code>,
+      <code>IllegalArgumentException</code>, etc.) — why invent our own?
+    </p>
+    <p>
+      <strong>Two reasons:</strong>
+    </p>
+    <ol>
+      <li><strong>Clarity in service code.</strong> When I write
+        <code>throw new ResourceNotFoundException("Owner not found")</code>, anyone reading
+        the line instantly knows what kind of error happened. Compare that to
+        <code>throw new RuntimeException("Owner not found")</code> — vague.</li>
+      <li><strong>Different exception types map to different HTTP status codes.</strong>
+        A "not found" should return <strong>404</strong>. A "duplicate" should return
+        <strong>409 Conflict</strong>. A "bad input" should return <strong>400</strong>. The
+        handler uses the exception's class to pick the right status automatically.</li>
+    </ol>
+
+    <div class="callout brain">
+      <strong>The architecture:</strong> Service code throws specific custom exceptions.
+      <code>GlobalExceptionHandler</code> intercepts <em>every</em> exception that escapes a
+      controller, looks at its class, and produces a uniform JSON response with the right HTTP
+      status. The frontend then reads that JSON and shows the user a friendly toast.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- The three custom exceptions -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">1️⃣</span> The Three Custom Exceptions</h2>
+    <p>
+      All three are deliberately tiny — just 7 lines each. They exist purely to give errors
+      a meaningful <em>name</em> that the handler can pattern-match on.
+    </p>
+
+    <h3>1.1 <code>BadRequestException</code> — "You gave me bad input"</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">exception/BadRequestException.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.exception;
+
+<span class="kw">public class</span> BadRequestException <span class="kw">extends</span> RuntimeException {
+    <span class="kw">public</span> BadRequestException(String message) {
+        <span class="kw">super</span>(message);  <span class="com">// pass the message up to RuntimeException</span>
+    }
+}</pre>
+    </div>
+    <p>
+      <strong>When I throw this:</strong> when the request is structurally valid but the values
+      are wrong for business reasons. Example: <em>"Cannot return 150 sarees for Rahul — only 30
+      in hand."</em> The HTTP method and URL are fine; the data inside isn't.
+    </p>
+    <p><strong>Maps to HTTP status:</strong> <code>400 Bad Request</code></p>
+
+    <h3>1.2 <code>ResourceNotFoundException</code> — "That thing doesn't exist"</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">exception/ResourceNotFoundException.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.exception;
+
+<span class="kw">public class</span> ResourceNotFoundException <span class="kw">extends</span> RuntimeException {
+    <span class="kw">public</span> ResourceNotFoundException(String message) {
+        <span class="kw">super</span>(message);
+    }
+}</pre>
+    </div>
+    <p>
+      <strong>When I throw this:</strong> when looking up a specific resource (an Owner, an
+      Employee, a Ledger entry) and the database returns nothing. Common pattern:
+      <code>repository.findById(id).orElseThrow(() -&gt; new ResourceNotFoundException("Owner not found"))</code>.
+    </p>
+    <p><strong>Maps to HTTP status:</strong> <code>404 Not Found</code></p>
+
+    <h3>1.3 <code>DuplicateResourceException</code> — "That already exists"</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">exception/DuplicateResourceException.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.exception;
+
+<span class="kw">public class</span> DuplicateResourceException <span class="kw">extends</span> RuntimeException {
+    <span class="kw">public</span> DuplicateResourceException(String message) {
+        <span class="kw">super</span>(message);
+    }
+}</pre>
+    </div>
+    <p>
+      <strong>When I throw this:</strong> when trying to create something that violates a
+      uniqueness rule. Example: registering a new owner with a mobile number that already
+      exists in the <code>users</code> table.
+    </p>
+    <p><strong>Maps to HTTP status:</strong> <code>409 Conflict</code></p>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- ApiErrorResponse -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">2️⃣</span> The Shape of Every Error — <code>ApiErrorResponse</code></h2>
+    <p>
+      Before we look at the handler, let's see <em>what</em> shape the handler will produce.
+      Every error response — no matter which exception triggered it — has exactly the same
+      five fields. That uniformity is what lets the frontend handle errors generically.
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">dto/common/ApiErrorResponse.java</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.dto.common;
+
+<span class="kw">import</span> lombok.Builder;
+<span class="kw">import</span> lombok.Data;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Data</span>      <span class="com">// Lombok: @Getter + @Setter + toString + equals + hashCode</span>
+<span class="ann">@Builder</span>   <span class="com">// Lombok: enables ApiErrorResponse.builder()...build()</span>
+<span class="kw">public class</span> ApiErrorResponse {
+    <span class="kw">private</span> LocalDateTime timeStamp;   <span class="com">// when the error happened</span>
+    <span class="kw">private int</span>          status;      <span class="com">// HTTP status code (400, 404, 409, etc.)</span>
+    <span class="kw">private</span> String        error;       <span class="com">// short label like "Bad Request"</span>
+    <span class="kw">private</span> String        message;     <span class="com">// human-friendly description</span>
+    <span class="kw">private</span> String        path;        <span class="com">// the URL that was being called</span>
+}</pre>
+    </div>
+
+    <h3>What it looks like as JSON</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">Sample error JSON the frontend receives</span><span class="lang">JSON</span></div>
+<pre>{
+  <span class="str">"timeStamp"</span>: <span class="str">"2026-05-15T14:32:11.234"</span>,
+  <span class="str">"status"</span>:    <span class="num2">400</span>,
+  <span class="str">"error"</span>:     <span class="str">"Bad Request"</span>,
+  <span class="str">"message"</span>:   <span class="str">"Cannot return 150 sarees for Rahul Textiles. Only 30 remaining in hand."</span>,
+  <span class="str">"path"</span>:      <span class="str">"/api/inventory/return"</span>
+}</pre>
+    </div>
+
+    <table class="ftable">
+      <thead><tr><th>Field</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>timeStamp</code></td><td>LocalDateTime</td><td>When the error happened — useful for log correlation</td></tr>
+        <tr><td><code>status</code></td><td>int</td><td>The HTTP status code (400, 404, 409, 500)</td></tr>
+        <tr><td><code>error</code></td><td>String</td><td>Short label matching the status (e.g., "Bad Request")</td></tr>
+        <tr><td><code>message</code></td><td>String</td><td>The actual human-readable description, shown to the user</td></tr>
+        <tr><td><code>path</code></td><td>String</td><td>The endpoint that produced the error — useful for debugging</td></tr>
+      </tbody>
+    </table>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- GlobalExceptionHandler -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">3️⃣</span> <code>GlobalExceptionHandler</code> — The Catch-All</h2>
+    <p>
+      This is the file that intercepts every uncaught exception across the whole backend. It's
+      ~200 lines, but the structure is simple: <strong>one method per kind of exception</strong>.
+      Each method builds an <code>ApiErrorResponse</code> with the appropriate status and message.
+    </p>
+
+    <h3>The annotation that makes it work — <code>@RestControllerAdvice</code></h3>
+    <p>
+      A regular <code>@RestController</code> handles HTTP requests. <code>@RestControllerAdvice</code>
+      is its sibling: a class that handles things across <em>all</em> controllers — exceptions,
+      response post-processing, etc. Spring auto-detects it at startup and registers each
+      <code>@ExceptionHandler</code> method as a global interceptor.
+    </p>
+
+    <h3>The class header</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">exception/GlobalExceptionHandler.java — top of file</span><span class="lang">Java</span></div>
+<pre><span class="kw">package</span> com.nool.backend.exception;
+
+<span class="kw">import</span> com.nool.backend.dto.common.ApiErrorResponse;
+<span class="kw">import</span> jakarta.servlet.http.HttpServletRequest;
+<span class="kw">import</span> org.springframework.dao.DataIntegrityViolationException;
+<span class="kw">import</span> org.springframework.http.HttpStatus;
+<span class="kw">import</span> org.springframework.http.ResponseEntity;
+<span class="kw">import</span> org.springframework.http.converter.HttpMessageNotReadableException;
+<span class="kw">import</span> org.springframework.web.bind.MethodArgumentNotValidException;
+<span class="kw">import</span> org.springframework.web.bind.annotation.ExceptionHandler;
+<span class="kw">import</span> org.springframework.web.bind.annotation.RestControllerAdvice;
+<span class="kw">import</span> org.springframework.web.servlet.NoHandlerFoundException;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@RestControllerAdvice</span>   <span class="com">// ★ Spring auto-registers this for global exception handling</span>
+<span class="kw">public class</span> GlobalExceptionHandler {
+    <span class="com">// ... handler methods below</span>
+}</pre>
+    </div>
+
+    <!-- 3.1 ResourceNotFound handler -->
+    <h3>3.1 Handler — <code>ResourceNotFoundException</code> → 404</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — 404 Not Found</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(ResourceNotFoundException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleNotFound(
+        ResourceNotFoundException exception,
+        HttpServletRequest        request) {
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())                 <span class="com">// when</span>
+            .status(HttpStatus.NOT_FOUND.value())           <span class="com">// 404</span>
+            .error(<span class="str">"Not Found"</span>)                          <span class="com">// label</span>
+            .message(exception.getMessage())                <span class="com">// "Owner not found"</span>
+            .path(request.getRequestURI())                  <span class="com">// /api/owners/99</span>
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+}</pre>
+    </div>
+    <p>
+      <strong>How it gets called:</strong> Anywhere in NOOL's service code, when I write
+      <code>throw new ResourceNotFoundException("Owner not found")</code>, Spring sees the
+      exception bubble up, finds this handler (registered for that exception class), invokes
+      it, and the client receives a 404 JSON response.
+    </p>
+
+    <!-- 3.2 Duplicate handler -->
+    <h3>3.2 Handler — <code>DuplicateResourceException</code> → 409</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — 409 Conflict</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(DuplicateResourceException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleDuplicate(
+        DuplicateResourceException exception,
+        HttpServletRequest         request) {
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.CONFLICT.value())            <span class="com">// 409</span>
+            .error(<span class="str">"Conflict"</span>)
+            .message(exception.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+}</pre>
+    </div>
+
+    <!-- 3.3 Validation -->
+    <h3>3.3 Handler — Validation failures → 400</h3>
+    <p>
+      When a request DTO has <code>@NotBlank</code>, <code>@Min</code> etc. validation
+      annotations and the input fails them, Spring throws
+      <code>MethodArgumentNotValidException</code>. We catch that and pull the first
+      field-level error message out.
+    </p>
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — 400 Validation</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(MethodArgumentNotValidException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleValidation(
+        MethodArgumentNotValidException exception,
+        HttpServletRequest              request) {
+
+    <span class="com">// Pick the FIRST field error to show the user.</span>
+    <span class="com">// (Could concatenate them all, but one is enough to act on.)</span>
+    String message = exception.getBindingResult()
+            .getFieldErrors()
+            .stream()
+            .map(error -&gt; error.getField() + <span class="str">": "</span> + error.getDefaultMessage())
+            .findFirst()
+            .orElse(<span class="str">"Validation failed"</span>);
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(<span class="str">"Bad Request"</span>)
+            .message(message)                               <span class="com">// e.g., "mobileNumber: must be 10 digits"</span>
+            .path(request.getRequestURI())
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.badRequest().body(errorResponse);
+}</pre>
+    </div>
+
+    <!-- 3.4 BadRequest -->
+    <h3>3.4 Handler — <code>BadRequestException</code> → 400</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — 400 Bad Request</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(BadRequestException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleBadRequest(
+        BadRequestException exception,
+        HttpServletRequest  request) {
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(<span class="str">"Bad Request"</span>)
+            .message(exception.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.badRequest().body(errorResponse);
+}</pre>
+    </div>
+
+    <!-- 3.5 IllegalArgument -->
+    <h3>3.5 Handler — <code>IllegalArgumentException</code> → 400</h3>
+    <p>
+      Standard Java exception thrown by various library methods. Same handling as BadRequest.
+    </p>
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — 400 (IllegalArgument)</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(IllegalArgumentException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleIllegalArgument(
+        IllegalArgumentException exception,
+        HttpServletRequest       request) {
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(<span class="str">"Bad Request"</span>)
+            .message(exception.getMessage())
+            .path(request.getRequestURI())
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.badRequest().body(errorResponse);
+}</pre>
+    </div>
+
+    <!-- 3.6 DataIntegrityViolation -->
+    <h3>3.6 Handler — Database integrity errors → smart messages ⭐</h3>
+    <p>
+      This is the most sophisticated handler in the file. When the database itself rejects
+      something — usually a foreign-key violation or a unique-constraint violation — Hibernate
+      wraps it in a <code>DataIntegrityViolationException</code>. The raw error message is
+      cryptic ("Duplicate entry '9000000001' for key 'mobile_number'"). We translate it into
+      something a non-technical user can act on.
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — DataIntegrityViolation</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(DataIntegrityViolationException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleDataIntegrityViolation(
+        DataIntegrityViolationException exception,
+        HttpServletRequest              request) {
+
+    String path       = request.getRequestURI();
+    String rootCause  = extractRootCauseMessage(exception);              <span class="com">// dig past wrapper layers</span>
+    String lowerCause = rootCause == <span class="kw">null</span> ? <span class="str">""</span> : rootCause.toLowerCase();
+
+    String     message;
+    HttpStatus status = HttpStatus.CONFLICT;
+
+    <span class="com">// ── Inspect the actual database error first, not just the URL ────────</span>
+    <span class="kw">if</span> (lowerCause.contains(<span class="str">"foreign key"</span>)
+            || lowerCause.contains(<span class="str">"a foreign key constraint fails"</span>)) {
+        status = HttpStatus.CONFLICT;
+        <span class="kw">if</span> (path.contains(<span class="str">"/employees"</span>)) {
+            message = <span class="str">"Cannot delete this employee — they have attendance, "</span> +
+                      <span class="str">"salary, or daily-work history. Mark them as 'Left Job' instead."</span>;
+        } <span class="kw">else if</span> (path.contains(<span class="str">"/owners"</span>)) {
+            message = <span class="str">"Cannot delete this owner — they have transaction or "</span> +
+                      <span class="str">"payment history. Mark them as 'Not Working' instead."</span>;
+        } <span class="kw">else</span> {
+            message = <span class="str">"Cannot complete the action: related records exist. "</span> +
+                      <span class="str">"Underlying error: "</span> + rootCause;
+        }
+    } <span class="kw">else if</span> (lowerCause.contains(<span class="str">"duplicate entry"</span>)
+            || lowerCause.contains(<span class="str">"unique constraint"</span>)) {
+        <span class="kw">if</span> (lowerCause.contains(<span class="str">"mobile"</span>) || lowerCause.contains(<span class="str">"mobile_number"</span>)) {
+            message = <span class="str">"This mobile number is already registered. "</span> +
+                      <span class="str">"Please use a different one."</span>;
+        } <span class="kw">else if</span> (lowerCause.contains(<span class="str">"attendance_date"</span>) || path.contains(<span class="str">"/attendance"</span>)) {
+            message = <span class="str">"Attendance is already marked for this employee on this date."</span>;
+        } <span class="kw">else if</span> (lowerCause.contains(<span class="str">"work_date"</span>) || path.contains(<span class="str">"/employee-daily-working"</span>)) {
+            message = <span class="str">"A daily work entry already exists for this employee on this date."</span>;
+        } <span class="kw">else if</span> (path.contains(<span class="str">"/salary"</span>)) {
+            message = <span class="str">"A salary payment already exists for this period."</span>;
+        } <span class="kw">else</span> {
+            message = <span class="str">"Duplicate entry detected. Underlying error: "</span> + rootCause;
+        }
+    } <span class="kw">else if</span> (lowerCause.contains(<span class="str">"cannot be null"</span>)
+            || lowerCause.contains(<span class="str">"not-null property"</span>)) {
+        status = HttpStatus.BAD_REQUEST;
+        message = <span class="str">"A required field is missing. Underlying error: "</span> + rootCause;
+    } <span class="kw">else</span> {
+        message = <span class="str">"Data conflict. Underlying error: "</span> + rootCause;
+    }
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(status.value())
+            .error(status.getReasonPhrase())
+            .message(message)
+            .path(path)
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.status(status).body(errorResponse);
+}
+
+<span class="com">// Helper: drill down through wrapper exceptions to the real root cause</span>
+<span class="kw">private</span> String extractRootCauseMessage(Throwable t) {
+    Throwable cur = t;
+    Throwable last = t;
+    <span class="kw">int</span> depth = <span class="num2">0</span>;
+    <span class="kw">while</span> (cur != <span class="kw">null</span> &amp;&amp; depth++ &lt; <span class="num2">10</span>) {      <span class="com">// max 10 levels — safety</span>
+        last = cur;
+        cur = cur.getCause();
+    }
+    <span class="kw">return</span> last.getMessage();
+}</pre>
+    </div>
+
+    <div class="callout brain">
+      <strong>Why this matters so much:</strong> a raw MySQL error like "Duplicate entry
+      '9000000001-2026-05-14' for key 'attendance.UK6e5a...'" means nothing to my mom. But
+      "Attendance is already marked for this employee on this date" — she immediately knows
+      what to do. <strong>This handler is the bridge between database reality and user-friendly
+      messages.</strong>
+    </div>
+
+    <!-- 3.7 Generic fallback -->
+    <h3>3.7 Handler — Anything else → 500</h3>
+    <p>
+      For exceptions we didn't anticipate (a real bug, a server error), there's a last-resort
+      handler. It deliberately re-throws Spring Security exceptions so they're handled by
+      Spring's own filters (which produce proper 401/403 responses).
+    </p>
+
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — 500 fallback</span><span class="lang">Java</span></div>
+<pre><span class="ann">@ExceptionHandler</span>(Exception.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleGenric(
+        Exception          exception,
+        HttpServletRequest request) <span class="kw">throws</span> Exception {
+
+    <span class="com">// Let Spring Security handle its own access-denied/authentication errors</span>
+    <span class="kw">if</span> (exception <span class="kw">instanceof</span> org.springframework.security.access.AccessDeniedException
+            || exception <span class="kw">instanceof</span> org.springframework.security.core.AuthenticationException) {
+        <span class="kw">throw</span> exception;       <span class="com">// re-throw — Spring Security has its own response logic</span>
+    }
+
+    ApiErrorResponse errorResponse = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+            .error(<span class="str">"Internal Server Error"</span>)
+            .message(exception.getMessage() != <span class="kw">null</span>
+                     ? exception.getMessage()
+                     : <span class="str">"An unexpected error occurred"</span>)
+            .path(request.getRequestURI())
+            .build();
+
+    <span class="kw">return</span> ResponseEntity.internalServerError().body(errorResponse);
+}</pre>
+    </div>
+
+    <!-- 3.8 HttpMessageNotReadable + NoHandlerFound -->
+    <h3>3.8 Two more handlers — bad JSON + unknown URL</h3>
+    <div class="codewrap">
+      <div class="head"><span class="path">GlobalExceptionHandler — extras</span><span class="lang">Java</span></div>
+<pre><span class="com">// When the request body is malformed JSON or has an invalid enum/date</span>
+<span class="ann">@ExceptionHandler</span>(HttpMessageNotReadableException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleMessageNotReadable(
+        HttpMessageNotReadableException ex,
+        HttpServletRequest              request) {
+
+    ApiErrorResponse error = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error(<span class="str">"Bad Request"</span>)
+            .message(<span class="str">"Invalid request body or enum/date value"</span>)
+            .path(request.getRequestURI())
+            .build();
+    <span class="kw">return</span> ResponseEntity.badRequest().body(error);
+}
+
+<span class="com">// When the URL doesn't match any controller</span>
+<span class="com">// (Active because application.properties has throw-exception-if-no-handler-found=true)</span>
+<span class="ann">@ExceptionHandler</span>(NoHandlerFoundException.class)
+<span class="kw">public</span> ResponseEntity&lt;ApiErrorResponse&gt; handleNoHandler(
+        NoHandlerFoundException ex,
+        HttpServletRequest      request) {
+
+    ApiErrorResponse error = ApiErrorResponse.builder()
+            .timeStamp(LocalDateTime.now())
+            .status(HttpStatus.NOT_FOUND.value())
+            .error(<span class="str">"Not Found"</span>)
+            .message(<span class="str">"API endpoint not found"</span>)
+            .path(request.getRequestURI())
+            .build();
+    <span class="kw">return</span> ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+}</pre>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- Master reference table -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <h2><span class="h2-emoji">📋</span> All Handlers at a Glance</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Exception caught</th><th>HTTP status</th><th>When it fires</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ResourceNotFoundException</code></td><td>404 Not Found</td><td>findById returned empty; "Owner not found"</td></tr>
+        <tr><td><code>DuplicateResourceException</code></td><td>409 Conflict</td><td>Manual duplicate-check inside services</td></tr>
+        <tr><td><code>MethodArgumentNotValidException</code></td><td>400 Bad Request</td><td>@Valid DTO validation failed</td></tr>
+        <tr><td><code>BadRequestException</code></td><td>400 Bad Request</td><td>Business-rule violation (e.g., over-return)</td></tr>
+        <tr><td><code>IllegalArgumentException</code></td><td>400 Bad Request</td><td>Standard Java argument error</td></tr>
+        <tr><td><code>DataIntegrityViolationException</code></td><td>400 or 409</td><td>DB foreign-key / unique / not-null violations</td></tr>
+        <tr><td><code>HttpMessageNotReadableException</code></td><td>400 Bad Request</td><td>Malformed JSON, bad enum value</td></tr>
+        <tr><td><code>NoHandlerFoundException</code></td><td>404 Not Found</td><td>URL doesn't match any controller</td></tr>
+        <tr><td><code>Exception</code> (fallback)</td><td>500 Internal Server Error</td><td>Anything else (genuine bugs)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Scenarios -->
+    <h2><span class="h2-emoji">🎬</span> Real Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Dad tries to delete a worker who has salary history</h5>
+      <ol>
+        <li>Dad clicks "Delete" on Prema's row in the Employees page.</li>
+        <li>Frontend sends <code>DELETE /api/employees/3</code>.</li>
+        <li>Backend issues <code>DELETE FROM employees WHERE employee_id=3</code>.</li>
+        <li>MySQL refuses — Prema has rows in <code>employee_daily_work</code> referencing her.</li>
+        <li>MySQL throws a foreign-key violation, Hibernate wraps it in <code>DataIntegrityViolationException</code>.</li>
+        <li><code>handleDataIntegrityViolation</code> reads the root cause, sees "foreign key" and path "/employees".</li>
+        <li>Returns: <em>"Cannot delete this employee — they have attendance, salary, or daily-work history. Mark them as 'Left Job' instead."</em></li>
+        <li>Dad reads the message and flips status to LEFT instead.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Admin marks Prema present twice on the same day</h5>
+      <ol>
+        <li>Mom marks Prema PRESENT for 2026-05-15. Saves.</li>
+        <li>She doesn't realize, and a few minutes later marks her PRESENT for the same date again.</li>
+        <li>Backend tries to INSERT a second row.</li>
+        <li>The UNIQUE constraint <code>(employee_id, attendance_date)</code> blocks it.</li>
+        <li><code>handleDataIntegrityViolation</code> sees "duplicate entry" + "attendance_date" in the cause.</li>
+        <li>Returns: <em>"Attendance is already marked for this employee on this date."</em></li>
+        <li>The UI shows a friendly toast — Mom realizes her mistake and moves on.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Trying to receive sarees for an owner that doesn't exist</h5>
+      <ol>
+        <li>Frontend sends <code>POST /api/inventory/receipt</code> with <code>ownerId: 99</code>.</li>
+        <li><code>SareeInventoryServiceImpl.addReceipt()</code> calls <code>findByIdForUpdate(99)</code>.</li>
+        <li>Repository returns empty Optional. <code>.orElseThrow(...)</code> fires.</li>
+        <li>Service throws <code>new ResourceNotFoundException("Owner not found")</code>.</li>
+        <li>Handler returns 404 with body: <em>{"status": 404, "message": "Owner not found", "path": "/api/inventory/receipt"}</em>.</li>
+        <li>Frontend's <code>handleResponse</code> in <code>api.js</code> reads it, throws JS Error, the React component shows the error in a toast.</li>
+      </ol>
+    </div>
+
+    <!-- Common mistakes -->
+    <div class="mistakes">
+      <h5>Common exception-handling mistakes</h5>
+
+      <div class="item">
+        <div class="bad">Catching exceptions inside controllers / services and silently swallowing them</div>
+        <div class="good">Let them propagate. The handler exists precisely so each layer doesn't have to know about HTTP. <code>try { ... } catch(Exception e) { return null; }</code> is almost always a bug.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Throwing raw <code>RuntimeException("Owner not found")</code></div>
+        <div class="good">Throw the specific subclass. The handler chooses 404 vs 400 vs 409 based on exception class. A raw RuntimeException would hit the 500 fallback and look like a server bug.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Including the stack trace or internal class names in user-facing messages</div>
+        <div class="good">The <code>message</code> field is what users read. Keep it human-friendly. Internal details belong in the server logs (which Spring Boot logs automatically).</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Letting Spring Security exceptions get caught by the generic 500 handler</div>
+        <div class="good">Notice we explicitly re-throw <code>AccessDeniedException</code> and <code>AuthenticationException</code>. Spring Security has its own response writer that produces proper 401/403 — don't intercept those.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Hard-coding the same string in two handlers</div>
+        <div class="good">If the same message pattern appears 3+ times, extract a helper method. (NOOL's handler is small enough that direct duplication is OK.)</div>
+      </div>
+    </div>
+
+    <!-- Q&A -->
+    <div class="qabox">
+      <h5>Interview questions about exception handling</h5>
+
+      <div class="qa">
+        <div class="q">What does <code>@RestControllerAdvice</code> do?</div>
+        <div class="a">
+          It marks a class as a global exception handler / response advisor that applies to all
+          <code>@RestController</code>-annotated controllers. Methods annotated with
+          <code>@ExceptionHandler(SomeException.class)</code> inside it are auto-registered.
+          When any controller's method throws SomeException, Spring routes it here, runs the
+          method, and uses the returned <code>ResponseEntity</code> as the HTTP response.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does NOOL have custom exceptions instead of using Spring's <code>ResponseStatusException</code>?</div>
+        <div class="a">
+          Two reasons. First, custom classes are more expressive — <code>ResourceNotFoundException</code>
+          reads better than <code>new ResponseStatusException(NOT_FOUND, "...")</code>. Second,
+          they keep HTTP concerns out of services — services throw business-level exceptions,
+          and only the handler maps them to HTTP. That separation matters if I ever expose the
+          same services through a different protocol (gRPC, messaging).
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why does <code>DataIntegrityViolationException</code> need its own handler instead of being caught by the generic one?</div>
+        <div class="a">
+          Because the raw exception message is cryptic — something like "Duplicate entry
+          '9000000001' for key 'mobile_number'". For technical users that's enough; for my mom
+          using NOOL on a Saturday morning it's useless. The handler parses the root cause and
+          produces a human-friendly translation. This is one of the most impactful pieces of
+          UX work in the whole backend.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>extractRootCauseMessage</code> capped at depth 10?</div>
+        <div class="a">
+          Pure defensive programming. Exception chains can in theory have cycles (rare but
+          possible with bad code). Without the cap, this loop could spin forever. 10 levels is
+          way more than any real chain ever has — typical depth is 2-3.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What happens if I throw an exception not handled by any <code>@ExceptionHandler</code> method?</div>
+        <div class="a">
+          The fallback <code>@ExceptionHandler(Exception.class)</code> catches it and returns
+          500. Without that, Spring's default would return a 500 with a generic error page —
+          but the JSON shape would differ from the rest of our responses. The fallback ensures
+          uniformity.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Where does the handler log the actual stack trace?</div>
+        <div class="a">
+          It doesn't — currently. Spring Boot's default error logging still records the stack
+          trace to the console because the exception bubbles up. If I wanted explicit log lines
+          per handler, I'd inject a <code>Logger</code> and call <code>log.error(...)</code> at
+          the top of each method. For NOOL's scale, the default is fine.
+        </div>
+      </div>
+    </div>
+
+    <!-- What's next -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      Errors are handled. Next we look at the <strong>Common DTOs</strong> — the small data
+      structures used across many parts of the system: pagination requests/responses, date-range
+      filters, the generic API wrapper. Tiny files but used in every controller.
+    </p>
+
+    <div class="chapnav">
+      <a href="08-enums.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 08 · The 6 Enums</span>
+      </a>
+      <a href="10-common-dtos.html" class="next">
+        <span class="arrow next">Next chapter →</span>
+        <span class="title">Ch 10 · Common DTOs</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 09 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>

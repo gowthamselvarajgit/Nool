@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter 15 · SareeLedgerEntry.java ⭐ · NOOL Learn</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+
+<div class="orbs">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="../index.html" class="brand">
+      <span class="brand-mark">N</span>
+      <span>NOOL · Learn</span>
+    </a>
+    <a href="../index.html" class="home-btn">📚 Table of Contents</a>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="chapter-hero">
+    <span class="num-badge">Chapter 15 · The Heart of NOOL ⭐</span>
+    <h1>
+      <span class="gradient">SareeLedgerEntry.java</span><br/>
+      The append-only inventory ledger
+    </h1>
+    <p class="subtitle">
+      The single most important entity in the whole system. Every saree that enters or leaves
+      the workshop becomes one row in this table. <strong>This file is the digital replacement
+      for my mom and dad's paper notebook.</strong>
+    </p>
+  </section>
+
+  <div class="content">
+
+    <div class="filehdr">
+      <div class="ficon">📒</div>
+      <div class="fmeta">
+        <h3>SareeLedgerEntry.java</h3>
+        <span class="fpath">backend/src/main/java/com/nool/backend/entity/owner/SareeLedgerEntry.java</span>
+        <div class="ftags"><span>Entity</span><span>⭐ CORE</span><span>Ledger</span><span>Append-only</span><span>Inventory</span></div>
+      </div>
+    </div>
+
+    <!-- ──────── The big idea ──────── -->
+    <h2><span class="h2-emoji">🧠</span> The Big Idea — Ledger, Not Stock Counter</h2>
+    <p>
+      Before we look at the code, here's the core design decision: NOOL does NOT keep a
+      single "current stock" number per owner. Instead, it records every <em>event</em>
+      (saree coming in OR going out) as its own row, and computes the current balance on
+      the fly.
+    </p>
+
+    <p>The two possible designs side-by-side:</p>
+
+    <table class="ftable">
+      <thead>
+        <tr><th></th><th>Stock counter (NOT what we use)</th><th>Ledger (what NOOL uses)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Storage</td><td>One number per owner (<code>currentStock</code>)</td><td>One row per transaction event</td></tr>
+        <tr><td>Receipt</td><td>Add to the number</td><td>Insert a RECEIPT row</td></tr>
+        <tr><td>Return</td><td>Subtract from the number</td><td>Insert a RETURN row</td></tr>
+        <tr><td>History</td><td>Lost forever</td><td>Complete, every transaction</td></tr>
+        <tr><td>"How many on May 13?"</td><td>Cannot answer</td><td>Easy — SUM events up to that date</td></tr>
+        <tr><td>Audit trail</td><td>None</td><td>Every event with date + remarks</td></tr>
+        <tr><td>Risk of drift</td><td>High — bugs can silently corrupt</td><td>None — always recomputable</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout brain">
+      <strong>This is exactly the same pattern banks use for passbooks.</strong> Your account
+      balance isn't stored as a number — it's derived by summing every credit and debit on
+      your statement. NOOL's inventory works the same way.
+    </div>
+
+    <!-- ──────── The full file ──────── -->
+    <h2><span class="h2-emoji">📜</span> The Full File — Every Line Explained</h2>
+
+    <div class="codewrap">
+      <div class="head">
+        <span class="path">entity/owner/SareeLedgerEntry.java</span>
+        <span class="lang">Java</span>
+      </div>
+<pre><span class="kw">package</span> com.nool.backend.entity.owner;
+
+<span class="kw">import</span> com.nool.backend.enums.LedgerEntryType;       <span class="com">// RECEIPT or RETURN</span>
+<span class="kw">import</span> jakarta.persistence.*;
+<span class="kw">import</span> lombok.*;
+<span class="kw">import</span> java.time.LocalDate;
+<span class="kw">import</span> java.time.LocalDateTime;
+
+<span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"saree_ledger"</span>)            <span class="com">// SQL table — think "passbook"</span>
+<span class="ann">@Getter</span> <span class="ann">@Setter</span>
+<span class="ann">@NoArgsConstructor</span>
+<span class="ann">@AllArgsConstructor</span>
+<span class="ann">@Builder</span>
+<span class="kw">public class</span> SareeLedgerEntry {
+
+    <span class="com">// ── PRIMARY KEY ───────────────────────────────────────────────</span>
+    <span class="ann">@Id</span>
+    <span class="ann">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="ann">@Column</span>(name = <span class="str">"entry_id"</span>)
+    <span class="kw">private</span> Long id;                                <span class="com">// row number, auto-increment</span>
+
+    <span class="com">// ── OWNER LINK ────────────────────────────────────────────────</span>
+    <span class="ann">@ManyToOne</span>(fetch = FetchType.LAZY)            <span class="com">// many entries → one owner</span>
+    <span class="ann">@JoinColumn</span>(name = <span class="str">"owner_id"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> SareeOwner sareeOwner;
+    <span class="com">// ★ Every entry MUST belong to an owner (FK is not nullable).
+    //   FetchType.LAZY = don't load the full SareeOwner object unless asked.
+    //   Most ledger operations only need the IDs, so this avoids an extra
+    //   JOIN on every read.</span>
+
+    <span class="com">// ── ENTRY TYPE (RECEIPT or RETURN) ────────────────────────────</span>
+    <span class="ann">@Enumerated</span>(EnumType.STRING)               <span class="com">// store as "RECEIPT" or "RETURN" text</span>
+    <span class="ann">@Column</span>(name = <span class="str">"entry_type"</span>, nullable = <span class="kw">false</span>, length = <span class="num2">16</span>)
+    <span class="kw">private</span> LedgerEntryType entryType;
+    <span class="com">// ★ The direction. RECEIPT = sarees coming IN, RETURN = going OUT.
+    //   The "in-hand" formula depends entirely on this.</span>
+
+    <span class="com">// ── ENTRY DATE (business date, not insert time) ───────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"entry_date"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDate entryDate;
+    <span class="com">// ★ The date the transaction actually happened — NOT when typed
+    //   into NOOL. Dad might record Friday's receipt on Monday morning.
+    //   This stores Friday's date so reports stay accurate.</span>
+
+    <span class="com">// ── QUANTITY (always positive) ────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"quantity"</span>, nullable = <span class="kw">false</span>)
+    <span class="kw">private</span> Integer quantity;
+    <span class="com">// ★ Always positive! Direction is encoded in entryType, not in sign.
+    //   "100 RECEIPT" reads more naturally than "+100", "30 RETURN"
+    //   reads more naturally than "-30".</span>
+
+    <span class="com">// ── REMARKS (optional note) ───────────────────────────────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"remarks"</span>)
+    <span class="kw">private</span> String remarks;
+    <span class="com">// Free-form. "Diwali batch", "Damaged on arrival",
+    // "Second batch — Saturday morning". Optional.</span>
+
+    <span class="com">// ── AUDIT TIMESTAMP (only created_at, NO updated_at!) ─────────</span>
+    <span class="ann">@Column</span>(name = <span class="str">"created_at"</span>, nullable = <span class="kw">false</span>, updatable = <span class="kw">false</span>)
+    <span class="kw">private</span> LocalDateTime createdAt;
+    <span class="com">// When the row was typed into NOOL — for audit log only.</span>
+
+    <span class="ann">@PrePersist</span>
+    <span class="kw">protected void</span> onCreate() {
+        <span class="kw">this</span>.createdAt = LocalDateTime.now();
+    }
+
+    <span class="com">// ★★★ NOTICE: No @PreUpdate. No `updatedAt` field. No setters that
+    //   should ever be called after save. Ledger rows are IMMUTABLE.
+    //   To "correct" a wrong row, insert a compensating row — never edit
+    //   history. This is the same principle banks follow.</span>
+}</pre>
+    </div>
+
+    <!-- ──────── Field reference ──────── -->
+    <h2><span class="h2-emoji">📋</span> Every Field — Type, Purpose, Example</h2>
+    <table class="ftable">
+      <thead>
+        <tr><th>Field</th><th>Java type</th><th>SQL column</th><th>Purpose</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Long</td><td>entry_id (PK)</td><td>Unique row identifier</td><td><code>147</code></td></tr>
+        <tr><td><code>sareeOwner</code></td><td>SareeOwner</td><td>owner_id (FK)</td><td>Which client this entry belongs to</td><td>FK → saree_owner(owner_id)</td></tr>
+        <tr><td><code>entryType</code></td><td>LedgerEntryType</td><td>entry_type</td><td>RECEIPT (in) or RETURN (out)</td><td><code>RECEIPT</code></td></tr>
+        <tr><td><code>entryDate</code></td><td>LocalDate</td><td>entry_date</td><td>Actual business date</td><td><code>2026-05-15</code></td></tr>
+        <tr><td><code>quantity</code></td><td>Integer</td><td>quantity</td><td>Number of sarees (always positive)</td><td><code>100</code></td></tr>
+        <tr><td><code>remarks</code></td><td>String</td><td>remarks</td><td>Optional note</td><td><code>"Diwali batch"</code></td></tr>
+        <tr><td><code>createdAt</code></td><td>LocalDateTime</td><td>created_at</td><td>When typed into NOOL (audit)</td><td><code>2026-05-15T11:08:00</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── The famous formula ──────── -->
+    <h2><span class="h2-emoji">🧮</span> The Famous In-Hand Formula</h2>
+    <p>The whole point of this entity is to enable this one calculation:</p>
+
+    <div class="formula">
+      <div class="label">Sarees still with the workshop (for one owner)</div>
+      <div class="eq">
+        <span class="var">inHand</span> = SUM(quantity WHERE type=<span class="op">RECEIPT</span>) − SUM(quantity WHERE type=<span class="op">RETURN</span>)
+      </div>
+    </div>
+
+    <p>And it's just as simple in SQL:</p>
+
+    <div class="sqlbox">
+<pre><span class="sc">-- How many of Rahul's sarees are still in the workshop?</span>
+<span class="sk">SELECT</span>
+    <span class="sk">COALESCE</span>(<span class="sk">SUM</span>(<span class="sk">CASE WHEN</span> entry_type = <span class="ss">'RECEIPT'</span> <span class="sk">THEN</span> quantity <span class="sk">ELSE</span> 0 <span class="sk">END</span>), 0)
+  - <span class="sk">COALESCE</span>(<span class="sk">SUM</span>(<span class="sk">CASE WHEN</span> entry_type = <span class="ss">'RETURN'</span>  <span class="sk">THEN</span> quantity <span class="sk">ELSE</span> 0 <span class="sk">END</span>), 0)
+<span class="sk">AS</span> in_hand
+<span class="sk">FROM</span> saree_ledger
+<span class="sk">WHERE</span> owner_id = <span class="num2">1</span>;</pre>
+    </div>
+
+    <p>
+      The actual NOOL code (in <code>SareeInventoryServiceImpl</code>, Chapter 45) splits this
+      into two simpler queries — one for RECEIPT sum, one for RETURN sum — and subtracts in
+      Java. Either way, the result is always computed fresh; never stored.
+    </p>
+
+    <!-- ──────── SQL ──────── -->
+    <h2><span class="h2-emoji">🗄️</span> What This Becomes in MySQL</h2>
+
+    <div class="sqlbox">
+<pre><span class="sk">CREATE TABLE</span> saree_ledger (
+    entry_id    <span class="sk">BIGINT</span>       <span class="sk">NOT NULL</span> <span class="sk">AUTO_INCREMENT</span>,
+    owner_id    <span class="sk">BIGINT</span>       <span class="sk">NOT NULL</span>,
+    entry_type  <span class="sk">VARCHAR</span>(16)   <span class="sk">NOT NULL</span>,       <span class="sc">-- 'RECEIPT' or 'RETURN'</span>
+    entry_date  <span class="sk">DATE</span>         <span class="sk">NOT NULL</span>,
+    quantity    <span class="sk">INT</span>          <span class="sk">NOT NULL</span>,
+    remarks     <span class="sk">VARCHAR</span>(255),
+    created_at  <span class="sk">DATETIME</span>(6)  <span class="sk">NOT NULL</span>,
+    <span class="sk">PRIMARY KEY</span> (entry_id),
+    <span class="sk">FOREIGN KEY</span> (owner_id) <span class="sk">REFERENCES</span> saree_owner(owner_id)
+);
+
+<span class="sc">-- A typical week with Rahul (owner_id = 1):</span>
+<span class="sk">INSERT INTO</span> saree_ledger
+    (owner_id, entry_type, entry_date, quantity, remarks, created_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">1</span>, <span class="ss">'RECEIPT'</span>, <span class="ss">'2026-05-11'</span>, <span class="num2">100</span>, <span class="ss">'Diwali batch'</span>,       <span class="ss">'2026-05-11 11:00:00'</span>),
+    (<span class="num2">1</span>, <span class="ss">'RETURN'</span>,  <span class="ss">'2026-05-13'</span>, <span class="num2">40</span>,  <span class="ss">'First batch ready'</span>, <span class="ss">'2026-05-13 16:30:00'</span>),
+    (<span class="num2">1</span>, <span class="ss">'RETURN'</span>,  <span class="ss">'2026-05-15'</span>, <span class="num2">30</span>,  <span class="ss">'Second batch'</span>,      <span class="ss">'2026-05-15 17:00:00'</span>);
+
+<span class="sc">-- Compute Rahul's current in-hand:</span>
+<span class="sk">SELECT</span>
+  (<span class="sk">SELECT</span> <span class="sk">COALESCE</span>(<span class="sk">SUM</span>(quantity), 0) <span class="sk">FROM</span> saree_ledger
+     <span class="sk">WHERE</span> owner_id = <span class="num2">1</span> <span class="sk">AND</span> entry_type = <span class="ss">'RECEIPT'</span>)
+- (<span class="sk">SELECT</span> <span class="sk">COALESCE</span>(<span class="sk">SUM</span>(quantity), 0) <span class="sk">FROM</span> saree_ledger
+     <span class="sk">WHERE</span> owner_id = <span class="num2">1</span> <span class="sk">AND</span> entry_type = <span class="ss">'RETURN'</span>)
+  <span class="sk">AS</span> in_hand;
+
+<span class="sc">-- Result: 100 - (40 + 30) = 30 sarees still being polished</span></pre>
+    </div>
+
+    <!-- ──────── Why immutable ──────── -->
+    <h2><span class="h2-emoji">🔒</span> Why This Entity Is Deliberately Immutable</h2>
+    <p>
+      You'll have noticed: there's <strong>no <code>@PreUpdate</code></strong>, no
+      <code>updatedAt</code> field, no expectation of editing a row after creation. That's
+      not laziness — it's a deliberate <em>append-only</em> design.
+    </p>
+
+    <h3>What "append-only" means</h3>
+    <ul>
+      <li>Once a ledger row is written, it stays exactly as-is forever.</li>
+      <li>No UPDATE statements ever run against this table from business code.</li>
+      <li>No DELETE either, except in rare admin correction scenarios (Chapter 46).</li>
+      <li>If a row was wrong, the correct fix is to insert a <em>compensating row</em> — not edit the wrong one.</li>
+    </ul>
+
+    <h3>Why this matters</h3>
+    <div class="callout brain">
+      <strong>Audit reliability.</strong> If a tax inspector ever asks "what sarees did you
+      handle for Rahul in March?", my parents can show every single transaction with the
+      exact date and remark, and prove that no data was edited after the fact. Editing
+      history would destroy that trust.
+      <br><br>
+      <strong>Bug containment.</strong> Without UPDATE/DELETE, the worst a buggy service
+      can do is insert a wrong row. That's recoverable. With UPDATE, a bug could silently
+      corrupt years of history.
+    </div>
+
+    <h3>"But what if a row really IS wrong?"</h3>
+    <p>Two clean correction patterns:</p>
+
+    <table class="ftable">
+      <thead><tr><th>Mistake</th><th>How to fix it</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Recorded RECEIPT of 100 but should have been 80</td>
+          <td>Insert a compensating <code>RETURN</code> of 20 with a remark like <em>"Correction for entry #147"</em>.</td>
+        </tr>
+        <tr>
+          <td>Recorded RETURN of 50 that never actually happened</td>
+          <td>Insert a compensating <code>RECEIPT</code> of 50 with a remark explaining.</td>
+        </tr>
+        <tr>
+          <td>Critical error — wrong owner, wrong date</td>
+          <td>Use admin-only <code>deleteEntry()</code> endpoint (Chapter 46) to actually remove the bad row. This is the last-resort tool.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ──────── Scenarios ──────── -->
+    <h2><span class="h2-emoji">🎬</span> Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <h5>Scenario 1: Rahul brings 100 sarees on Monday</h5>
+      <ol>
+        <li>Dad logs into NOOL → Inventory → Add Receipt.</li>
+        <li>Picks "Rahul Textiles", quantity 100, date 2026-05-11, remarks "Diwali batch".</li>
+        <li>Frontend posts to <code>POST /api/inventory/receipt</code>.</li>
+        <li><code>SareeInventoryServiceImpl.addReceipt()</code> validates and inserts.</li>
+        <li>New ledger row: <code>entry_id=1, owner_id=1, type=RECEIPT, qty=100, date=2026-05-11, remarks="Diwali batch"</code>.</li>
+        <li><code>@PrePersist</code> stamps <code>created_at = NOW()</code>.</li>
+        <li>Rahul's new in-hand: <code>100 received − 0 returned = 100 in hand</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 2: Wednesday — Dad returns 40 polished sarees</h5>
+      <ol>
+        <li>Dad clicks Inventory → Add Return. Rahul Textiles, 40 sarees, today.</li>
+        <li>Service computes current in-hand = 100. Requested 40 ≤ 100? Yes — approved.</li>
+        <li>Inserts: <code>entry_id=2, owner_id=1, type=RETURN, qty=40, date=2026-05-13</code>.</li>
+        <li>Rahul's new in-hand: <code>100 − 40 = 60</code>.</li>
+      </ol>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 3: Dad accidentally tries to return 80 sarees (only 60 in hand)</h5>
+      <ol>
+        <li>Dad fat-fingers 80 instead of 8.</li>
+        <li>Service recomputes in-hand: 100 received − 40 returned = 60.</li>
+        <li>Check: 80 > 60 → REJECT.</li>
+        <li>Throws <code>BadRequestException("Cannot return 80 sarees for Rahul Textiles. Only 60 remaining in hand.")</code>.</li>
+        <li>GlobalExceptionHandler converts to HTTP 400 with friendly message.</li>
+        <li>Frontend shows the error in red. <strong>No ledger row is inserted.</strong></li>
+        <li>Dad realizes his typo, retypes 8, and tries again. This time it succeeds.</li>
+      </ol>
+      <p>This safety net is something a paper notebook fundamentally cannot provide.</p>
+    </div>
+
+    <div class="scenario">
+      <h5>Scenario 4: Dad recorded the wrong RECEIPT quantity — how to fix it?</h5>
+      <p>Suppose Dad recorded a receipt of 100, but actually Rahul brought 80 (Dad mis-counted on Monday). Today he realizes the mistake.</p>
+      <p><strong>Wrong approach:</strong> Edit entry #1 directly. ❌ Breaks the audit trail.</p>
+      <p><strong>Right approach:</strong> Insert a compensating row:</p>
+      <div class="sqlbox">
+<pre><span class="sk">INSERT INTO</span> saree_ledger
+    (owner_id, entry_type, entry_date, quantity, remarks, created_at)
+<span class="sk">VALUES</span>
+    (<span class="num2">1</span>, <span class="ss">'RETURN'</span>, <span class="ss">'2026-05-15'</span>, <span class="num2">20</span>,
+     <span class="ss">'Correction: entry #1 overstated by 20'</span>,
+     <span class="ss">'2026-05-15 09:00:00'</span>);</pre>
+      </div>
+      <p>Now Rahul's in-hand drops by 20 to reflect the true count, and the original mistake + correction are both visible in the history forever.</p>
+    </div>
+
+    <!-- ──────── Common mistakes ──────── -->
+    <div class="mistakes">
+      <h5>Common mistakes around SareeLedgerEntry</h5>
+
+      <div class="item">
+        <div class="bad">Adding a <code>currentStock</code> field on SareeOwner and updating it on each transaction</div>
+        <div class="good">Loses history; risks drift. The ledger pattern (one row per event) is the proven safe approach. Current stock is ALWAYS derived as a SUM.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Allowing negative quantities to mean RETURN</div>
+        <div class="good">Sign-based directions are confusing. Use the <code>entryType</code> enum. Quantities are always positive — easier to read, debug, and aggregate.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Adding <code>@PreUpdate</code> to let admins edit past entries</div>
+        <div class="good">Ledger rows are immutable. If a row is wrong, insert a compensating row. Editing history breaks audit trust and risks data corruption.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Storing the rate on each ledger row to "lock in" historical pricing</div>
+        <div class="good">NOOL doesn't do this currently — it always uses the owner's current rate. If you ever extend to lock historical rates, the natural place is a <code>rate_at_time</code> column on this entity. But don't add it speculatively.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Removing the FK to <code>saree_owner</code> for "simplicity"</div>
+        <div class="good">The FK prevents orphan rows — you can't insert a ledger entry pointing to a non-existent owner. DB-level referential integrity catches real bugs.</div>
+      </div>
+
+      <div class="item">
+        <div class="bad">Computing in-hand WITHOUT a row lock on the owner</div>
+        <div class="good">Two simultaneous returns can both read the same "before" total and both pass validation when only one should. The service layer (Chapter 45) uses pessimistic locking to serialize this.</div>
+      </div>
+    </div>
+
+    <!-- ──────── Q&A ──────── -->
+    <div class="qabox">
+      <h5>Interview questions about SareeLedgerEntry</h5>
+
+      <div class="qa">
+        <div class="q">Why use an append-only ledger instead of a single stock count?</div>
+        <div class="a">
+          Three reasons. (1) Complete audit history — every transaction with dates and remarks
+          is preserved. (2) No drift — a stock counter can get out of sync with reality; a
+          ledger is always recomputable from raw events. (3) It mirrors how my parents already
+          worked in paper notebooks (receipts in one column, returns in another), so the
+          mental model is familiar.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why is <code>quantity</code> always a positive Integer? Why not use sign for direction?</div>
+        <div class="a">
+          Clarity. "RETURN 40" reads more naturally than "-40". Queries like
+          <code>SUM(quantity) WHERE entry_type = 'RETURN'</code> are simpler than worrying
+          about signs. And a negative number that should have been positive could silently
+          corrupt the in-hand calculation — using the enum + positive integers makes errors
+          obvious.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why doesn't this entity have <code>@PreUpdate</code> or <code>updatedAt</code>?</div>
+        <div class="a">
+          Because ledger entries should never be updated. They represent historical events —
+          editing them would rewrite history and destroy audit trust. The absence of
+          <code>@PreUpdate</code> isn't an oversight; it's a design statement: "this row is
+          immutable".
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What's the difference between <code>entryDate</code> and <code>createdAt</code>?</div>
+        <div class="a">
+          <code>entryDate</code> is the <em>business date</em> — when the sarees actually
+          changed hands. <code>createdAt</code> is the <em>technical date</em> — when the row
+          was typed into NOOL. They're often different: Dad might enter Friday's receipts on
+          Monday morning. Reports use <code>entryDate</code>; audit logs use <code>createdAt</code>.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">How would you compute the in-hand balance for a specific past date?</div>
+        <div class="a">
+          Sum all RECEIPTs minus all RETURNs <em>up to</em> that date:
+          <code>SUM(quantity WHERE type=RECEIPT AND entry_date &lt;= ?) − SUM(quantity WHERE
+          type=RETURN AND entry_date &lt;= ?)</code>. This is the magic of the ledger
+          pattern — you can rewind history to any point. A stock counter could never do this.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Could two concurrent return requests both succeed and overdraw the balance?</div>
+        <div class="a">
+          Without protection, yes — both could read the same "before" total, both pass validation,
+          and both INSERT. To prevent this, the service layer (Chapter 45) uses a pessimistic
+          lock on the owner row: <code>SELECT ... FOR UPDATE</code> via
+          <code>findByIdForUpdate</code>. This serializes simultaneous transactions; the second
+          one reads the updated balance and correctly fails the check.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">Why <code>@ManyToOne</code> here instead of just a <code>Long owner_id</code> field?</div>
+        <div class="a">
+          Two benefits. (1) The FK constraint enforces database-level integrity — you can't
+          insert a row pointing at a non-existent owner. (2) Convenient navigation in code:
+          <code>ledger.getSareeOwner().getOwnerName()</code>. With <code>FetchType.LAZY</code>,
+          we only pay for the JOIN when the navigation is actually used.
+        </div>
+      </div>
+
+      <div class="qa">
+        <div class="q">What does the table name <code>saree_ledger</code> (not <code>saree_ledgers</code>) suggest?</div>
+        <div class="a">
+          A small naming inconsistency — most tables in NOOL are plural
+          (<code>users</code>, <code>employees</code>), but this one is singular. It's an
+          accepted historical choice — the word "ledger" naturally feels singular even when
+          there are many entries. A naming-consistency cleanup would rename to
+          <code>saree_ledger_entries</code> or <code>saree_ledgers</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── What's next ──────── -->
+    <h2><span class="h2-emoji">⏭️</span> What's Coming Next</h2>
+    <p>
+      With the inventory ledger covered, we're done with the owner-side entities. Next comes
+      the worker-side data-recording entities: <strong>Attendance</strong> (was-this-worker-here-today?)
+      and <strong>EmployeeDailyWork</strong> (how-many-sarees-did-they-polish?).
+    </p>
+
+    <div class="chapnav">
+      <a href="14-saree-owner-entity.html">
+        <span class="arrow">← Previous chapter</span>
+        <span class="title">Ch 14 · SareeOwner.java</span>
+      </a>
+      <a class="dim next">
+        <span class="arrow next">Coming soon →</span>
+        <span class="title">Ch 16 · Attendance.java</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Chapter 15 of 85 · <a href="../index.html">Back to table of contents</a></p>
+  <p>Built with ❤️ by <strong>Gowtham Selvaraj</strong> — for Mom &amp; Dad.</p>
+</footer>
+
+</body>
+</html>
