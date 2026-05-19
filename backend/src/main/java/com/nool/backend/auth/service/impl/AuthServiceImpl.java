@@ -42,10 +42,11 @@ public class AuthServiceImpl implements AuthService {
 
         // ✅ Prepare JWT claims
         UserProfile profile = user.getUserProfile();
-        
+
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().name());
+        claims.put("name", user.getName());
         claims.put("employeeId", profile != null ? profile.getEmployeeId() : null);
         claims.put("ownerId", profile != null ? profile.getOwnerId() : null);
 
@@ -55,6 +56,8 @@ public class AuthServiceImpl implements AuthService {
         return AuthLoginResponseDto.builder()
                 .token(token)
                 .role(user.getRole())
+                .name(user.getName())
+                .mobileNumber(user.getMobileNumber())
                 .employeeId(profile != null ? profile.getEmployeeId() : null)
                 .ownerId(profile != null ? profile.getOwnerId() : null)
                 .build();

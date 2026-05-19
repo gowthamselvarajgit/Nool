@@ -9,34 +9,64 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * On first startup, seeds a single SUPER_ADMIN account from environment variables.
+ *
+ * Production setup:
+ *   - Set SUPER_ADMIN_MOBILE and SUPER_ADMIN_PASSWORD in .env (or the hosting
+ *     platform's environment).
+ *   - The application will create the super admin only if no SUPER_ADMIN already
+ *     exists in the database. Subsequent restarts are no-ops.
+ *
+ * The super admin can then log in and create regular ADMIN accounts via the
+ * super-admin UI (or the POST /super-admin/admins endpoint).
+ *
+ * NOTE: Regular ADMIN accounts are NOT auto-seeded — they must be created by a
+ * super admin after the first login.
+ */
 @Component
 @RequiredArgsConstructor
-public class AdminBootstrapRunner implements CommandLineRunner{
+public class AdminBootstrapRunner implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${admin.mobile}")
-    private String adminMobile;
+    @Value("${super-admin.mobile:}")
+    private String superAdminMobile;
 
-    @Value("${admin.password}")
-    private String adminPassword;
+    @Value("${super-admin.password:}")
+    private String superAdminPassword;
+
+    @Value("${super-admin.name:Super Admin}")
+    private String superAdminName;
 
     @Override
-    public void run(String... args){
-        boolean adminExists = userRepository.existsByRole(Role.ADMIN);
-        if (adminExists){
+    public void run(String... args) {
+        if (userRepository.existsByRole(Role.SUPER_ADMIN)) {
+            return; // Already seeded
+        }
+
+        if (superAdminMobile == null || superAdminMobile.isBlank()
+                || superAdminPassword == null || superAdminPassword.isBlank()) {
+            System.out.println("⚠ No SUPER_ADMIN seeded — set SUPER_ADMIN_MOBILE and "
+                    + "SUPER_ADMIN_PASSWORD env vars (see .env.example) to enable seeding.");
             return;
         }
 
-        User admin = new User();
-        admin.setMobileNumber(adminMobile);
-        admin.setPassword(passwordEncoder.encode(adminPassword));
-        admin.setRole(Role.ADMIN);
-        admin.setActive(true);
+        if (userRepository.existsByMobileNumber(superAdminMobile)) {
+            System.out.println("⚠ A user with mobile " + superAdminMobile
+                    + " already exists — skipping SUPER_ADMIN seed.");
+            return;
+        }
 
-        userRepository.save(admin);
+        User superAdmin = User.builder()
+                .mobileNumber(superAdminMobile)
+                .password(passwordEncoder.encode(superAdminPassword))
+                .role(Role.SUPER_ADMIN)
+                .name(superAdminName)
+                .active(true)
+                .build();
 
-        System.out.println("✅ DEFAULT ADMIN ACCOUNT CREATED SUCCESSFULLY");
-
+        userRepository.save(superAdmin);
+        System.out.println("✓ SUPER_ADMIN account '" + superAdminName + "' created for mobile " + superAdminMobile);
     }
 }

@@ -155,9 +155,23 @@ CREATE DATABASE IF NOT EXISTS nool_db
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Default credentials assumed by `application.properties`: user `root`, password `root`. Override via Spring properties or environment variables for non-local environments.
+### 2. Backend environment
 
-### 2. Backend
+The backend reads all secrets from environment variables. A template is provided.
+
+```bash
+cd backend
+cp .env.example .env
+# Edit .env and set at minimum:
+#   JWT_SECRET             (long random string, ≥ 64 chars)
+#   SUPER_ADMIN_MOBILE     (10-digit mobile for the first super admin)
+#   SUPER_ADMIN_PASSWORD   (strong password)
+#   DB_USERNAME / DB_PASSWORD
+```
+
+> The `.env` file is git-ignored. In production, set these as real OS / hosting-platform environment variables instead of using a `.env` file.
+
+### 3. Run the backend
 
 ```bash
 cd backend
@@ -167,23 +181,28 @@ mvnw.cmd spring-boot:run          # Windows
 
 The API is served at **http://localhost:8083/api**.
 
-On first start, the application seeds a default administrator account:
+On **first** startup, the application reads `SUPER_ADMIN_MOBILE` and `SUPER_ADMIN_PASSWORD` from the environment and seeds a single super-admin account. No default admin is seeded — the super admin must create administrators in-app.
 
-| Field | Value |
-| --- | --- |
-| Mobile number | `9876543210` |
-| Password | `Admin@123` |
-| Role | `ADMIN` |
-
-### 3. Frontend
+### 4. Frontend
 
 ```bash
 cd frontend
+cp .env.example .env.local   # optional — for local overrides only
 npm install
 npm run dev
 ```
 
-The SPA is served at **http://localhost:5173** and is pre-configured to call the backend at `/api`.
+The SPA is served at **http://localhost:5173**. In development, Vite proxies `/api` to the backend; in production, set `VITE_API_BASE_URL` to the deployed backend URL before building.
+
+### 5. First login
+
+| Field | Value |
+| --- | --- |
+| Mobile number | the `SUPER_ADMIN_MOBILE` you set in `.env` |
+| Password | the `SUPER_ADMIN_PASSWORD` you set in `.env` |
+| Role | `SUPER_ADMIN` |
+
+Log in, open **Admin Management** in the sidebar, and create one or more `ADMIN` accounts for daily workshop operation.
 
 ---
 
@@ -206,20 +225,24 @@ The inventory ledger is intentionally decoupled — receipts and returns are ind
 
 ## Feature Matrix by Role
 
-| Module | Admin | Worker (Employee) | Saree Owner |
-| --- | :---: | :---: | :---: |
-| Workshop dashboard | ✅ | — | — |
-| Personal dashboard | — | ✅ | ✅ |
-| Manage employees | ✅ | — | — |
-| Manage saree owners | ✅ | — | — |
-| Per-owner inventory ledger (List + Calendar view) | ✅ | — | ✅ (own) |
-| Receive / return sarees | ✅ | — | — |
-| Daily work entry | ✅ | ✅ (own) | — |
-| Attendance management | ✅ | ✅ (read own) | — |
-| Salary disbursement | ✅ | ✅ (read own) | — |
-| Owner payment disbursement | ✅ | — | ✅ (read own) |
-| Excel exports | ✅ | ✅ (own data) | ✅ (own data) |
-| Analytics | ✅ | — | — |
+| Module | Super Admin | Admin | Worker (Employee) | Saree Owner |
+| --- | :---: | :---: | :---: | :---: |
+| Create / disable admin accounts | ✅ | — | — | — |
+| Reset admin passwords | ✅ | — | — | — |
+| Workshop dashboard | ✅ | ✅ | — | — |
+| Personal dashboard | — | — | ✅ | ✅ |
+| Manage employees | ✅ | ✅ | — | — |
+| Manage saree owners | ✅ | ✅ | — | — |
+| Per-owner inventory ledger (List + Calendar view) | ✅ | ✅ | — | ✅ (own) |
+| Receive / return sarees | ✅ | ✅ | — | — |
+| Daily work entry | ✅ | ✅ | ✅ (own) | — |
+| Attendance management | ✅ | ✅ | ✅ (read own) | — |
+| Salary disbursement | ✅ | ✅ | ✅ (read own) | — |
+| Owner payment disbursement | ✅ | ✅ | — | ✅ (read own) |
+| Excel exports | ✅ | ✅ | ✅ (own data) | ✅ (own data) |
+| Analytics | ✅ | ✅ | — | — |
+
+**Super admin** inherits every admin capability and additionally owns the **Admin Management** screen — the only place where new administrator accounts can be created. Regular admins cannot reach the `/super-admin/**` endpoints.
 
 The admin sidebar is organised by the natural business workflow:
 
@@ -232,21 +255,45 @@ The admin sidebar is organised by the natural business workflow:
 
 ## Configuration
 
-All backend configuration is in `backend/src/main/resources/application.properties`. Highlights:
+All secrets and environment-specific values are externalised to environment variables. Templates are committed at:
 
-| Property | Default | Description |
+- `backend/.env.example`
+- `frontend/.env.example`
+
+`backend/src/main/resources/application.properties` references each variable with a `${VAR_NAME:default}` placeholder. A local `.env` file (in `backend/`) is auto-loaded by Spring via `spring.config.import`. In production, set the same variables as real OS / hosting-platform environment variables.
+
+### Backend environment variables
+
+| Variable | Default | Required in prod | Description |
+| --- | --- | :---: | --- |
+| `SERVER_PORT` | `8083` | optional | HTTP port the backend listens on |
+| `JWT_SECRET` | dev-only fallback | **yes** | Signing key for JWTs. **Must be ≥ 64 chars of random data in production** — generate with `openssl rand -base64 64` |
+| `JWT_EXPIRATION` | `86400000` (24h) | no | Token lifetime in milliseconds |
+| `SUPER_ADMIN_MOBILE` | _empty_ | **yes** (first run) | Mobile of the seeded super-admin account |
+| `SUPER_ADMIN_PASSWORD` | _empty_ | **yes** (first run) | Password for the seeded super-admin |
+| `DB_URL` | `jdbc:mysql://localhost:3306/nool_db?...` | **yes** | JDBC connection string |
+| `DB_USERNAME` | `root` | **yes** | Database user |
+| `DB_PASSWORD` | `root` | **yes** | Database password |
+| `JPA_DDL_AUTO` | `update` | **yes** | **Set to `validate` (or `none`) in production** after first deploy |
+| `JPA_SHOW_SQL` | `false` | no | Echo SQL statements to logs |
+| `NOOL_RATE_PER_SAREE` | `70.0` | no | Fallback owner polish rate (used only when an owner has no per-owner rate) |
+| `CORS_ALLOWED_ORIGINS` | localhost dev ports | **yes** | Comma-separated list of frontend origins permitted to call the API |
+| `SQL_LOG_LEVEL` / `SQL_BIND_LOG_LEVEL` | `warn` | no | Hibernate SQL log verbosity |
+
+### Frontend environment variables (Vite)
+
+| Variable | Default | Description |
 | --- | --- | --- |
-| `server.port` | `8083` | HTTP port |
-| `server.servlet.context-path` | `/api` | Base path for all endpoints |
-| `spring.datasource.url` | `jdbc:mysql://localhost:3306/nool_db` | MySQL connection string |
-| `spring.datasource.username` / `password` | `root` / `root` | DB credentials |
-| `spring.jpa.hibernate.ddl-auto` | `update` | Schema is evolved on startup (development only) |
-| `jwt.secret` | local development key | Override in production |
-| `jwt.expiration` | `86400000` (24 h) | Token lifetime in milliseconds |
-| `admin.mobile` / `admin.password` | seeded admin | Bootstrap administrator |
-| `nool.rate-per-saree` | `70.0` | Fallback rate used when an owner has no per-owner rate configured |
+| `VITE_API_BASE_URL` | `/api` (via dev proxy) | Absolute URL of the backend API in production builds (e.g. `https://api.nool.example.com/api`). Leave empty in dev — Vite proxies `/api` to the backend. |
+| `BACKEND_TARGET` | `http://localhost:8083` | Dev-only: where the Vite proxy forwards `/api/*`. Not exposed to client code. |
 
-> ⚠ **Production deployment** requires overriding `jwt.secret`, the database credentials, and the seeded admin password.
+> ⚠ **Production hardening checklist** — before going live, you must:
+> 1. Generate a fresh `JWT_SECRET` (≥ 64 random chars).
+> 2. Set a strong `SUPER_ADMIN_PASSWORD`.
+> 3. Restrict `CORS_ALLOWED_ORIGINS` to your real frontend URL(s) only.
+> 4. Switch `JPA_DDL_AUTO` to `validate` (and manage schema changes through proper migrations such as Flyway).
+> 5. Run the backend over HTTPS — never expose JWTs over plain HTTP.
+> 6. Use a non-root DB user with the minimum required privileges.
 
 ---
 
@@ -257,6 +304,7 @@ All REST endpoints live under `/api`. A representative set of resources:
 | Resource | Base path | Highlights |
 | --- | --- | --- |
 | Authentication | `/api/auth` | Login, token refresh |
+| **Super-admin** | **`/api/super-admin`** | **Create / list / disable admins, reset passwords (SUPER_ADMIN only)** |
 | Admin dashboard | `/api/dashboard` | Workshop-wide summary, revenue & workforce analytics |
 | Employees | `/api/employees` | CRUD, status toggle, list with pagination |
 | Attendance | `/api/attendance` | Mark, list, per-employee + per-period summaries |
@@ -307,16 +355,58 @@ npm run preview               # Preview the built bundle locally
 
 ## Deployment
 
-The application is designed to be deployed as two artefacts:
+The application is built to run **identically** in local development and in production — only the environment variables change. There are two deployable artefacts:
 
-1. **Backend JAR** — `backend/target/backend-0.0.1-SNAPSHOT.jar`, runnable with `java -jar` against any JVM 21+ runtime. Configure via Spring properties or environment variables.
-2. **Frontend static bundle** — `frontend/dist/`, deployable to any static host (Nginx, S3 + CloudFront, Netlify, Vercel). Ensure the SPA fallback route returns `index.html` for client-side routes.
+| Artefact | Build command | Output | Runs on |
+| --- | --- | --- | --- |
+| Backend JAR | `./mvnw clean package` | `backend/target/backend-0.0.1-SNAPSHOT.jar` | Any JVM 21+ host (Render, Railway, AWS EC2/ECS, Heroku, on-prem) |
+| Frontend SPA bundle | `npm run build` | `frontend/dist/` (static files) | Any static host with SPA fallback (Nginx, S3+CloudFront, Netlify, Vercel) |
 
-For production deployments, in addition to overriding the secrets listed under [Configuration](#configuration):
+### Backend deployment
 
-- Set `spring.jpa.hibernate.ddl-auto` to `validate` or `none` and manage migrations explicitly (e.g. via Flyway).
-- Place the API behind HTTPS with proper CORS configuration.
-- Rotate `jwt.secret` and force re-authentication on rotation.
+```bash
+cd backend
+./mvnw clean package
+java -jar target/backend-0.0.1-SNAPSHOT.jar
+```
+
+Set every variable from `backend/.env.example` as an environment variable on the hosting platform. Do **not** copy the `.env` file to production — use the platform's secrets manager instead.
+
+Minimum required vars in production:
+
+```
+JWT_SECRET=<openssl rand -base64 64>
+SUPER_ADMIN_MOBILE=<10-digit mobile>
+SUPER_ADMIN_PASSWORD=<strong password>
+DB_URL=<production JDBC URL>
+DB_USERNAME=<non-root DB user>
+DB_PASSWORD=<strong DB password>
+CORS_ALLOWED_ORIGINS=https://app.your-domain.com
+JPA_DDL_AUTO=validate
+```
+
+### Frontend deployment
+
+```bash
+cd frontend
+# Tell the SPA where the backend is hosted:
+echo "VITE_API_BASE_URL=https://api.your-domain.com/api" > .env.production
+npm install
+npm run build
+# Upload dist/ to your static host
+```
+
+Configure the static host to serve `index.html` as a fallback for **all** unknown paths (the SPA owns routing client-side).
+
+### Health checks & observability
+
+- Backend exposes Spring Boot defaults; expose `/actuator/health` if you add `spring-boot-starter-actuator` to `pom.xml`.
+- Watch the application logs on first deploy to confirm: `✓ SUPER_ADMIN account created for mobile <...>`.
+
+### Rotating secrets
+
+- `JWT_SECRET` rotation invalidates all outstanding tokens — users must log in again. Schedule this for a low-traffic window.
+- Super-admin password resets happen out-of-band: stop the app, re-run `mvnw spring-boot:run` with a temporary `SUPER_ADMIN_PASSWORD`, then immediately log in and rotate it (or update the DB row directly using BCrypt encoding).
 
 ---
 

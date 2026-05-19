@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -41,12 +42,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtUtil.extractAllClaims(token);
                 String role = claims.get("role", String.class);
 
+                // SUPER_ADMIN inherits every ADMIN permission. By granting both
+                // authorities, every existing `hasAuthority("ADMIN")` rule keeps
+                // working without modification — and SUPER_ADMIN-only endpoints
+                // can check `hasAuthority("SUPER_ADMIN")` explicitly.
+                List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                if (role != null) {
+                    authorities.add(new SimpleGrantedAuthority(role));
+                    if ("SUPER_ADMIN".equals(role)) {
+                        authorities.add(new SimpleGrantedAuthority("ADMIN"));
+                    }
+                }
+
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                claims,
-                                null,
-                                List.of(new SimpleGrantedAuthority(role))
-                        );
+                        new UsernamePasswordAuthenticationToken(claims, null, authorities);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }

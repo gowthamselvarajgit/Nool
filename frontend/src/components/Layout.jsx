@@ -17,26 +17,33 @@ export const Sidebar = ({ isOpen, setIsOpen }) => {
   //   1. From the owner — receive sarees
   //   2. Polish at the workshop — assign work & track who's in
   //   3. Money — collect from owners, pay employees
+  const adminMenu = [
+    { type: 'item', label: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
+
+    { type: 'section', label: '① From the Owner' },
+    { type: 'item', label: 'Owners', href: '/admin/owners', icon: '🧵' },
+    { type: 'item', label: 'Inventory', href: '/admin/inventory', icon: '📦' },
+
+    { type: 'section', label: '② Polish at Workshop' },
+    { type: 'item', label: 'Employees', href: '/admin/employees', icon: '👥' },
+    { type: 'item', label: 'Daily Work', href: '/admin/daily-work', icon: '📝' },
+    { type: 'item', label: 'Attendance', href: '/admin/attendance', icon: '📍' },
+
+    { type: 'section', label: '③ Money' },
+    { type: 'item', label: 'Owner Payments', href: '/admin/payments', icon: '💳' },
+    { type: 'item', label: 'Employee Salary', href: '/admin/salary', icon: '💰' },
+
+    { type: 'section', label: 'Insights' },
+    { type: 'item', label: 'Analytics', href: '/admin/analytics', icon: '📈' },
+  ];
+
   const menuItems = {
-    ADMIN: [
-      { type: 'item', label: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
-
-      { type: 'section', label: '① From the Owner' },
-      { type: 'item', label: 'Owners', href: '/admin/owners', icon: '🧵' },
-      { type: 'item', label: 'Inventory', href: '/admin/inventory', icon: '📦' },
-
-      { type: 'section', label: '② Polish at Workshop' },
-      { type: 'item', label: 'Employees', href: '/admin/employees', icon: '👥' },
-      { type: 'item', label: 'Daily Work', href: '/admin/daily-work', icon: '📝' },
-      { type: 'item', label: 'Attendance', href: '/admin/attendance', icon: '📍' },
-
-      { type: 'section', label: '③ Money' },
-      { type: 'item', label: 'Owner Payments', href: '/admin/payments', icon: '💳' },
-      { type: 'item', label: 'Employee Salary', href: '/admin/salary', icon: '💰' },
-
-      { type: 'section', label: 'Insights' },
-      { type: 'item', label: 'Analytics', href: '/admin/analytics', icon: '📈' },
+    SUPER_ADMIN: [
+      { type: 'section', label: 'Super Admin' },
+      { type: 'item', label: 'Admin Management', href: '/super-admin/dashboard', icon: '🛡️' },
+      ...adminMenu,
     ],
+    ADMIN: adminMenu,
     WORKER: [
       { type: 'item', label: 'Dashboard', href: '/employee/dashboard', icon: '📊' },
       { type: 'item', label: 'Profile', href: '/employee/profile', icon: '👤' },
@@ -214,12 +221,23 @@ export const Header = ({ onMenuToggle }) => {
           <div className="flex items-center gap-3 pl-4 md:pl-6 border-l border-border">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-bold text-text-main leading-tight">
-                {user?.role === 'ADMIN' ? 'Administrator' : user?.role === 'WORKER' ? 'Employee' : user?.role === 'SAREE_OWNER' ? 'Saree Owner' : 'User'}
+                {user?.name
+                  || (user?.role === 'SUPER_ADMIN' ? 'Super Admin'
+                    : user?.role === 'ADMIN' ? 'Administrator'
+                    : user?.role === 'WORKER' ? 'Employee'
+                    : user?.role === 'SAREE_OWNER' ? 'Saree Owner'
+                    : 'User')}
               </p>
-              <p className="text-xs text-secondary-500 mt-0.5">{user?.mobileNumber || 'Online'}</p>
+              <p className="text-xs text-secondary-500 mt-0.5">
+                {user?.role === 'SUPER_ADMIN' ? 'Super Admin'
+                  : user?.role === 'ADMIN' ? 'Administrator'
+                  : user?.role === 'WORKER' ? 'Employee'
+                  : user?.role === 'SAREE_OWNER' ? 'Saree Owner'
+                  : (user?.mobileNumber || 'Online')}
+              </p>
             </div>
             <div className="w-9 h-9 md:w-11 md:h-11 bg-gradient-to-tr from-primary-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md shadow-primary-500/20 border-2 border-white text-sm">
-              {user?.role?.charAt(0) || 'U'}
+              {(user?.name || user?.role || 'U').charAt(0).toUpperCase()}
             </div>
           </div>
         </div>

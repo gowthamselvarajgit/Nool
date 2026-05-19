@@ -1,5 +1,11 @@
-// Use proxy path during development, absolute URL for production
-const API_BASE_URL = '/api';
+// API base URL — driven by env so the same bundle works locally (proxy → /api)
+// and in production (absolute URL of the deployed backend).
+//
+// Local development: leave VITE_API_BASE_URL unset; the Vite dev server
+// proxies "/api" to the backend (see vite.config.js).
+// Production build:  set VITE_API_BASE_URL=https://api.yourdomain.com/api
+// in frontend/.env.production (or your hosting platform's env vars).
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const getToken = () => localStorage.getItem('nool_token');
 
@@ -51,6 +57,56 @@ export const authService = {
       method: 'GET',
       headers: headers(),
     });
+    return handleResponse(response);
+  },
+
+  // Change the *currently logged-in* user's password.
+  changePassword: async ({ currentPassword, newPassword }) => {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    return handleResponse(response);
+  },
+};
+
+// ─── Super Admin (admin account management) ─────────────────────────────────
+export const superAdminService = {
+  listAdmins: async () => {
+    const response = await fetch(`${API_BASE_URL}/super-admin/admins`, {
+      method: 'GET',
+      headers: headers(),
+    });
+    return handleResponse(response);
+  },
+
+  createAdmin: async ({ name, mobileNumber, password }) => {
+    const response = await fetch(`${API_BASE_URL}/super-admin/admins`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ name, mobileNumber, password }),
+    });
+    return handleResponse(response);
+  },
+
+  setStatus: async (userId, active) => {
+    const response = await fetch(
+      `${API_BASE_URL}/super-admin/admins/${userId}/status?active=${active}`,
+      { method: 'PATCH', headers: headers() }
+    );
+    return handleResponse(response);
+  },
+
+  resetPassword: async (userId, password) => {
+    const response = await fetch(
+      `${API_BASE_URL}/super-admin/admins/${userId}/password`,
+      {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ password }),
+      }
+    );
     return handleResponse(response);
   },
 };

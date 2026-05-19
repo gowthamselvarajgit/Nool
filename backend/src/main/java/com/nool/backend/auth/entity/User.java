@@ -26,6 +26,13 @@ public class User {
     @Column(name = "password", nullable = false, length = 100)
     private String password;
 
+    // Display name for the user. Required for ADMIN / SUPER_ADMIN accounts so
+    // we can show "Rahul" rather than just the phone number. For WORKER /
+    // SAREE_OWNER accounts this can stay null — their name lives on the
+    // corresponding Employee / SareeOwner entity.
+    @Column(name = "name", length = 100)
+    private String name;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role;

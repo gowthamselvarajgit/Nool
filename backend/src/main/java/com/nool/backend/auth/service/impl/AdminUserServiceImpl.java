@@ -6,6 +6,7 @@ import com.nool.backend.repository.auth.UserRepository;
 import com.nool.backend.auth.service.AdminUserService;
 import com.nool.backend.enums.Role;
 import com.nool.backend.exception.DuplicateResourceException;
+import com.nool.backend.exception.ResourceNotFoundException;
 import com.nool.backend.repository.auth.UserProfileRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,32 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .build();
         userProfileRepository.save(profile);
         return savedUser;
+    }
+
+    @Override
+    @Transactional
+    public User resetPassword(Long userId, String rawPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public User createAdminUser(String mobileNumber, String rawPassword, String name) {
+        if (userRepository.findByMobileNumber(mobileNumber).isPresent()) {
+            throw new DuplicateResourceException("A login account with this mobile number already exists");
+        }
+
+        User user = User.builder()
+                .mobileNumber(mobileNumber)
+                .password(passwordEncoder.encode(rawPassword))
+                .role(Role.ADMIN)
+                .name(name)
+                .active(true)
+                .build();
+        return userRepository.save(user);
     }
 
     @Override

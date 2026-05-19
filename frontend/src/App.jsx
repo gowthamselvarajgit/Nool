@@ -25,6 +25,7 @@ import EmployeeProfile from './pages/EmployeeProfile';
 import DailyWorkPage from './pages/DailyWorkPage';
 import PerformancePage from './pages/PerformancePage';
 import PaymentsManagementPage from './pages/PaymentsManagementPage';
+import SuperAdminPage from './pages/SuperAdminPage';
 
 function App() {
   return (
@@ -43,6 +44,16 @@ function App() {
 
           {/* Error Routes */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+          {/* Super Admin Routes */}
+          <Route
+            path="/super-admin/dashboard"
+            element={
+              <PrivateRoute requiredRole="SUPER_ADMIN">
+                <SuperAdminPage />
+              </PrivateRoute>
+            }
+          />
 
           {/* Admin Routes */}
           <Route

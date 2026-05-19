@@ -56,13 +56,17 @@ export const LoginPage = () => {
 
       login(response.token, {
         role: response.role,
-        mobileNumber: formData.mobileNumber,
+        name: response.name || null,
+        mobileNumber: response.mobileNumber || formData.mobileNumber,
         employeeId: response.employeeId || null,
         sareeOwnerId: response.sareeOwnerId || null,
       });
 
       // Route based on role
       switch (response.role) {
+        case 'SUPER_ADMIN':
+          navigate('/super-admin/dashboard');
+          break;
         case 'ADMIN':
           navigate('/admin/dashboard');
           break;

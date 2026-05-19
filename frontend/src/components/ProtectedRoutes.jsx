@@ -3,6 +3,15 @@ import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Loading } from '../components/Common';
 
+// SUPER_ADMIN inherits every ADMIN-only route. Any other role check requires
+// an exact match.
+const roleSatisfies = (userRole, required) => {
+  if (!required) return true;
+  if (userRole === required) return true;
+  if (required === 'ADMIN' && userRole === 'SUPER_ADMIN') return true;
+  return false;
+};
+
 export const PrivateRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
@@ -14,7 +23,7 @@ export const PrivateRoute = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
+  if (!roleSatisfies(user?.role, requiredRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -30,6 +39,8 @@ export const PublicRoute = ({ children }) => {
 
   if (isAuthenticated) {
     switch (user?.role) {
+      case 'SUPER_ADMIN':
+        return <Navigate to="/super-admin/dashboard" replace />;
       case 'ADMIN':
         return <Navigate to="/admin/dashboard" replace />;
       case 'WORKER':
