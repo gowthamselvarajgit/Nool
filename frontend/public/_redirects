@@ -1,0 +1,3 @@
+# SPA fallback — every unknown path returns index.html so the React Router
+# owns routing. Required on Cloudflare Pages and Netlify.
+/*    /index.html   200
