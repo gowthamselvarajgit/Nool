@@ -45,15 +45,24 @@ public class SecurityConfig {
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
 
-        // ✅ IMPORTANT: Use patterns instead of strict origins
-        configuration.setAllowedOriginPatterns(origins);
+        // ✅ IMPORTANT: Use patterns (regex) instead of strict origins
+        // If origin is "https://nool-rouge.vercel.app", convert to pattern
+        List<String> originPatterns = origins.stream()
+                .map(origin -> origin.replace(".", "\\.").replace("*", ".*"))
+                .collect(Collectors.toList());
+        
+        configuration.setAllowedOriginPatterns(originPatterns);
 
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         );
 
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
+        
+        // ✅ Cache preflight responses for 1 hour (3600 seconds)
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
