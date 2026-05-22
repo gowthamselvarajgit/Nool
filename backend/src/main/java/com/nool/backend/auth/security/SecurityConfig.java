@@ -45,13 +45,9 @@ public class SecurityConfig {
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
 
-        // ✅ IMPORTANT: Use patterns (regex) instead of strict origins
-        // If origin is "https://nool-rouge.vercel.app", convert to pattern
-        List<String> originPatterns = origins.stream()
-                .map(origin -> origin.replace(".", "\\.").replace("*", ".*"))
-                .collect(Collectors.toList());
-        
-        configuration.setAllowedOriginPatterns(originPatterns);
+        // ✅ Use setAllowedOrigins() for literal URLs (not patterns)
+        // When credentials are enabled, we MUST use literal origins, not patterns
+        configuration.setAllowedOrigins(origins);
 
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
