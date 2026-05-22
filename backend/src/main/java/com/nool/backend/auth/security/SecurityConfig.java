@@ -31,7 +31,7 @@ public class SecurityConfig {
      * set to the deployed frontend URL(s). The default value covers a typical local
      * Vite dev server so the app still works out-of-the-box for developers.
      */
-    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:4173,https://nool-rouge.vercel.app}")
+    @Value("${cors.allowed-origins: https://nool-rouge.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -46,7 +46,7 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
-        configuration.setAllowedOrigins(origins);
+        configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
