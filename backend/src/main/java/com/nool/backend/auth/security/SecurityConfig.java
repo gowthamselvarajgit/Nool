@@ -26,7 +26,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // ✅ IMPORTANT: No space after colon
+    // ✅ FIXED: No space + correct property key
     @Value("${cors.allowed-origins:https://nool-rouge.vercel.app}")
     private String allowedOrigins;
 
@@ -35,7 +35,7 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ CORS CONFIGURATION (FINAL FIX)
+    // ✅ FINAL CORS CONFIG
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -45,7 +45,7 @@ public class SecurityConfig {
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
 
-        // ✅ Use patterns (important fix)
+        // ✅ IMPORTANT: Use patterns instead of strict origins
         configuration.setAllowedOriginPatterns(origins);
 
         configuration.setAllowedMethods(
@@ -75,10 +75,10 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .authorizeHttpRequests(auth -> auth
 
-                        // ✅ ✅ ✅ CRITICAL FIX (preflight request)
+                        // ✅ ✅ ✅ CRITICAL FIX (preflight must be allowed)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ Public routes
+                        // ✅ ✅ ✅ FIX for context path (/api handled internally)
                         .requestMatchers("/auth/**").permitAll()
 
                         // ── Super Admin ──
