@@ -26,12 +26,8 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    /**
-     * Comma-separated list of allowed origins for CORS. In production this should be
-     * set to the deployed frontend URL(s). The default value covers a typical local
-     * Vite dev server so the app still works out-of-the-box for developers.
-     */
-    @Value("${cors.allowed-origins: https://nool-rouge.vercel.app}")
+    // ✅ IMPORTANT: No space after colon
+    @Value("${cors.allowed-origins:https://nool-rouge.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -39,20 +35,29 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // ✅ CORS CONFIGURATION (FINAL FIX)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
+
+        // ✅ Use patterns (important fix)
         configuration.setAllowedOriginPatterns(origins);
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
+        configuration.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+        );
+
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 
@@ -60,6 +65,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                // ✅ Enable CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
@@ -68,78 +74,80 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // ── Public ────────────────────────────────────────────────────────
+
+                        // ✅ ✅ ✅ CRITICAL FIX (preflight request)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // ✅ Public routes
                         .requestMatchers("/auth/**").permitAll()
 
-                        // ── Super-admin only (admin account management) ───────────────────
-                        // Note: SUPER_ADMIN also has the ADMIN authority granted in
-                        // JwtAuthenticationFilter, so they retain every admin power below.
+                        // ── Super Admin ──
                         .requestMatchers("/super-admin/**").hasAuthority("SUPER_ADMIN")
 
-                        // ── Admin-only analytics & dashboard ──────────────────────────────
+                        // ── Admin ──
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
 
-                        // ── Employee management ───────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/employees").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.PUT,    "/employees").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH,  "/employees/status").hasAuthority("ADMIN")
+                        // ── Employees ──
+                        .requestMatchers(HttpMethod.POST, "/employees").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/employees").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/employees/status").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/employees/**").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/employees/list").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.GET,    "/employees/me").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.GET,    "/employees/**").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/employees/list").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/employees/me").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.GET, "/employees/**").hasAnyAuthority("ADMIN", "WORKER")
 
-                        // ── Attendance ────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/attendance").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/attendance/list").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/attendance/my-list").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.POST,   "/attendance/employee/*/summary").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.POST,   "/attendance/summary").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.GET,    "/attendance/**").hasAnyAuthority("ADMIN", "WORKER")
+                        // ── Attendance ──
+                        .requestMatchers(HttpMethod.POST, "/attendance").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/attendance/list").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/attendance/my-list").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/attendance/employee/*/summary").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/attendance/summary").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.GET, "/attendance/**").hasAnyAuthority("ADMIN", "WORKER")
 
-                        // ── Daily Work ────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working/list").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working/my-list").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working/employee/*/summary").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.POST,   "/employee-daily-working/summary").hasAnyAuthority("ADMIN", "WORKER")
+                        // ── Daily Work ──
+                        .requestMatchers(HttpMethod.POST, "/employee-daily-working").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/employee-daily-working/list").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/employee-daily-working/my-list").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/employee-daily-working/employee/*/summary").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/employee-daily-working/summary").hasAnyAuthority("ADMIN", "WORKER")
 
-                        // ── Salary ────────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/salary-payments").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/salary-payments/employee/*/history").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.POST,   "/salary-payments/history").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.POST,   "/salary-payments/summary").hasAnyAuthority("ADMIN", "WORKER")
-                        .requestMatchers(HttpMethod.GET,    "/salary-payments/employees-summary").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/salary-payments/**").hasAuthority("ADMIN")
+                        // ── Salary ──
+                        .requestMatchers(HttpMethod.POST, "/salary-payments").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/salary-payments/employee/*/history").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/salary-payments/history").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.POST, "/salary-payments/summary").hasAnyAuthority("ADMIN", "WORKER")
+                        .requestMatchers(HttpMethod.GET, "/salary-payments/employees-summary").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/salary-payments/**").hasAuthority("ADMIN")
 
-                        // ── Owners ────────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/owners").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.PUT,    "/owners").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH,  "/owners/status").hasAuthority("ADMIN")
+                        // ── Owners ──
+                        .requestMatchers(HttpMethod.POST, "/owners").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/owners").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/owners/status").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/owners/**").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/owners/list").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.GET,    "/owners/me").hasAnyAuthority("ADMIN", "SAREE_OWNER")
-                        .requestMatchers(HttpMethod.GET,    "/owners/**").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/owners/list").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/owners/me").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        .requestMatchers(HttpMethod.GET, "/owners/**").hasAnyAuthority("ADMIN", "SAREE_OWNER")
 
-                        // ── Inventory ─────────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/inventory/receipt").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/return").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/owner/*/ledger").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/owner/*/summary").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/summary").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.GET,    "/inventory/owners").hasAuthority("ADMIN")
+                        // ── Inventory ──
+                        .requestMatchers(HttpMethod.POST, "/inventory/receipt").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/inventory/return").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/inventory/owner/*/ledger").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/inventory/owner/*/summary").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/inventory/summary").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/inventory/owners").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/inventory/entry/**").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/my-ledger").hasAnyAuthority("ADMIN", "SAREE_OWNER")
-                        .requestMatchers(HttpMethod.POST,   "/inventory/my-summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/inventory/my-ledger").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/inventory/my-summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
 
-                        // ── Owner Payments ────────────────────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/owner-payments").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/owner-payments/owner/*/history").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/owner-payments/owner/*/summary").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.GET,    "/owner-payments/owners-summary").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST,   "/owner-payments/history").hasAnyAuthority("ADMIN", "SAREE_OWNER")
-                        .requestMatchers(HttpMethod.POST,   "/owner-payments/summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        // ── Owner Payments ──
+                        .requestMatchers(HttpMethod.POST, "/owner-payments").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/owner-payments/owner/*/history").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/owner-payments/owner/*/summary").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/owner-payments/owners-summary").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/owner-payments/history").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/owner-payments/summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
 
-                        // ── Fallback ──────────────────────────────────────────────────────
+                        // ✅ fallback
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -147,3 +155,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+``
