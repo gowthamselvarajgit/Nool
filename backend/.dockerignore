@@ -1,0 +1,16 @@
+# Keep the build context small and never bake secrets into the image.
+.env
+.env.*
+!.env.example
+
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+.idea/
+.vscode/
+*.iml
+
+.git/
+.gitignore
+HELP.md
+README.md
