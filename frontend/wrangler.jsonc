@@ -1,0 +1,19 @@
+// Cloudflare Workers + Static Assets configuration for the NOOL SPA.
+// Reference: https://developers.cloudflare.com/workers/static-assets/
+//
+// This makes the new "Workers" deployment flow on Cloudflare treat the
+// Vite-built `dist/` directory as a static site, with the SPA fallback
+// configured natively (so /admin/dashboard, /super-admin/dashboard, etc.
+// all serve index.html and let React Router take over).
+//
+// The `_redirects` file in public/ remains the equivalent fallback for
+// classic Cloudflare Pages and Netlify — both configs coexist safely.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nool",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
