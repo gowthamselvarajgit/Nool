@@ -57,7 +57,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             boolean linkedToSomething = profile != null
                     && (profile.getEmployeeId() != null || profile.getOwnerId() != null);
             boolean isAdmin = existingUser.getRole() != null
-                    && existingUser.getRole().name().equals("ADMIN");
+                    && (existingUser.getRole().name().equals("ADMIN") || existingUser.getRole().name().equals("SUPER_ADMIN"));
             if (linkedToSomething || isAdmin) {
                 throw new DuplicateResourceException("This mobile number is already in use by another account");
             }
@@ -139,8 +139,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EmployeeResponseDto getEmployeeById(Long employeeId) {
         // A WORKER can only read their own profile, never another employee's.
-        String role = CurrentUserUtil.getRole();
-        if (!"ADMIN".equals(role)) {
+        if (!CurrentUserUtil.isAdminOrSuperAdmin()) {
             Long callerEmployeeId = CurrentUserUtil.getEmployeeId();
             if (callerEmployeeId == null || !callerEmployeeId.equals(employeeId)) {
                 throw new org.springframework.security.access.AccessDeniedException("You can only view your own profile");

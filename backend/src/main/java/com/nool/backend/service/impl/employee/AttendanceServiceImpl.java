@@ -137,8 +137,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public AttendanceSummaryDto getAttendanceSummaryByEmployee(Long employeeId, DateRangeDto dateRangeDto) {
-        String role = CurrentUserUtil.getRole();
-        if (!"ADMIN".equals(role)) {
+        if (!CurrentUserUtil.isAdminOrSuperAdmin()) {
             Long caller = CurrentUserUtil.getEmployeeId();
             if (caller == null || !caller.equals(employeeId)) {
                 throw new org.springframework.security.access.AccessDeniedException(

@@ -49,7 +49,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
             boolean linkedToSomething = profile != null
                     && (profile.getEmployeeId() != null || profile.getOwnerId() != null);
             boolean isAdmin = existingUser.getRole() != null
-                    && existingUser.getRole().name().equals("ADMIN");
+                    && (existingUser.getRole().name().equals("ADMIN") || existingUser.getRole().name().equals("SUPER_ADMIN"));
             if (linkedToSomething || isAdmin) {
                 throw new DuplicateResourceException("This mobile number is already in use by another account");
             }
@@ -123,8 +123,7 @@ public class SareeOwnerServiceImpl implements SareeOwnerService {
     @Override
     public SareeOwnerResponseDto getOwnerById(Long ownerId) {
         // A SAREE_OWNER can only read their own profile.
-        String role = CurrentUserUtil.getRole();
-        if (!"ADMIN".equals(role)) {
+        if (!CurrentUserUtil.isAdminOrSuperAdmin()) {
             Long callerOwnerId = CurrentUserUtil.getOwnerId();
             if (callerOwnerId == null || !callerOwnerId.equals(ownerId)) {
                 throw new org.springframework.security.access.AccessDeniedException("You can only view your own profile");

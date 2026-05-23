@@ -24,6 +24,11 @@ public class CurrentUserUtil {
         return getClaims().get("role", String.class);
     }
 
+    public static boolean isAdminOrSuperAdmin() {
+        String role = getRole();
+        return "ADMIN".equals(role) || "SUPER_ADMIN".equals(role);
+    }
+
     public static Long getEmployeeId() {
         return getClaims().get("employeeId", Long.class);
     }

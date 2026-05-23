@@ -226,8 +226,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
     }
 
     private void assertSelfOrAdmin(Long ownerId) {
-        String role = CurrentUserUtil.getRole();
-        if ("ADMIN".equals(role)) return;
+        if (CurrentUserUtil.isAdminOrSuperAdmin()) return;
         Long caller = CurrentUserUtil.getOwnerId();
         if (caller == null || !caller.equals(ownerId)) {
             throw new org.springframework.security.access.AccessDeniedException(

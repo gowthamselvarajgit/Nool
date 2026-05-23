@@ -220,8 +220,7 @@ public class SalaryServiceImpl implements SalaryService {
     }
 
     private void assertSelfOrAdmin(Long employeeId) {
-        String role = CurrentUserUtil.getRole();
-        if ("ADMIN".equals(role)) return;
+        if (CurrentUserUtil.isAdminOrSuperAdmin()) return;
         Long caller = CurrentUserUtil.getEmployeeId();
         if (caller == null || !caller.equals(employeeId)) {
             throw new org.springframework.security.access.AccessDeniedException(
