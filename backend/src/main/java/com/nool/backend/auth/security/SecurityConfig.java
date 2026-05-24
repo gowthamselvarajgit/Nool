@@ -27,7 +27,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     // ✅ FIXED: No space + correct property key
-    @Value("${cors.allowed-origins:https://nool-rouge.vercel.app}")
+    @Value("${cors.allowed-origins:https://noolerp.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -151,6 +151,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/owner-payments/owners-summary").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/owner-payments/history").hasAnyAuthority("ADMIN", "SAREE_OWNER")
                         .requestMatchers(HttpMethod.POST, "/owner-payments/summary").hasAnyAuthority("ADMIN", "SAREE_OWNER")
+
+                        .requestMatchers("/health", "/api/health").permitAll()
 
                         // ✅ fallback
                         .anyRequest().authenticated()

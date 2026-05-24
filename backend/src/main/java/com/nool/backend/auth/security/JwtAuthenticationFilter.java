@@ -43,13 +43,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtUtil.extractAllClaims(token);
                 String role = claims.get("role", String.class);
 
-                // SUPER_ADMIN inherits every ADMIN permission. By granting both
-                // authorities, every existing `hasAuthority("ADMIN")` rule keeps
-                // working without modification — and SUPER_ADMIN-only endpoints
-                // can check `hasAuthority("SUPER_ADMIN")` explicitly.
                 List<SimpleGrantedAuthority> authorities = new ArrayList<>();
                 if (role != null) {
                     authorities.add(new SimpleGrantedAuthority(role));
+
                     if ("SUPER_ADMIN".equals(role)) {
                         authorities.add(new SimpleGrantedAuthority("ADMIN"));
                     }
@@ -67,15 +64,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        // ✅ CRITICAL: Skip JWT filter for:
-        // 1. Preflight OPTIONS requests (CORS)
-        // 2. Auth endpoints (login, logout, validate)
+
         String method = request.getMethod();
         String uri = request.getRequestURI();
-        
+
+        // ✅ Allow preflight requests
         boolean isOptions = "OPTIONS".equalsIgnoreCase(method);
+
+        // ✅ Allow auth endpoints
         boolean isAuthPath = uri.startsWith("/api/auth/");
-        
-        return isOptions || isAuthPath;
+
+        // ✅ ✅ CRITICAL FIX: Allow health endpoint
+        boolean isHealth = uri.equals("/health") || uri.equals("/api/health");
+
+        return isOptions || isAuthPath || isHealth;
     }
 }
