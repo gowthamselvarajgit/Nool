@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Card, Button, Input, Select, Modal, Loading, ErrorMessage, EmptyState } from '../components/Common';
+import { Card, Button, Input, Modal, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { ownerPaymentService } from '../services/api';
 import { formatDate, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
@@ -24,7 +24,7 @@ export const PaymentsManagementPage = () => {
   // Pay modal
   const [showPayModal, setShowPayModal] = useState(false);
   const [payForm, setPayForm] = useState({
-    ownerId: '', amountPaid: '', paymentDate: today, paymentMode: 'CASH', remarks: '',
+    ownerId: '', amountPaid: '', paymentDate: today, remarks: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -72,7 +72,6 @@ export const PaymentsManagementPage = () => {
       ownerId: o ? String(o.ownerId) : '',
       amountPaid: o ? String(Math.round(o.pendingAmount || 0)) : '',
       paymentDate: today,
-      paymentMode: 'CASH',
       remarks: '',
     });
     setModalError('');
@@ -80,7 +79,7 @@ export const PaymentsManagementPage = () => {
   }
 
   async function submitPay() {
-    const { ownerId, amountPaid, paymentDate, paymentMode, remarks } = payForm;
+    const { ownerId, amountPaid, paymentDate, remarks } = payForm;
     if (!ownerId) { setModalError('Please select an owner'); return; }
     const amt = parseFloat(amountPaid);
     if (!amt || amt <= 0) { setModalError('Amount must be greater than 0'); return; }
@@ -91,7 +90,6 @@ export const PaymentsManagementPage = () => {
       await ownerPaymentService.create({
         ownerId: parseInt(ownerId),
         amountPaid: amt,
-        paymentMode,
         paymentDate,
         remarks: remarks || null,
       });
@@ -316,16 +314,6 @@ export const PaymentsManagementPage = () => {
             />
           </div>
 
-          <Select
-            label="Payment Mode" value={payForm.paymentMode}
-            onChange={e => setPayForm(f => ({ ...f, paymentMode: e.target.value }))}
-            options={[
-              { value: 'CASH', label: '💵 Cash' },
-              { value: 'ONLINE', label: '📱 Online Transfer' },
-              { value: 'CHEQUE', label: '🏦 Cheque' },
-            ]}
-          />
-
           <Input
             label="Notes (optional)" value={payForm.remarks}
             onChange={e => setPayForm(f => ({ ...f, remarks: e.target.value }))}
@@ -393,7 +381,6 @@ export const PaymentsManagementPage = () => {
                       'Payment Date': p.paymentDate ? formatDate(p.paymentDate) : '',
                       'Amount Paid (₹)': p.amountPaid ?? 0,
                       'Cumulative Paid (₹)': cum,
-                      'Mode': p.paymentMode || '',
                       'Notes': p.remarks || '',
                     };
                   });
@@ -401,7 +388,7 @@ export const PaymentsManagementPage = () => {
                     rows,
                     fileName: `Nool_OwnerPayments_${selectedOwner.ownerName.replace(/\s+/g, '_')}`,
                     sheetName: 'Payment History',
-                    columnWidths: [4, 14, 16, 18, 12, 24],
+                    columnWidths: [4, 14, 16, 18, 24],
                   });
                 }}
               >
@@ -459,7 +446,6 @@ export const PaymentsManagementPage = () => {
                           <tr className="text-gray-600 text-xs font-semibold uppercase tracking-wider">
                             <th className="px-3 py-2 text-left">Date Paid</th>
                             <th className="px-3 py-2 text-right">Amount</th>
-                            <th className="px-3 py-2 text-left">Mode</th>
                             <th className="px-3 py-2 text-right">Paid So Far</th>
                             <th className="px-3 py-2 text-left">Notes</th>
                           </tr>
@@ -469,11 +455,6 @@ export const PaymentsManagementPage = () => {
                             <tr key={p.paymentId} className="hover:bg-gray-50">
                               <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">{formatDate(p.paymentDate)}</td>
                               <td className="px-3 py-2.5 text-right font-bold text-emerald-700">{inr(p.amountPaid)}</td>
-                              <td className="px-3 py-2.5">
-                                <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
-                                  {p.paymentMode}
-                                </span>
-                              </td>
                               <td className="px-3 py-2.5 text-right text-gray-700">{inr(p.cumulativePaid)}</td>
                               <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[180px] truncate" title={p.remarks || ''}>
                                 {p.remarks || '—'}

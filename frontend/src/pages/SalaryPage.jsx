@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
 import {
-  Card, Button, Input, Select, Modal, Loading, ErrorMessage, EmptyState,
+  Card, Button, Input, Modal, Loading, ErrorMessage, EmptyState,
 } from '../components/Common';
 import { useAuth } from '../hooks/useAuth';
 import { salaryService, employeeService } from '../services/api';
@@ -38,7 +38,7 @@ const AdminView = () => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [payForm, setPayForm] = useState({
     employeeId: '', fromDate: firstOfMonth, toDate: today, amountPaid: '',
-    paymentDate: today, paymentMode: 'CASH', remarks: '',
+    paymentDate: today, remarks: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -88,7 +88,6 @@ const AdminView = () => {
       toDate: today,
       amountPaid: emp ? String(Math.round(emp.pendingSalary || 0)) : '',
       paymentDate: today,
-      paymentMode: 'CASH',
       remarks: '',
     });
     setModalError('');
@@ -96,7 +95,7 @@ const AdminView = () => {
   }
 
   async function submitPay() {
-    const { employeeId, fromDate, toDate, amountPaid, paymentDate, paymentMode, remarks } = payForm;
+    const { employeeId, fromDate, toDate, amountPaid, paymentDate, remarks } = payForm;
     if (!employeeId) { setModalError('Please select an employee'); return; }
     if (!fromDate || !toDate) { setModalError('Please pick the period covered'); return; }
     const amt = parseFloat(amountPaid);
@@ -108,7 +107,7 @@ const AdminView = () => {
       await salaryService.create({
         employeeId: parseInt(employeeId, 10),
         fromDate, toDate, amountPaid: amt,
-        paymentDate, paymentMode, remarks: remarks || null,
+        paymentDate, remarks: remarks || null,
       });
       setShowPayModal(false);
       await fetchAll();
@@ -342,16 +341,6 @@ const AdminView = () => {
             />
           </div>
 
-          <Select
-            label="Payment Mode" value={payForm.paymentMode}
-            onChange={e => setPayForm(f => ({ ...f, paymentMode: e.target.value }))}
-            options={[
-              { value: 'CASH', label: 'Cash' },
-              { value: 'ONLINE', label: 'Online Transfer' },
-              { value: 'CHEQUE', label: 'Cheque' },
-            ]}
-          />
-
           <Input
             label="Notes (optional)" value={payForm.remarks}
             onChange={e => setPayForm(f => ({ ...f, remarks: e.target.value }))}
@@ -423,7 +412,6 @@ const AdminView = () => {
                       'Cumulative Paid (₹)': cum,
                       'Period From': p.fromDate ? formatDate(p.fromDate) : '',
                       'Period To': p.toDate ? formatDate(p.toDate) : '',
-                      'Mode': p.paymentMode || '',
                       'Notes': p.remarks || '',
                     };
                   });
@@ -431,7 +419,7 @@ const AdminView = () => {
                     rows,
                     fileName: `Nool_Salary_${selectedEmployee.employeeName.replace(/\s+/g, '_')}`,
                     sheetName: 'Payment History',
-                    columnWidths: [4, 14, 16, 18, 14, 14, 12, 24],
+                    columnWidths: [4, 14, 16, 18, 14, 14, 24],
                   });
                 }}
               >
@@ -492,7 +480,6 @@ const AdminView = () => {
                             <th className="px-3 py-2 text-left">Date Paid</th>
                             <th className="px-3 py-2 text-right">Amount</th>
                             <th className="px-3 py-2 text-left">For Period</th>
-                            <th className="px-3 py-2 text-left">Mode</th>
                             <th className="px-3 py-2 text-right">Paid So Far</th>
                             <th className="px-3 py-2 text-left">Notes</th>
                           </tr>
@@ -504,11 +491,6 @@ const AdminView = () => {
                               <td className="px-3 py-2.5 text-right font-bold text-emerald-700">{inr(p.amountPaid)}</td>
                               <td className="px-3 py-2.5 text-gray-600 text-xs">
                                 {p.fromDate ? formatDate(p.fromDate) : '—'} → {p.toDate ? formatDate(p.toDate) : '—'}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
-                                  {p.paymentMode}
-                                </span>
                               </td>
                               <td className="px-3 py-2.5 text-right text-gray-700">{inr(p.cumulativePaid)}</td>
                               <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[180px] truncate" title={p.remarks || ''}>
@@ -658,12 +640,11 @@ const WorkerView = () => {
                       'Cumulative Paid (₹)': p.cumulativePaid,
                       'Period From': p.fromDate ? formatDate(p.fromDate) : '',
                       'Period To': p.toDate ? formatDate(p.toDate) : '',
-                      'Mode': p.paymentMode || '',
                       'Notes': p.remarks || '',
                     })),
                     fileName: 'Nool_My_Salary',
                     sheetName: 'Salary History',
-                    columnWidths: [4, 14, 16, 18, 14, 14, 12, 24],
+                    columnWidths: [4, 14, 16, 18, 14, 14, 24],
                   })}
                   className="flex items-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-sm font-semibold transition-colors"
                 >
@@ -689,7 +670,6 @@ const WorkerView = () => {
                     <th className="px-4 py-3 text-left">Date Paid</th>
                     <th className="px-4 py-3 text-right">Amount</th>
                     <th className="px-4 py-3 text-left">For Period</th>
-                    <th className="px-4 py-3 text-left">Mode</th>
                     <th className="px-4 py-3 text-right">Paid So Far</th>
                     <th className="px-4 py-3 text-left">Notes</th>
                   </tr>
@@ -701,11 +681,6 @@ const WorkerView = () => {
                       <td className="px-4 py-3 text-right font-bold text-emerald-700">{inr(p.amountPaid)}</td>
                       <td className="px-4 py-3 text-gray-600 text-xs">
                         {p.fromDate ? formatDate(p.fromDate) : '—'} → {p.toDate ? formatDate(p.toDate) : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
-                          {p.paymentMode}
-                        </span>
                       </td>
                       <td className="px-4 py-3 text-right text-gray-700">{inr(p.cumulativePaid)}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate" title={p.remarks || ''}>

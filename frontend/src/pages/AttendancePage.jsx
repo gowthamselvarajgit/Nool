@@ -5,7 +5,7 @@ import { attendanceService, employeeService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, friendlyStatus, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
-import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, Download } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, Clock, RefreshCw, ChevronRight, ChevronLeft, Download } from 'lucide-react';
 
 const AttendancePage = () => {
   const { user } = useAuth();
@@ -16,13 +16,19 @@ const AttendancePage = () => {
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(toLocalISODate(new Date()).slice(0, 7));
 
-  // Mark modal
+  // Mark modal (kept as fallback — not currently exposed via a button)
   const [showMarkModal, setShowMarkModal] = useState(false);
   const [markEmployee, setMarkEmployee] = useState('');
   const [markDate, setMarkDate] = useState(toLocalISODate(new Date()));
   const [markStatus, setMarkStatus] = useState('PRESENT');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [markError, setMarkError] = useState('');
+
+  // Inline marking — admin picks a date once at the top, then taps
+  // Present/Absent/Half-day on each employee's card.
+  const [inlineDate, setInlineDate] = useState(toLocalISODate(new Date()));
+  const [markingEmpId, setMarkingEmpId] = useState(null);     // employee currently being POSTed
+  const [cardError, setCardError] = useState({});             // { [employeeId]: errMsg }
 
   // Detail modal — independent month so users can browse past months freely
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -115,6 +121,33 @@ const AttendancePage = () => {
     setShowDetailModal(true);
   };
 
+  // ── Inline mark from the card ──────────────────────────────────────────────
+  // Posts a single attendance record for `emp` on `inlineDate` and refreshes.
+  // Errors land on the card (we do NOT show a global toast).
+  const markFromCard = async (emp, status) => {
+    setCardError(prev => ({ ...prev, [emp.employeeId]: '' }));
+    setMarkingEmpId(emp.employeeId);
+    try {
+      await attendanceService.mark({
+        employeeId: emp.employeeId,
+        attendanceDate: inlineDate,
+        status,
+      });
+      await fetchAll();
+    } catch (err) {
+      setCardError(prev => ({ ...prev, [emp.employeeId]: err.message }));
+    } finally {
+      setMarkingEmpId(null);
+    }
+  };
+
+  // When the user changes the inline marking date, also slide the month
+  // picker to that date's month so the stats stay in sync.
+  const handleInlineDateChange = (newDate) => {
+    setInlineDate(newDate);
+    if (newDate) setSelectedMonth(newDate.slice(0, 7));
+  };
+
   // ── Calendar data for the detail modal ──────────────────────────────────────
   // Recomputed for whichever month the user is currently viewing in the modal.
   const detailMonthData = useMemo(() => {
@@ -180,19 +213,41 @@ const AttendancePage = () => {
           <div>
             <h1 className="text-4xl font-bold text-gray-900">📍 Attendance</h1>
             <p className="text-gray-500 mt-1">
-              {isWorker ? 'View your attendance history' : 'Click any employee card to view their attendance history'}
+              {isWorker
+                ? 'View your attendance history'
+                : 'Pick a date, then tap Present / Absent / Half-day on each employee.'}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(e.target.value)}
-              className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-            />
-            <Button variant="outline" onClick={fetchAll}><RefreshCw className="w-4 h-4" /></Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isWorker && (
+              <div className="flex flex-col">
+                <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-0.5">
+                  Marking date
+                </label>
+                <input
+                  type="date"
+                  value={inlineDate}
+                  onChange={e => handleInlineDateChange(e.target.value)}
+                  max={toLocalISODate(new Date())}
+                  className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                />
+              </div>
+            )}
+            <div className="flex flex-col">
+              <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-0.5">
+                Stats month
+              </label>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              />
+            </div>
+            <Button variant="outline" onClick={fetchAll} className="self-end"><RefreshCw className="w-4 h-4" /></Button>
             <Button
               variant="outline"
+              className="self-end"
               onClick={() => exportToExcel({
                 rows: monthRecords.map(r => ({
                   'Employee': r.employeeName || '',
@@ -206,11 +261,6 @@ const AttendancePage = () => {
             >
               <Download className="w-4 h-4 mr-1" /> Export
             </Button>
-            {!isWorker && (
-              <Button onClick={() => { setMarkError(''); setShowMarkModal(true); }}>
-                <Plus className="w-4 h-4 mr-1" /> Mark Attendance
-              </Button>
-            )}
           </div>
         </div>
 
@@ -298,6 +348,57 @@ const AttendancePage = () => {
                 ) : (
                   <p className="text-xs text-gray-400 text-center">No records this month</p>
                 )}
+
+                {/* ── Inline mark for the selected date (admin only) ──────── */}
+                {!isWorker && (() => {
+                  const todayMark = emp.records.find(r => r.attendanceDate === inlineDate)?.status;
+                  const busy = markingEmpId === emp.employeeId;
+                  return (
+                    <div onClick={(e) => e.stopPropagation()} className="border-t border-gray-100 pt-3">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1.5">
+                        Mark for {formatDate(inlineDate)}
+                      </p>
+                      {todayMark ? (
+                        <div className={`rounded-lg px-3 py-2 text-center text-sm font-bold flex items-center justify-center gap-1.5 ${
+                          todayMark === 'PRESENT' ? 'bg-emerald-100 text-emerald-700'
+                            : todayMark === 'ABSENT' ? 'bg-rose-100 text-rose-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {statusIcon(todayMark)} {friendlyStatus(todayMark)}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <button
+                            disabled={busy}
+                            onClick={() => markFromCard(emp, 'PRESENT')}
+                            className="bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 text-xs font-bold py-2 rounded-lg border border-emerald-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" /> Present
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => markFromCard(emp, 'ABSENT')}
+                            className="bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 text-xs font-bold py-2 rounded-lg border border-rose-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Absent
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => markFromCard(emp, 'HALF_DAY')}
+                            className="bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 text-xs font-bold py-2 rounded-lg border border-amber-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <Clock className="w-3.5 h-3.5" /> Half
+                          </button>
+                        </div>
+                      )}
+                      {cardError[emp.employeeId] && (
+                        <p className="text-rose-600 text-[11px] mt-1.5 bg-rose-50 border border-rose-100 rounded px-2 py-1">
+                          {cardError[emp.employeeId]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

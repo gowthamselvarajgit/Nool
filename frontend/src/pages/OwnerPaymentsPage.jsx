@@ -92,7 +92,6 @@ export const OwnerPaymentsPage = () => {
       ? new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
       : '—',
     amount: p.amountPaid || 0,
-    mode: p.paymentMode || 'CASH'
   }));
 
   return (
@@ -129,12 +128,11 @@ export const OwnerPaymentsPage = () => {
                   'Payment ID': p.paymentId,
                   'Date': p.paymentDate ? formatDate(p.paymentDate) : '',
                   'Amount (₹)': p.amountPaid ?? 0,
-                  'Mode': p.paymentMode || '',
                   'Remarks': p.remarks || '',
                 })),
                 fileName: 'Nool_My_Payments',
                 sheetName: 'Payments',
-                columnWidths: [12, 14, 14, 12, 24],
+                columnWidths: [12, 14, 14, 24],
               })}
               className="flex items-center gap-2 px-4 py-2.5 bg-white text-text-main border border-border rounded-xl text-sm font-semibold hover:bg-surface-hover transition-colors shadow-sm disabled:opacity-50"
             >
@@ -290,9 +288,11 @@ export const OwnerPaymentsPage = () => {
                               })
                             : '—'}
                         </p>
-                        <p className="text-xs text-secondary-500 font-medium mt-0.5">
-                          {payment.paymentMode || 'CASH'}{payment.remarks ? ` • ${payment.remarks}` : ''}
-                        </p>
+                        {payment.remarks && (
+                          <p className="text-xs text-secondary-500 font-medium mt-0.5">
+                            {payment.remarks}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">

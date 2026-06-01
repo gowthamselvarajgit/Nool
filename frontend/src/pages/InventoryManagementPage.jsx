@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '../components/Layout';
-import { Card, Button, Input, Modal, Loading, ErrorMessage, EmptyState } from '../components/Common';
+import { Card, Button, Input, Loading, ErrorMessage, EmptyState } from '../components/Common';
 import { inventoryService, ownerService } from '../services/api';
 import { formatDate, toLocalISODate } from '../utils/formatters';
 import { exportToExcel } from '../utils/excelExporter';
@@ -24,9 +24,10 @@ export const InventoryManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // ── Modal state (only for short Receipt/Return forms) ──────────────────────
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showReturnModal, setShowReturnModal] = useState(false);
+  // ── Inline form state ──────────────────────────────────────────────────────
+  // Replaces the old Receipt/Return modals. When non-null, an in-page form is
+  // rendered instead of the owner grid. Values: 'RECEIPT' | 'RETURN' | null.
+  const [formMode, setFormMode] = useState(null);
 
   // ── Detail-view state (one owner's data shown in-page, not a modal) ────────
   // selectedOwner !== null → grid is hidden, detail view is shown
@@ -113,17 +114,26 @@ export const InventoryManagementPage = () => {
     }
   }
 
-  // ── Receipt / Return ───────────────────────────────────────────────────────
+  // ── Receipt / Return (inline form, not modal) ──────────────────────────────
   const openReceipt = (preselectOwner = null) => {
     setReceiptForm({ ...blankForm, ownerId: preselectOwner ? String(preselectOwner.ownerId) : '' });
     setModalError('');
-    setShowReceiptModal(true);
+    setFormMode('RECEIPT');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const openReturn = (preselectOwner = null) => {
     setReturnForm({ ...blankForm, ownerId: preselectOwner ? String(preselectOwner.ownerId) : '' });
     setModalError('');
-    setShowReturnModal(true);
+    setFormMode('RETURN');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const closeForm = () => {
+    setFormMode(null);
+    setModalError('');
+    setReceiptForm(blankForm);
+    setReturnForm(blankForm);
   };
 
   const submitReceipt = async () => {
@@ -140,7 +150,7 @@ export const InventoryManagementPage = () => {
         quantity: qty,
         remarks: receiptForm.remarks || null,
       });
-      setShowReceiptModal(false);
+      setFormMode(null);
       setReceiptForm(blankForm);
       // Refresh the detail view if we're viewing this owner
       if (selectedOwner?.ownerId === parseInt(receiptForm.ownerId)) {
@@ -171,7 +181,7 @@ export const InventoryManagementPage = () => {
         quantity: qty,
         remarks: returnForm.remarks || null,
       });
-      setShowReturnModal(false);
+      setFormMode(null);
       setReturnForm(blankForm);
       if (selectedOwner?.ownerId === parseInt(returnForm.ownerId)) {
         await openLedger(selectedOwner);
@@ -515,8 +525,117 @@ export const InventoryManagementPage = () => {
           </div>
         </Card>
 
+        {/* ── Inline Receipt / Return form (replaces the old modal) ── */}
+        {formMode && (() => {
+          const isReceipt = formMode === 'RECEIPT';
+          const form = isReceipt ? receiptForm : returnForm;
+          const setForm = isReceipt ? setReceiptForm : setReturnForm;
+          const submit = isReceipt ? submitReceipt : submitReturn;
+          // For returns, only show owners that have stock in hand.
+          const ownerOptions = isReceipt
+            ? owners.map(o => ({ value: String(o.id), label: o.name }))
+            : ownersInventory
+                .filter(o => (o.sareesInHand ?? 0) > 0)
+                .map(o => ({ value: String(o.ownerId), label: `${o.ownerName} (${o.sareesInHand} in hand)` }));
+          const selectedReturnOwner = !isReceipt && form.ownerId
+            ? ownersInventory.find(x => x.ownerId === parseInt(form.ownerId))
+            : null;
+
+          return (
+            <Card className="!p-0 overflow-hidden">
+              <div className={`flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b ${
+                isReceipt ? 'bg-indigo-50 border-indigo-100' : 'bg-emerald-50 border-emerald-100'
+              }`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    onClick={closeForm}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold flex-shrink-0"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Back
+                  </button>
+                  <div className="min-w-0">
+                    <h2 className={`text-lg sm:text-xl font-bold truncate ${
+                      isReceipt ? 'text-indigo-900' : 'text-emerald-900'
+                    }`}>
+                      {isReceipt ? '📥 New Receipt' : '📤 New Return'}
+                    </h2>
+                    <p className="text-xs text-gray-600">
+                      {isReceipt
+                        ? 'Record sarees coming in from an owner.'
+                        : 'Record sarees returned to an owner.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 space-y-4 max-w-2xl">
+                {/* Owner */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Owner *</label>
+                  <select
+                    value={form.ownerId}
+                    onChange={e => setForm(f => ({ ...f, ownerId: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                  >
+                    <option value="">Select owner...</option>
+                    {ownerOptions.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Return: in-hand hint */}
+                {selectedReturnOwner && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
+                    <p className="text-amber-800">
+                      <strong>{selectedReturnOwner.sareesInHand}</strong> sarees currently in hand with {selectedReturnOwner.ownerName}
+                    </p>
+                  </div>
+                )}
+
+                <Input
+                  label={isReceipt ? 'Received Date' : 'Return Date'}
+                  type="date"
+                  value={form.entryDate}
+                  onChange={e => setForm(f => ({ ...f, entryDate: e.target.value }))}
+                  required
+                />
+                <Input
+                  label={isReceipt ? 'Quantity Received' : 'Quantity to Return'}
+                  type="number"
+                  min="1"
+                  value={form.quantity}
+                  onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                  placeholder={isReceipt ? 'e.g. 100' : 'e.g. 50'}
+                  required
+                />
+                <Input
+                  label="Remarks (optional)"
+                  value={form.remarks}
+                  onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))}
+                />
+
+                {modalError && (
+                  <p className="text-rose-600 text-sm bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                    {modalError}
+                  </p>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <Button className="flex-1" onClick={submit} isLoading={submitting}>
+                    {isReceipt ? 'Save Receipt' : 'Save Return'}
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={closeForm}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
+
         {/* ── Per-Owner Cards (grid mode) ── */}
-        {!selectedOwner && (
+        {!formMode && !selectedOwner && (
         <div>
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
             <div>
@@ -617,7 +736,7 @@ export const InventoryManagementPage = () => {
         )}
 
         {/* ── Per-Owner Detail View (replaces owner cards while an owner is selected) ── */}
-        {selectedOwner && (() => {
+        {!formMode && selectedOwner && (() => {
           // Pull fresh stats from ownersInventory so the header reflects recent receipts/returns.
           const fresh = ownersInventory.find(o => o.ownerId === selectedOwner.ownerId) || selectedOwner;
           const inHand = fresh.sareesInHand ?? 0;
@@ -843,7 +962,8 @@ export const InventoryManagementPage = () => {
           );
         })()}
 
-        {/* ── Ledger Report Section ── */}
+        {/* ── Ledger Report Section (hidden while inline form is open) ── */}
+        {!formMode && (
         <Card className="!p-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
@@ -1011,99 +1131,9 @@ export const InventoryManagementPage = () => {
             </>
           )}
         </Card>
+        )}
       </div>
 
-      {/* ── Receipt Modal ── */}
-      <Modal
-        isOpen={showReceiptModal}
-        onClose={() => { setShowReceiptModal(false); setModalError(''); }}
-        title="📥 New Receipt"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Owner *</label>
-            <select
-              value={receiptForm.ownerId}
-              onChange={e => setReceiptForm(f => ({ ...f, ownerId: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-            >
-              <option value="">Select owner...</option>
-              {owners.map(o => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
-            </select>
-          </div>
-          <Input
-            label="Received Date" type="date" value={receiptForm.entryDate}
-            onChange={e => setReceiptForm(f => ({ ...f, entryDate: e.target.value }))} required
-          />
-          <Input
-            label="Quantity Received" type="number" min="1" value={receiptForm.quantity}
-            onChange={e => setReceiptForm(f => ({ ...f, quantity: e.target.value }))} placeholder="e.g. 100" required
-          />
-          <Input
-            label="Remarks (optional)" value={receiptForm.remarks}
-            onChange={e => setReceiptForm(f => ({ ...f, remarks: e.target.value }))}
-          />
-          {modalError && <p className="text-red-600 text-sm">{modalError}</p>}
-          <div className="flex gap-2 pt-2">
-            <Button className="flex-1" onClick={submitReceipt} isLoading={submitting}>Save Receipt</Button>
-            <Button variant="outline" className="flex-1" onClick={() => setShowReceiptModal(false)}>Cancel</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ── Return Modal ── */}
-      <Modal
-        isOpen={showReturnModal}
-        onClose={() => { setShowReturnModal(false); setModalError(''); }}
-        title="📤 New Return"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Owner *</label>
-            <select
-              value={returnForm.ownerId}
-              onChange={e => setReturnForm(f => ({ ...f, ownerId: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-            >
-              <option value="">Select owner...</option>
-              {ownersInventory
-                .filter(o => (o.sareesInHand ?? 0) > 0)
-                .map(o => (
-                  <option key={o.ownerId} value={String(o.ownerId)}>
-                    {o.ownerName} ({o.sareesInHand} in hand)
-                  </option>
-                ))}
-            </select>
-          </div>
-          {returnForm.ownerId && (() => {
-            const o = ownersInventory.find(x => x.ownerId === parseInt(returnForm.ownerId));
-            return o ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
-                <p className="text-amber-800">
-                  <strong>{o.sareesInHand}</strong> sarees currently in hand with {o.ownerName}
-                </p>
-              </div>
-            ) : null;
-          })()}
-          <Input
-            label="Return Date" type="date" value={returnForm.entryDate}
-            onChange={e => setReturnForm(f => ({ ...f, entryDate: e.target.value }))} required
-          />
-          <Input
-            label="Quantity to Return" type="number" min="1" value={returnForm.quantity}
-            onChange={e => setReturnForm(f => ({ ...f, quantity: e.target.value }))} placeholder="e.g. 50" required
-          />
-          <Input
-            label="Remarks (optional)" value={returnForm.remarks}
-            onChange={e => setReturnForm(f => ({ ...f, remarks: e.target.value }))}
-          />
-          {modalError && <p className="text-red-600 text-sm">{modalError}</p>}
-          <div className="flex gap-2 pt-2">
-            <Button className="flex-1" onClick={submitReturn} isLoading={submitting}>Save Return</Button>
-            <Button variant="outline" className="flex-1" onClick={() => setShowReturnModal(false)}>Cancel</Button>
-          </div>
-        </div>
-      </Modal>
     </MainLayout>
   );
 };
