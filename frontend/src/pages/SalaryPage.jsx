@@ -107,7 +107,13 @@ const AdminView = () => {
       await salaryService.create({
         employeeId: parseInt(employeeId, 10),
         fromDate, toDate, amountPaid: amt,
-        paymentDate, remarks: remarks || null,
+        paymentDate,
+        // Backend's PaymentMode enum requires one of CASH | UPI | BANK_TRANSFER
+        // and the column is NOT NULL. UI for mode is intentionally hidden — we
+        // send CASH silently as the default so validation passes without
+        // touching the live DB schema.
+        paymentMode: 'CASH',
+        remarks: remarks || null,
       });
       setShowPayModal(false);
       await fetchAll();

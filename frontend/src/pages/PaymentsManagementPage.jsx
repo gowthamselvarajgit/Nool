@@ -90,6 +90,11 @@ export const PaymentsManagementPage = () => {
       await ownerPaymentService.create({
         ownerId: parseInt(ownerId),
         amountPaid: amt,
+        // Backend's PaymentMode enum requires one of CASH | UPI | BANK_TRANSFER
+        // and the column is NOT NULL. UI for mode is intentionally hidden — we
+        // send CASH silently as the default so validation passes without
+        // touching the live DB schema.
+        paymentMode: 'CASH',
         paymentDate,
         remarks: remarks || null,
       });
