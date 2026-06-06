@@ -24,5 +24,13 @@ public class OwnerPaymentRequestDto {
     @NotNull(message = "Payment date is required")
     private LocalDate paymentDate;
 
+    /**
+     * Optional. Signed advance adjustment for this row.
+     *   Positive  → owner gave extra (workshop now holds an advance)
+     *   Negative  → admin is applying a previous advance to this bill
+     *   Null/0    → plain payment, no advance change
+     */
+    private Double advanceAmount;
+
     private String remarks;
 }

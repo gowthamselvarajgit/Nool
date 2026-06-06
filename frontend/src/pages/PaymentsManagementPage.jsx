@@ -24,7 +24,7 @@ export const PaymentsManagementPage = () => {
   // Pay modal
   const [showPayModal, setShowPayModal] = useState(false);
   const [payForm, setPayForm] = useState({
-    ownerId: '', amountPaid: '', paymentDate: today, remarks: '',
+    ownerId: '', amountPaid: '', paymentDate: today, advanceAmount: '', remarks: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -72,6 +72,7 @@ export const PaymentsManagementPage = () => {
       ownerId: o ? String(o.ownerId) : '',
       amountPaid: o ? String(Math.round(o.pendingAmount || 0)) : '',
       paymentDate: today,
+      advanceAmount: '',
       remarks: '',
     });
     setModalError('');
@@ -79,11 +80,14 @@ export const PaymentsManagementPage = () => {
   }
 
   async function submitPay() {
-    const { ownerId, amountPaid, paymentDate, remarks } = payForm;
+    const { ownerId, amountPaid, paymentDate, advanceAmount, remarks } = payForm;
     if (!ownerId) { setModalError('Please select an owner'); return; }
     const amt = parseFloat(amountPaid);
     if (!amt || amt <= 0) { setModalError('Amount must be greater than 0'); return; }
     if (!paymentDate) { setModalError('Please pick the payment date'); return; }
+    // advanceAmount is optional — blank = 0, otherwise parse as number (can be negative)
+    const adv = advanceAmount === '' || advanceAmount == null ? 0 : parseFloat(advanceAmount);
+    if (Number.isNaN(adv)) { setModalError('Extra amount must be a number'); return; }
     try {
       setSubmitting(true);
       setModalError('');
@@ -96,6 +100,8 @@ export const PaymentsManagementPage = () => {
         // touching the live DB schema.
         paymentMode: 'CASH',
         paymentDate,
+        // Signed advance: positive = owner gave extra, negative = applying previous advance.
+        advanceAmount: adv,
         remarks: remarks || null,
       });
       setShowPayModal(false);
@@ -236,6 +242,25 @@ export const PaymentsManagementPage = () => {
                         {settled ? '—' : inr(pending)}
                       </span>
                     </div>
+                    {/* Advance balance — shown only when non-zero */}
+                    {!!(s.advanceBalance && s.advanceBalance !== 0) && (
+                      <div className={`flex items-center justify-between py-2 px-3 rounded-lg border ${
+                        s.advanceBalance > 0
+                          ? 'bg-violet-50/70 border-violet-200'
+                          : 'bg-rose-50/70 border-rose-200'
+                      }`}>
+                        <span className={`text-xs font-bold ${
+                          s.advanceBalance > 0 ? 'text-violet-800' : 'text-rose-800'
+                        }`}>
+                          {s.advanceBalance > 0 ? 'Advance received' : 'Advance owed to owner'}
+                        </span>
+                        <span className={`text-sm font-bold ${
+                          s.advanceBalance > 0 ? 'text-violet-700' : 'text-rose-700'
+                        }`}>
+                          {inr(Math.abs(s.advanceBalance))}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2">
@@ -247,7 +272,6 @@ export const PaymentsManagementPage = () => {
                     </button>
                     <button
                       onClick={() => openPay(s)}
-                      disabled={pending <= 0}
                       className="flex-1 flex items-center justify-center gap-1 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors border border-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <IndianRupee className="w-4 h-4" /> Pay Now
@@ -308,6 +332,41 @@ export const PaymentsManagementPage = () => {
             ) : null;
           })()}
 
+          {/* ── Existing advance hint with one-tap apply ────────────────────── */}
+          {payForm.ownerId && (() => {
+            const o = summaries.find(s => String(s.ownerId) === payForm.ownerId);
+            const bal = o?.advanceBalance ?? 0;
+            if (!bal) return null;
+            const isPositive = bal > 0;
+            return (
+              <div className={`rounded-xl border p-3 ${isPositive ? 'bg-violet-50 border-violet-200' : 'bg-rose-50 border-rose-200'}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-sm">
+                    <p className={`font-bold ${isPositive ? 'text-violet-900' : 'text-rose-900'}`}>
+                      {isPositive
+                        ? `${inr(bal)} advance previously received from this owner`
+                        : `${inr(-bal)} advance previously owed back to this owner`}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${isPositive ? 'text-violet-700' : 'text-rose-700'}`}>
+                      Use it now (deduct from this bill) or leave it for a future payment.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPayForm(f => ({ ...f, advanceAmount: String(-bal) }))}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${
+                      isPositive
+                        ? 'bg-violet-600 text-white hover:bg-violet-700'
+                        : 'bg-rose-600 text-white hover:bg-rose-700'
+                    }`}
+                  >
+                    Apply {inr(Math.abs(bal))} now
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Amount to Pay (₹) *" type="number" min="1" value={payForm.amountPaid}
@@ -317,6 +376,20 @@ export const PaymentsManagementPage = () => {
               label="Payment Date *" type="date" value={payForm.paymentDate}
               onChange={e => setPayForm(f => ({ ...f, paymentDate: e.target.value }))} required
             />
+          </div>
+
+          {/* Optional extra amount / advance settlement field */}
+          <div>
+            <Input
+              label="Extra Amount / Advance (optional, ₹)"
+              type="number"
+              value={payForm.advanceAmount}
+              onChange={e => setPayForm(f => ({ ...f, advanceAmount: e.target.value }))}
+              placeholder="0"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Positive = owner gave extra now (saved as advance). Negative = applying a previous advance to this bill. Leave blank for a normal payment.
+            </p>
           </div>
 
           <Input
@@ -451,6 +524,7 @@ export const PaymentsManagementPage = () => {
                           <tr className="text-gray-600 text-xs font-semibold uppercase tracking-wider">
                             <th className="px-3 py-2 text-left">Date Paid</th>
                             <th className="px-3 py-2 text-right">Amount</th>
+                            <th className="px-3 py-2 text-right">Advance</th>
                             <th className="px-3 py-2 text-right">Paid So Far</th>
                             <th className="px-3 py-2 text-left">Notes</th>
                           </tr>
@@ -460,6 +534,13 @@ export const PaymentsManagementPage = () => {
                             <tr key={p.paymentId} className="hover:bg-gray-50">
                               <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">{formatDate(p.paymentDate)}</td>
                               <td className="px-3 py-2.5 text-right font-bold text-emerald-700">{inr(p.amountPaid)}</td>
+                              <td className={`px-3 py-2.5 text-right text-xs font-semibold ${
+                                !p.advanceAmount ? 'text-gray-300'
+                                  : p.advanceAmount > 0 ? 'text-violet-700'
+                                  : 'text-rose-700'
+                              }`}>
+                                {!p.advanceAmount ? '—' : (p.advanceAmount > 0 ? `+${inr(p.advanceAmount)}` : `−${inr(Math.abs(p.advanceAmount))}`)}
+                              </td>
                               <td className="px-3 py-2.5 text-right text-gray-700">{inr(p.cumulativePaid)}</td>
                               <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[180px] truncate" title={p.remarks || ''}>
                                 {p.remarks || '—'}

@@ -12,6 +12,7 @@ public class OwnerPaymentResponseDto {
     private Long ownerId;
     private String ownerName;
     private Double amountPaid;
+    private Double advanceAmount;   // signed advance change for this row (null = legacy 0)
     private String paymentMode;
     private LocalDate paymentDate;
     private String remarks;

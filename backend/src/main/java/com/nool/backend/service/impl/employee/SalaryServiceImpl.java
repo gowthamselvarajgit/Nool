@@ -47,6 +47,7 @@ public class SalaryServiceImpl implements SalaryService {
                 .fromDate(requestDto.getFromDate())
                 .toDate(requestDto.getToDate())
                 .amountPaid(requestDto.getAmountPaid())
+                .advanceAmount(requestDto.getAdvanceAmount())   // null OK — treated as 0
                 .paymentMode(requestDto.getPaymentMode()) // ✅ enum directly
                 .paymentDate(requestDto.getPaymentDate())
                 .remarks(requestDto.getRemarks())
@@ -59,6 +60,7 @@ public class SalaryServiceImpl implements SalaryService {
                 .employeeId(employee.getId())
                 .employeeName(employee.getName())
                 .amountPaid(saved.getAmountPaid())
+                .advanceAmount(saved.getAdvanceAmount())
                 .paymentMode(saved.getPaymentMode().name())
                 .paymentDate(saved.getPaymentDate())
                 .fromDate(saved.getFromDate())
@@ -94,6 +96,7 @@ public class SalaryServiceImpl implements SalaryService {
                         .employeeId(salaryPayment.getEmployee().getId())
                         .employeeName(salaryPayment.getEmployee().getName())
                         .amountPaid(salaryPayment.getAmountPaid())
+                        .advanceAmount(salaryPayment.getAdvanceAmount())
                         .paymentMode(salaryPayment.getPaymentMode().name())
                         .paymentDate(salaryPayment.getPaymentDate())
                         .fromDate(salaryPayment.getFromDate())
@@ -145,8 +148,15 @@ public class SalaryServiceImpl implements SalaryService {
                 );
         double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
 
-        // ✅ Pending salary must NEVER be negative
-        double pendingSalary = Math.max(totalEarnings - totalPaid, 0);
+        // Advance balance is ALL-TIME (not bound to date range) — it represents
+        // the worker's running advance against future earnings, not a per-period
+        // figure. Legacy rows with NULL advance count as 0.
+        Double totalAdvanceBoxed = salaryPaymentRepository.sumAdvanceByEmployee(employeeId);
+        double totalAdvance = totalAdvanceBoxed == null ? 0.0 : totalAdvanceBoxed;
+
+        // pending = earnings - (paid - advanceMovement). Legacy rows have
+        // advance=0, so this reduces to the original (earnings - paid).
+        double pendingSalary = Math.max(totalEarnings - (totalPaid - totalAdvance), 0);
 
         return SalarySummaryDto.builder()
                 .employeeId(employeeId)
@@ -154,6 +164,7 @@ public class SalaryServiceImpl implements SalaryService {
                 .totalEarnings(totalEarnings)
                 .totalSalaryPaid(totalPaid)
                 .pendingSalary(pendingSalary)
+                .advanceBalance(totalAdvance)
                 .build();
     }
 
@@ -201,19 +212,30 @@ public class SalaryServiceImpl implements SalaryService {
             paidByEmployee.put(empId, paid);
         }
 
+        // 3b) all-time advance balance per employee. NULL legacy rows coalesced to 0.
+        java.util.Map<Long, Double> advanceByEmployee = new java.util.HashMap<>();
+        for (Object[] row : salaryPaymentRepository.sumAdvanceByAllEmployees()) {
+            Long empId = (Long) row[0];
+            Double adv = ((Number) row[1]).doubleValue();
+            advanceByEmployee.put(empId, adv);
+        }
+
         // 4) build per-employee summaries
         List<SalarySummaryDto> result = new java.util.ArrayList<>(employees.size());
         for (Employee emp : employees) {
             long fresh = freshByEmployee.getOrDefault(emp.getId(), 0L);
             double earnings = fresh * emp.getPolishRate();
             double paid = paidByEmployee.getOrDefault(emp.getId(), 0.0);
-            double pending = Math.max(earnings - paid, 0);
+            double advance = advanceByEmployee.getOrDefault(emp.getId(), 0.0);
+            // Settled-salary = paid - advance. Pending = earnings - settled.
+            double pending = Math.max(earnings - (paid - advance), 0);
             result.add(SalarySummaryDto.builder()
                     .employeeId(emp.getId())
                     .employeeName(emp.getName())
                     .totalEarnings(earnings)
                     .totalSalaryPaid(paid)
                     .pendingSalary(pending)
+                    .advanceBalance(advance)
                     .build());
         }
         return result;

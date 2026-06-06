@@ -12,6 +12,7 @@ public class SalaryPaymentResponseDto {
     private Long employeeId;
     private String employeeName;
     private Double amountPaid;
+    private Double advanceAmount;   // signed advance change for this row (null = legacy 0)
     private String paymentMode;
     private LocalDate paymentDate;
     private LocalDate fromDate;

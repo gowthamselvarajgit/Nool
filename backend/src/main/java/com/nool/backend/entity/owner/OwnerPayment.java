@@ -27,6 +27,18 @@ public class OwnerPayment {
     @Column(name = "amount_received", nullable = false)
     private Double amountPaid;
 
+    /**
+     * Signed change to the owner's advance balance on this row.
+     *   Positive  → owner gave extra money (workshop holds advance from owner)
+     *   Negative  → admin is applying a previous advance to settle a new bill
+     *   Null / 0  → plain payment, no advance movement (default for legacy rows)
+     *
+     * Settled-bill amount for the row = amountPaid - advanceAmount
+     * Owner's running advance balance = SUM(COALESCE(advanceAmount, 0))
+     */
+    @Column(name = "advance_amount")
+    private Double advanceAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_mode", nullable = false)
     private PaymentMode paymentMode;

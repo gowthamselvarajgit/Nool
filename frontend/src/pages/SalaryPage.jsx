@@ -38,7 +38,7 @@ const AdminView = () => {
   const [showPayModal, setShowPayModal] = useState(false);
   const [payForm, setPayForm] = useState({
     employeeId: '', fromDate: firstOfMonth, toDate: today, amountPaid: '',
-    paymentDate: today, remarks: '',
+    paymentDate: today, advanceAmount: '', remarks: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -88,6 +88,7 @@ const AdminView = () => {
       toDate: today,
       amountPaid: emp ? String(Math.round(emp.pendingSalary || 0)) : '',
       paymentDate: today,
+      advanceAmount: '',
       remarks: '',
     });
     setModalError('');
@@ -95,12 +96,14 @@ const AdminView = () => {
   }
 
   async function submitPay() {
-    const { employeeId, fromDate, toDate, amountPaid, paymentDate, remarks } = payForm;
+    const { employeeId, fromDate, toDate, amountPaid, paymentDate, advanceAmount, remarks } = payForm;
     if (!employeeId) { setModalError('Please select an employee'); return; }
     if (!fromDate || !toDate) { setModalError('Please pick the period covered'); return; }
     const amt = parseFloat(amountPaid);
     if (!amt || amt <= 0) { setModalError('Amount must be greater than 0'); return; }
     if (!paymentDate) { setModalError('Please pick the payment date'); return; }
+    const adv = advanceAmount === '' || advanceAmount == null ? 0 : parseFloat(advanceAmount);
+    if (Number.isNaN(adv)) { setModalError('Extra amount must be a number'); return; }
     try {
       setSubmitting(true);
       setModalError('');
@@ -113,6 +116,8 @@ const AdminView = () => {
         // send CASH silently as the default so validation passes without
         // touching the live DB schema.
         paymentMode: 'CASH',
+        // Signed advance: positive = admin gave extra, negative = applying previous advance.
+        advanceAmount: adv,
         remarks: remarks || null,
       });
       setShowPayModal(false);
@@ -253,6 +258,24 @@ const AdminView = () => {
                         {settled ? '—' : inr(pending)}
                       </span>
                     </div>
+                    {!!(s.advanceBalance && s.advanceBalance !== 0) && (
+                      <div className={`flex items-center justify-between py-2 px-3 rounded-lg border ${
+                        s.advanceBalance > 0
+                          ? 'bg-violet-50/70 border-violet-200'
+                          : 'bg-rose-50/70 border-rose-200'
+                      }`}>
+                        <span className={`text-xs font-bold ${
+                          s.advanceBalance > 0 ? 'text-violet-800' : 'text-rose-800'
+                        }`}>
+                          {s.advanceBalance > 0 ? 'Advance given to worker' : 'Workshop owes worker'}
+                        </span>
+                        <span className={`text-sm font-bold ${
+                          s.advanceBalance > 0 ? 'text-violet-700' : 'text-rose-700'
+                        }`}>
+                          {inr(Math.abs(s.advanceBalance))}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2">
@@ -264,7 +287,6 @@ const AdminView = () => {
                     </button>
                     <button
                       onClick={() => openPay(s)}
-                      disabled={pending <= 0}
                       className="flex-1 flex items-center justify-center gap-1 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors border border-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <IndianRupee className="w-4 h-4" /> Pay Now
@@ -336,6 +358,41 @@ const AdminView = () => {
             />
           </div>
 
+          {/* ── Existing advance hint with one-tap apply ────────────────── */}
+          {payForm.employeeId && (() => {
+            const emp = summaries.find(s => String(s.employeeId) === payForm.employeeId);
+            const bal = emp?.advanceBalance ?? 0;
+            if (!bal) return null;
+            const isPositive = bal > 0;
+            return (
+              <div className={`rounded-xl border p-3 ${isPositive ? 'bg-violet-50 border-violet-200' : 'bg-rose-50 border-rose-200'}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-sm">
+                    <p className={`font-bold ${isPositive ? 'text-violet-900' : 'text-rose-900'}`}>
+                      {isPositive
+                        ? `${inr(bal)} advance previously given to this worker`
+                        : `${inr(-bal)} previously over-settled — workshop owes worker`}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${isPositive ? 'text-violet-700' : 'text-rose-700'}`}>
+                      Deduct it now (from this payout) or leave it for a future salary.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPayForm(f => ({ ...f, advanceAmount: String(-bal) }))}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap ${
+                      isPositive
+                        ? 'bg-violet-600 text-white hover:bg-violet-700'
+                        : 'bg-rose-600 text-white hover:bg-rose-700'
+                    }`}
+                  >
+                    Apply {inr(Math.abs(bal))} now
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Amount to Pay (₹) *" type="number" min="1" value={payForm.amountPaid}
@@ -345,6 +402,19 @@ const AdminView = () => {
               label="Payment Date *" type="date" value={payForm.paymentDate}
               onChange={e => setPayForm(f => ({ ...f, paymentDate: e.target.value }))} required
             />
+          </div>
+
+          <div>
+            <Input
+              label="Extra Amount / Advance (optional, ₹)"
+              type="number"
+              value={payForm.advanceAmount}
+              onChange={e => setPayForm(f => ({ ...f, advanceAmount: e.target.value }))}
+              placeholder="0"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Positive = giving worker extra now (saved as advance). Negative = applying a previous advance to this payout. Leave blank for a normal payment.
+            </p>
           </div>
 
           <Input
@@ -486,6 +556,7 @@ const AdminView = () => {
                             <th className="px-3 py-2 text-left">Date Paid</th>
                             <th className="px-3 py-2 text-right">Amount</th>
                             <th className="px-3 py-2 text-left">For Period</th>
+                            <th className="px-3 py-2 text-right">Advance</th>
                             <th className="px-3 py-2 text-right">Paid So Far</th>
                             <th className="px-3 py-2 text-left">Notes</th>
                           </tr>
@@ -497,6 +568,13 @@ const AdminView = () => {
                               <td className="px-3 py-2.5 text-right font-bold text-emerald-700">{inr(p.amountPaid)}</td>
                               <td className="px-3 py-2.5 text-gray-600 text-xs">
                                 {p.fromDate ? formatDate(p.fromDate) : '—'} → {p.toDate ? formatDate(p.toDate) : '—'}
+                              </td>
+                              <td className={`px-3 py-2.5 text-right text-xs font-semibold ${
+                                !p.advanceAmount ? 'text-gray-300'
+                                  : p.advanceAmount > 0 ? 'text-violet-700'
+                                  : 'text-rose-700'
+                              }`}>
+                                {!p.advanceAmount ? '—' : (p.advanceAmount > 0 ? `+${inr(p.advanceAmount)}` : `−${inr(Math.abs(p.advanceAmount))}`)}
                               </td>
                               <td className="px-3 py-2.5 text-right text-gray-700">{inr(p.cumulativePaid)}</td>
                               <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[180px] truncate" title={p.remarks || ''}>
@@ -676,6 +754,7 @@ const WorkerView = () => {
                     <th className="px-4 py-3 text-left">Date Paid</th>
                     <th className="px-4 py-3 text-right">Amount</th>
                     <th className="px-4 py-3 text-left">For Period</th>
+                    <th className="px-4 py-3 text-right">Advance</th>
                     <th className="px-4 py-3 text-right">Paid So Far</th>
                     <th className="px-4 py-3 text-left">Notes</th>
                   </tr>
@@ -687,6 +766,13 @@ const WorkerView = () => {
                       <td className="px-4 py-3 text-right font-bold text-emerald-700">{inr(p.amountPaid)}</td>
                       <td className="px-4 py-3 text-gray-600 text-xs">
                         {p.fromDate ? formatDate(p.fromDate) : '—'} → {p.toDate ? formatDate(p.toDate) : '—'}
+                      </td>
+                      <td className={`px-4 py-3 text-right text-xs font-semibold ${
+                        !p.advanceAmount ? 'text-gray-300'
+                          : p.advanceAmount > 0 ? 'text-violet-700'
+                          : 'text-rose-700'
+                      }`}>
+                        {!p.advanceAmount ? '—' : (p.advanceAmount > 0 ? `+${inr(p.advanceAmount)}` : `−${inr(Math.abs(p.advanceAmount))}`)}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-700">{inr(p.cumulativePaid)}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate" title={p.remarks || ''}>

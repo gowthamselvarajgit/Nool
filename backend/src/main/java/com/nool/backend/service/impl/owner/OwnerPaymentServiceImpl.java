@@ -49,6 +49,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
         OwnerPayment payment = OwnerPayment.builder()
                 .owner(owner)
                 .amountPaid(requestDto.getAmountPaid())
+                .advanceAmount(requestDto.getAdvanceAmount())   // null OK — treated as 0
                 .paymentMode(requestDto.getPaymentMode()) // ✅ enum directly (NO valueOf)
                 .paymentDate(requestDto.getPaymentDate())
                 .remarks(requestDto.getRemarks())
@@ -61,6 +62,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                 .ownerId(owner.getId())
                 .ownerName(owner.getOwnerName())
                 .amountPaid(saved.getAmountPaid())
+                .advanceAmount(saved.getAdvanceAmount())
                 .paymentMode(saved.getPaymentMode().name())
                 .paymentDate(saved.getPaymentDate())
                 .remarks(saved.getRemarks())
@@ -93,6 +95,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                         .ownerId(p.getOwner().getId())
                         .ownerName(p.getOwner().getOwnerName())
                         .amountPaid(p.getAmountPaid())
+                        .advanceAmount(p.getAdvanceAmount())
                         .paymentMode(p.getPaymentMode().name())
                         .paymentDate(p.getPaymentDate())
                         .remarks(p.getRemarks())
@@ -132,14 +135,18 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
         Double totalPaidBoxed = ownerPaymentRepository.sumTotalAmountPaidByOwner(ownerId);
         double totalPaid = totalPaidBoxed == null ? 0.0 : totalPaidBoxed;
 
+        Double totalAdvanceBoxed = ownerPaymentRepository.sumAdvanceByOwner(ownerId);
+        double totalAdvance = totalAdvanceBoxed == null ? 0.0 : totalAdvanceBoxed;
+
         // Owner-configured rate; fall back to global config if unset OR 0
         // (legacy rows can land with rate=0 because the column was added later).
         Double ownerRate = owner.getPolishRatePerSaree();
         double rate = (ownerRate != null && ownerRate > 0) ? ownerRate : ratePerSaree;
         double totalPayable = totalReturned * rate;
 
-        // ✅ NEVER allow negative pending
-        double pendingAmount = Math.max(totalPayable - totalPaid, 0);
+        // pending = bills - (cash - advanceMovement). Legacy rows have advance=0,
+        // so this reduces to the original (totalPayable - totalPaid) for them.
+        double pendingAmount = Math.max(totalPayable - (totalPaid - totalAdvance), 0);
 
         return OwnerPaymentSummaryDto.builder()
                 .ownerId(ownerId)
@@ -147,6 +154,7 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
                 .totalAmountPayable(totalPayable)
                 .totalAmountPaid(totalPaid)
                 .pendingAmount(pendingAmount)
+                .advanceBalance(totalAdvance)
                 .build();
     }
 
@@ -201,6 +209,15 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
             paidByOwner.put(ownerId, paid);
         }
 
+        // 3b) all-time advance balance per owner. NULL legacy rows are coalesced
+        //     to 0 inside the query, so the empty map default also stays 0.
+        java.util.Map<Long, Double> advanceByOwner = new java.util.HashMap<>();
+        for (Object[] row : ownerPaymentRepository.sumAdvanceByAllOwners()) {
+            Long ownerId = (Long) row[0];
+            Double adv = ((Number) row[1]).doubleValue();
+            advanceByOwner.put(ownerId, adv);
+        }
+
         // 4) build per-owner summaries
         List<OwnerPaymentSummaryDto> result = new java.util.ArrayList<>(owners.size());
         for (SareeOwner owner : owners) {
@@ -213,13 +230,16 @@ public class OwnerPaymentServiceImpl implements OwnerPaymentService {
             double rate = (ownerRate != null && ownerRate > 0) ? ownerRate : ratePerSaree;
             double payable = returned * rate;
             double paid = paidByOwner.getOrDefault(owner.getId(), 0.0);
-            double pending = Math.max(payable - paid, 0);
+            double advance = advanceByOwner.getOrDefault(owner.getId(), 0.0);
+            // Settled-bill amount = paid - advance. Pending = bills - settled.
+            double pending = Math.max(payable - (paid - advance), 0);
             result.add(OwnerPaymentSummaryDto.builder()
                     .ownerId(owner.getId())
                     .ownerName(owner.getOwnerName())
                     .totalAmountPayable(payable)
                     .totalAmountPaid(paid)
                     .pendingAmount(pending)
+                    .advanceBalance(advance)
                     .build());
         }
         return result;

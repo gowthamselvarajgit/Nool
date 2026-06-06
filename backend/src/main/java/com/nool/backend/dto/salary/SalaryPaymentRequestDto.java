@@ -29,5 +29,13 @@ public class SalaryPaymentRequestDto {
     @NotNull(message = "Payment mode is required")
     private PaymentMode paymentMode;
 
+    /**
+     * Optional. Signed advance adjustment for this row.
+     *   Positive  → admin gave the worker extra (worker owes future earnings)
+     *   Negative  → admin is settling a previous advance from this payout
+     *   Null/0    → plain salary payment, no advance change
+     */
+    private Double advanceAmount;
+
     private String remarks;
 }

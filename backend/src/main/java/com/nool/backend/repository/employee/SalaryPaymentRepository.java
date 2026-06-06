@@ -65,4 +65,20 @@ public interface SalaryPaymentRepository extends JpaRepository<SalaryPayment, Lo
            GROUP BY s.employee.id
            """)
     List<Object[]> sumPaidByAllEmployees();
+
+    /** Net advance balance for one employee. COALESCE handles legacy NULL rows as 0. */
+    @Query("""
+           SELECT COALESCE(SUM(COALESCE(s.advanceAmount, 0)), 0)
+           FROM SalaryPayment s
+           WHERE s.employee.id = :employeeId
+           """)
+    Double sumAdvanceByEmployee(Long employeeId);
+
+    /** Net advance balance per employee across the whole table. */
+    @Query("""
+           SELECT s.employee.id, COALESCE(SUM(COALESCE(s.advanceAmount, 0)), 0)
+           FROM SalaryPayment s
+           GROUP BY s.employee.id
+           """)
+    List<Object[]> sumAdvanceByAllEmployees();
 }

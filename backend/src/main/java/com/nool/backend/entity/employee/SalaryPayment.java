@@ -30,6 +30,18 @@ public class SalaryPayment {
     @Column(name = "amount_paid", nullable = false)
     private Double amountPaid;
 
+    /**
+     * Signed change to the worker's advance balance on this row.
+     *   Positive  → admin gave the worker extra money (worker owes future earnings)
+     *   Negative  → admin is settling a previous advance from this payout
+     *   Null / 0  → plain salary payment (default for legacy rows)
+     *
+     * Settled-salary amount for the row = amountPaid - advanceAmount
+     * Worker's running advance balance = SUM(COALESCE(advanceAmount, 0))
+     */
+    @Column(name = "advance_amount")
+    private Double advanceAmount;
+
     @Column(name = "payment_date", nullable = false)
     private LocalDate paymentDate;
 

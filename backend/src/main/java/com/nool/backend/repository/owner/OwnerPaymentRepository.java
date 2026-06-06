@@ -20,6 +20,18 @@ public interface OwnerPaymentRepository extends JpaRepository<OwnerPayment, Long
     @Query("SELECT COALESCE(SUM(p.amountPaid), 0) FROM OwnerPayment p WHERE p.owner.id = :ownerId")
     Double sumTotalAmountPaidByOwner(Long ownerId);
 
+    /** Net advance balance for one owner. COALESCE handles legacy NULL rows as 0. */
+    @Query("SELECT COALESCE(SUM(COALESCE(p.advanceAmount, 0)), 0) FROM OwnerPayment p WHERE p.owner.id = :ownerId")
+    Double sumAdvanceByOwner(Long ownerId);
+
+    /** Net advance balance per owner across the whole table. */
+    @Query("""
+           SELECT p.owner.id, COALESCE(SUM(COALESCE(p.advanceAmount, 0)), 0)
+           FROM OwnerPayment p
+           GROUP BY p.owner.id
+           """)
+    List<Object[]> sumAdvanceByAllOwners();
+
     @Query("""
            SELECT COALESCE(SUM(p.amountPaid), 0)
            FROM OwnerPayment p
